@@ -12,11 +12,13 @@ import time
 from typing import TypeAlias
 
 from .config import ScannerConfig
+from .banned_substring_catalog import BannedSubstringCatalog
 from .engine import Scanner
 from .findings import Action, Finding, Severity, Span
 from .inspection import ScanScope
 from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult
 from .rules.secrets import SecretsRule
+from .rules.banned_substrings import BannedSubstringsRule
 from .rules.invisible_characters import InvisibleCharactersRule
 from .secret_catalog import BUILTIN_SECRET_CATALOG, SecretCatalog
 
@@ -113,14 +115,17 @@ _WORKER_SCANNER: Scanner | None = None
 def _initialize_worker(
     scanner_config: ScannerConfig,
     secret_catalog: SecretCatalog | None,
+    banned_substring_catalog: BannedSubstringCatalog | None,
 ) -> None:
     global _WORKER_SCANNER
-    if secret_catalog is None:
+    if secret_catalog is None and banned_substring_catalog is None:
         _WORKER_SCANNER = Scanner(config=scanner_config)
     else:
-        rules = [SecretsRule(secret_catalog)]
+        rules = [SecretsRule(secret_catalog or BUILTIN_SECRET_CATALOG)]
         if scanner_config.enable_invisible_characters:
             rules.append(InvisibleCharactersRule())
+        if banned_substring_catalog is not None:
+            rules.append(BannedSubstringsRule(banned_substring_catalog))
         _WORKER_SCANNER = Scanner(
             rules=rules,
             config=scanner_config,
@@ -192,6 +197,7 @@ class ProcessScannerPool:
         scanner_config: ScannerConfig | None = None,
         pool_config: ProcessScannerPoolConfig | None = None,
         secret_catalog: SecretCatalog | None = None,
+        banned_substring_catalog: BannedSubstringCatalog | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
     ) -> None:
         if scanner_config is not None and not isinstance(scanner_config, ScannerConfig):
@@ -206,6 +212,13 @@ class ProcessScannerPool:
             secret_catalog, SecretCatalog
         ):
             raise TypeError("secret_catalog must be a SecretCatalog or None")
+        if banned_substring_catalog is not None and not isinstance(
+            banned_substring_catalog, BannedSubstringCatalog
+        ):
+            raise TypeError(
+                "banned_substring_catalog must be a "
+                "BannedSubstringCatalog or None"
+            )
         if not isinstance(policy, FirewallPolicy):
             raise TypeError("policy must be a FirewallPolicy")
         resolved_scanner_config = scanner_config or ScannerConfig()
@@ -218,16 +231,26 @@ class ProcessScannerPool:
                         if resolved_scanner_config.enable_invisible_characters
                         else ()
                     ),
+                    *(
+                        ("content.banned_substrings",)
+                        if banned_substring_catalog is not None
+                        else ()
+                    ),
                 )
             ),
             supported_rule_ids=frozenset(
-                ("secrets.detected", "unicode.invisible_characters")
+                (
+                    "content.banned_substrings",
+                    "secrets.detected",
+                    "unicode.invisible_characters",
+                )
             ),
         )
         self._scanner_config = resolved_scanner_config
         self._pool_config = pool_config or ProcessScannerPoolConfig()
         self._configured_secret_catalog = secret_catalog
         self._secret_catalog = secret_catalog or BUILTIN_SECRET_CATALOG
+        self._banned_substring_catalog = banned_substring_catalog
         self._policy = policy
         self._state = ProcessPoolState.NEW
         self._state_lock = Lock()
@@ -256,6 +279,10 @@ class ProcessScannerPool:
     def secret_catalog(self) -> SecretCatalog:
         return self._secret_catalog
 
+    @property
+    def banned_substring_catalog(self) -> BannedSubstringCatalog | None:
+        return self._banned_substring_catalog
+
     def start(self) -> "ProcessScannerPool":
         """Start workers eagerly and fail before accepting traffic if startup fails."""
 
@@ -275,6 +302,7 @@ class ProcessScannerPool:
                     initargs=(
                         self._scanner_config,
                         self._configured_secret_catalog,
+                        self._banned_substring_catalog,
                     ),
                     max_tasks_per_child=self._pool_config.max_tasks_per_child,
                 )

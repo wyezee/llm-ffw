@@ -5,6 +5,7 @@ from enum import Enum
 from threading import Condition, Lock
 
 from .capabilities import FirewallCapabilities
+from .banned_substring_catalog import BannedSubstringCatalog
 from .config import ScannerConfig
 from .facade import FirewallUnavailableError, LLMFirewall
 from .policy import BALANCED_POLICY, FirewallPolicy
@@ -53,6 +54,7 @@ class LLMFirewallManager:
         pool_config: ProcessScannerPoolConfig | None = None,
         additional_secret_catalog: SecretCatalog | None = None,
         replacement_secret_catalog: SecretCatalog | None = None,
+        banned_substring_catalog: BannedSubstringCatalog | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
         request_timeout_seconds: float | None = 5.0,
     ) -> None:
@@ -60,6 +62,7 @@ class LLMFirewallManager:
         self._pool_config = pool_config
         self._policy = policy
         self._request_timeout_seconds = request_timeout_seconds
+        self._banned_substring_catalog = banned_substring_catalog
         initial = self._build_firewall(
             additional_secret_catalog=additional_secret_catalog,
             replacement_secret_catalog=replacement_secret_catalog,
@@ -82,6 +85,7 @@ class LLMFirewallManager:
             pool_config=self._pool_config,
             additional_secret_catalog=additional_secret_catalog,
             replacement_secret_catalog=replacement_secret_catalog,
+            banned_substring_catalog=self._banned_substring_catalog,
             policy=self._policy,
             request_timeout_seconds=self._request_timeout_seconds,
         )

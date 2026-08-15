@@ -97,6 +97,13 @@ override it. Other format, joining, bidi, private-use, and unassigned
 characters are not removed. See
 [`docs/invisible-characters.md`](docs/invisible-characters.md).
 
+## Deployment-defined banned substrings
+
+An optional immutable `BannedSubstringCatalog` provides constrained substring
+or ASCII-word matching for input and output. It defaults to redaction and never
+accepts caller regex. See
+[`docs/banned-substrings.md`](docs/banned-substrings.md).
+
 ## Supported secret signatures
 
 Built-in catalog `3.0.0` has 28 constrained signatures and 47 prefixes for

@@ -1,9 +1,15 @@
 """Deterministic scanning for text sent to and from language models."""
 
 from .capabilities import (
+    BannedSubstringCatalogCapability,
     FirewallCapabilities,
     RuleCapability,
     SecretCatalogCapability,
+)
+from .banned_substring_catalog import (
+    BannedSubstring,
+    BannedSubstringCatalog,
+    LiteralMatchMode,
 )
 from .config import ScannerConfig
 from .engine import Scanner
@@ -43,11 +49,16 @@ from .secret_catalog import (
     SignatureStatus,
 )
 from .rules.invisible_characters import InvisibleCharactersRule
+from .rules.banned_substrings import BannedSubstringsRule
 
 __all__ = [
     "Action",
     "AUDIT_POLICY",
     "BALANCED_POLICY",
+    "BannedSubstring",
+    "BannedSubstringCatalog",
+    "BannedSubstringCatalogCapability",
+    "BannedSubstringsRule",
     "BUILTIN_SECRET_CATALOG",
     "ContentBlockedError",
     "Finding",
@@ -64,6 +75,7 @@ __all__ = [
     "InvisibleCharactersRule",
     "LLMFirewall",
     "LLMFirewallManager",
+    "LiteralMatchMode",
     "ProcessPoolNotRunningError",
     "ProcessPoolSaturatedError",
     "ProcessPoolState",

@@ -4,10 +4,12 @@ from concurrent.futures.process import BrokenProcessPool
 import math
 
 from .capabilities import (
+    BannedSubstringCatalogCapability,
     FirewallCapabilities,
     RuleCapability,
     SecretCatalogCapability,
 )
+from .banned_substring_catalog import BannedSubstringCatalog
 from .config import ScannerConfig
 from .findings import Finding
 from .inspection import ScanScope
@@ -20,6 +22,7 @@ from .process_pool import (
     ProcessScannerPoolConfig,
 )
 from .rules.secrets import SecretsRule
+from .rules.banned_substrings import BannedSubstringsRule
 from .rules.invisible_characters import InvisibleCharactersRule
 from .secret_catalog import (
     BUILTIN_SECRET_CATALOG,
@@ -120,6 +123,7 @@ class LLMFirewall:
         pool_config: ProcessScannerPoolConfig | None = None,
         additional_secret_catalog: SecretCatalog | None = None,
         replacement_secret_catalog: SecretCatalog | None = None,
+        banned_substring_catalog: BannedSubstringCatalog | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
         request_timeout_seconds: float | None = 5.0,
     ) -> None:
@@ -136,6 +140,7 @@ class LLMFirewall:
             secret_catalog=(
                 None if catalog is BUILTIN_SECRET_CATALOG else catalog
             ),
+            banned_substring_catalog=banned_substring_catalog,
             policy=policy,
         )
         catalog = self._pool.secret_catalog
@@ -154,6 +159,15 @@ class LLMFirewall:
                     scopes=tuple(InvisibleCharactersRule.SCOPES),
                 )
             )
+        literal_catalog = self._pool.banned_substring_catalog
+        if literal_catalog is not None:
+            rule_capabilities.append(
+                RuleCapability(
+                    rule_id=BannedSubstringsRule.RULE_ID,
+                    purpose=BannedSubstringsRule.PURPOSE,
+                    scopes=tuple(literal_catalog.scopes),
+                )
+            )
         self._capabilities = FirewallCapabilities(
             rules=tuple(rule_capabilities),
             secret_catalog=SecretCatalogCapability(
@@ -169,6 +183,15 @@ class LLMFirewall:
             ),
             policy_id=self._pool.policy.policy_id,
             policy_version=self._pool.policy.version,
+            banned_substring_catalog=(
+                BannedSubstringCatalogCapability(
+                    catalog_id=literal_catalog.catalog_id,
+                    version=literal_catalog.version,
+                    pattern_count=len(literal_catalog.patterns),
+                )
+                if literal_catalog is not None
+                else None
+            ),
         )
 
     @property

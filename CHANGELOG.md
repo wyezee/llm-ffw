@@ -6,6 +6,10 @@ All notable changes are recorded here before a tagged release.
 
 ### Added
 
+- Optional `BannedSubstringsRule` with versioned caller-owned literal catalogs,
+  prefix-factored matching, bounded findings, process propagation, and safe
+  capability summaries.
+
 - Opt-in `InvisibleCharactersRule` with contextual U+200B removal, bounded
   findings, compact original-span mapping, and one remove-then-rescan pass.
 - Explicit `REMOVE` policy action and focused clean/dirty/process performance

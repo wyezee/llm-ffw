@@ -65,6 +65,25 @@ class SecretCatalogCapability:
 
 
 @dataclass(frozen=True, slots=True)
+class BannedSubstringCatalogCapability:
+    """Disclosure-safe literal catalog coordinates and count."""
+
+    catalog_id: str
+    version: str
+    pattern_count: int
+
+    def __post_init__(self) -> None:
+        _non_empty(self.catalog_id, "catalog_id")
+        _non_empty(self.version, "version")
+        if (
+            isinstance(self.pattern_count, bool)
+            or not isinstance(self.pattern_count, int)
+            or self.pattern_count <= 0
+        ):
+            raise ValueError("pattern_count must be a positive integer")
+
+
+@dataclass(frozen=True, slots=True)
 class FirewallCapabilities:
     """Safe summary of the rules, catalog, and policy pinned to one facade."""
 
@@ -72,6 +91,7 @@ class FirewallCapabilities:
     secret_catalog: SecretCatalogCapability
     policy_id: str
     policy_version: str
+    banned_substring_catalog: BannedSubstringCatalogCapability | None = None
 
     def __post_init__(self) -> None:
         try:
@@ -86,6 +106,14 @@ class FirewallCapabilities:
             raise TypeError("secret_catalog must be a SecretCatalogCapability")
         _non_empty(self.policy_id, "policy_id")
         _non_empty(self.policy_version, "policy_version")
+        if self.banned_substring_catalog is not None and not isinstance(
+            self.banned_substring_catalog,
+            BannedSubstringCatalogCapability,
+        ):
+            raise TypeError(
+                "banned_substring_catalog must be a "
+                "BannedSubstringCatalogCapability or None"
+            )
         object.__setattr__(
             self,
             "rules",
@@ -98,6 +126,7 @@ class FirewallCapabilities:
 
 
 __all__ = [
+    "BannedSubstringCatalogCapability",
     "FirewallCapabilities",
     "RuleCapability",
     "SecretCatalogCapability",
