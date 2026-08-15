@@ -120,6 +120,23 @@ configured resource-limit violations block by default. The rule does not
 extract JSON from Markdown or repair malformed output. See
 [`docs/json-output.md`](docs/json-output.md).
 
+## Opt-in unsafe URL inspection
+
+Applications that pass model-produced URLs to users or downstream tools can
+enable bounded structural URL inspection:
+
+```python
+from llm_ffw import LLMFirewall, UnsafeURLConfig
+
+firewall = LLMFirewall(unsafe_url_config=UnsafeURLConfig())
+```
+
+`UnsafeURLRule` redacts dangerous schemes, embedded URL user-info, local or
+non-public IP targets, and ambiguous authorities under balanced policy. It
+checks input and output by default; deployments can restrict its `scopes`.
+It performs no DNS, HTTP, reputation, model, or other network call. See
+[`docs/unsafe-urls.md`](docs/unsafe-urls.md).
+
 ## Supported secret signatures
 
 Built-in catalog `3.0.0` has 28 constrained signatures and 47 prefixes for

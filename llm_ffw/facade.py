@@ -9,12 +9,14 @@ from .capabilities import (
     JSONOutputCapability,
     RuleCapability,
     SecretCatalogCapability,
+    UnsafeURLCapability,
 )
 from .banned_substring_catalog import BannedSubstringCatalog
 from .config import ScannerConfig
 from .findings import Finding
 from .inspection import ScanScope
 from .json_output import JSONOutputConfig
+from .unsafe_url import UnsafeURLConfig
 from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult
 from .process_pool import (
     ProcessPoolNotRunningError,
@@ -27,6 +29,7 @@ from .rules.secrets import SecretsRule
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.json_output import JSONOutputRule
+from .rules.unsafe_url import UnsafeURLRule
 from .secret_catalog import (
     BUILTIN_SECRET_CATALOG,
     SecretCatalog,
@@ -128,6 +131,7 @@ class LLMFirewall:
         replacement_secret_catalog: SecretCatalog | None = None,
         banned_substring_catalog: BannedSubstringCatalog | None = None,
         json_output_config: JSONOutputConfig | None = None,
+        unsafe_url_config: UnsafeURLConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
         request_timeout_seconds: float | None = 5.0,
     ) -> None:
@@ -146,6 +150,7 @@ class LLMFirewall:
             ),
             banned_substring_catalog=banned_substring_catalog,
             json_output_config=json_output_config,
+            unsafe_url_config=unsafe_url_config,
             policy=policy,
         )
         catalog = self._pool.secret_catalog
@@ -179,6 +184,14 @@ class LLMFirewall:
                     rule_id=JSONOutputRule.RULE_ID,
                     purpose=JSONOutputRule.PURPOSE,
                     scopes=tuple(JSONOutputRule.SCOPES),
+                )
+            )
+        if self._pool.unsafe_url_config is not None:
+            rule_capabilities.append(
+                RuleCapability(
+                    rule_id=UnsafeURLRule.RULE_ID,
+                    purpose=UnsafeURLRule.PURPOSE,
+                    scopes=tuple(self._pool.unsafe_url_config.scopes),
                 )
             )
         self._capabilities = FirewallCapabilities(
@@ -222,6 +235,16 @@ class LLMFirewall:
                     ),
                 )
                 if self._pool.json_output_config is not None
+                else None
+            ),
+            unsafe_url=(
+                UnsafeURLCapability(
+                    max_candidates=(
+                        self._pool.unsafe_url_config.max_candidates
+                    ),
+                    max_url_chars=self._pool.unsafe_url_config.max_url_chars,
+                )
+                if self._pool.unsafe_url_config is not None
                 else None
             ),
         )

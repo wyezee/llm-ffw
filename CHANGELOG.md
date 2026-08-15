@@ -6,6 +6,14 @@ All notable changes are recorded here before a tagged release.
 
 ### Added
 
+- Opt-in input/output `UnsafeURLRule` with configurable scopes and bounded
+  structural parsing for dangerous schemes, embedded authority credentials,
+  local targets, and ambiguous authorities; no DNS, HTTP, model, or reputation
+  calls.
+- Built-in policy profiles `1.3.0` redact unsafe URLs under balanced policy,
+  block them under strict policy, and report them under audit policy.
+- Cross-platform 8 MB unsafe-URL clean, adversarial, redaction, memory, and
+  concurrent process-pool release gates.
 - Opt-in `JSONOutputRule` for strict complete-document validation with bounded
   depth and structure, safe failure metadata, process propagation, and
   conditional post-policy validation after transformations.

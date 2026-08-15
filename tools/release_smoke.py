@@ -13,7 +13,14 @@ EXPECTED_VERSION = "0.1.0"
 SMOKE_CODE = """
 from importlib.metadata import files, metadata, version
 from inspect import signature
-from llm_ffw import Action, Firewall, LLMFirewall, LLMFirewallManager, ScanScope
+from llm_ffw import (
+    Action,
+    Firewall,
+    LLMFirewall,
+    LLMFirewallManager,
+    ScanScope,
+    UnsafeURLConfig,
+)
 
 assert version("llm-ffw") == "0.1.0"
 assert metadata("llm-ffw").get_all("Requires-Dist") is None
@@ -32,6 +39,13 @@ assert "https://" not in repr(capabilities)
 manager = LLMFirewallManager()
 assert manager.capabilities() == capabilities
 manager.close()
+url_firewall = LLMFirewall(unsafe_url_config=UnsafeURLConfig())
+assert url_firewall.capabilities().unsafe_url.max_candidates == 128
+assert any(
+    rule.rule_id == "url.unsafe"
+    for rule in url_firewall.capabilities().rules
+)
+url_firewall.close()
 synthetic = "sk-" + "A" * 20
 result = Firewall().process(synthetic, scope=ScanScope.INPUT)
 assert result.decision is Action.REDACT

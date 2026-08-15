@@ -108,6 +108,20 @@ class JSONOutputCapability:
 
 
 @dataclass(frozen=True, slots=True)
+class UnsafeURLCapability:
+    """Disclosure-safe URL inspection limits pinned to the facade."""
+
+    max_candidates: int
+    max_url_chars: int
+
+    def __post_init__(self) -> None:
+        for field_name in ("max_candidates", "max_url_chars"):
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{field_name} must be a positive integer")
+
+
+@dataclass(frozen=True, slots=True)
 class FirewallCapabilities:
     """Safe summary of the rules, catalog, and policy pinned to one facade."""
 
@@ -117,6 +131,7 @@ class FirewallCapabilities:
     policy_version: str
     banned_substring_catalog: BannedSubstringCatalogCapability | None = None
     json_output: JSONOutputCapability | None = None
+    unsafe_url: UnsafeURLCapability | None = None
 
     def __post_init__(self) -> None:
         try:
@@ -145,6 +160,10 @@ class FirewallCapabilities:
             raise TypeError(
                 "json_output must be a JSONOutputCapability or None"
             )
+        if self.unsafe_url is not None and not isinstance(
+            self.unsafe_url, UnsafeURLCapability
+        ):
+            raise TypeError("unsafe_url must be an UnsafeURLCapability or None")
         object.__setattr__(
             self,
             "rules",
@@ -162,4 +181,5 @@ __all__ = [
     "JSONOutputCapability",
     "RuleCapability",
     "SecretCatalogCapability",
+    "UnsafeURLCapability",
 ]

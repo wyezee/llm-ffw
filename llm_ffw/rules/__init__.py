@@ -5,6 +5,7 @@ from .banned_substrings import BannedSubstringsRule
 from .invisible_characters import InvisibleCharactersRule
 from .json_output import JSONOutputRule
 from .secrets import SecretsRule
+from .unsafe_url import UnsafeURLRule
 
 __all__ = [
     "BannedSubstringsRule",
@@ -13,4 +14,5 @@ __all__ = [
     "Rule",
     "RuleMatch",
     "SecretsRule",
+    "UnsafeURLRule",
 ]

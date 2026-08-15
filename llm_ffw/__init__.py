@@ -6,6 +6,7 @@ from .capabilities import (
     JSONOutputCapability,
     RuleCapability,
     SecretCatalogCapability,
+    UnsafeURLCapability,
 )
 from .banned_substring_catalog import (
     BannedSubstring,
@@ -23,6 +24,7 @@ from .inspection import (
     ScanScope,
 )
 from .json_output import JSONOutputConfig
+from .unsafe_url import UnsafeURLConfig
 from .manager import (
     FirewallManagerState,
     FirewallReloadError,
@@ -53,6 +55,7 @@ from .secret_catalog import (
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.json_output import JSONOutputRule
+from .rules.unsafe_url import UnsafeURLRule
 
 __all__ = [
     "Action",
@@ -99,6 +102,9 @@ __all__ = [
     "SignatureStatus",
     "Span",
     "STRICT_POLICY",
+    "UnsafeURLCapability",
+    "UnsafeURLConfig",
+    "UnsafeURLRule",
 ]
 
 __version__ = "0.1.0"
