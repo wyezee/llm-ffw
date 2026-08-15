@@ -16,7 +16,7 @@ class NormalizedText:
     def original_span(self, start: int, end: int) -> Span:
         """Translate a valid normalized half-open span to original offsets."""
 
-        if not 0 <= start < end <= len(self.text):
+        if not 0 <= start <= end <= len(self.text):
             raise ValueError("normalized span is outside the text")
         if self._original_boundaries is None:
             return Span(start, end)

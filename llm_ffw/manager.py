@@ -8,6 +8,7 @@ from .capabilities import FirewallCapabilities
 from .banned_substring_catalog import BannedSubstringCatalog
 from .config import ScannerConfig
 from .facade import FirewallUnavailableError, LLMFirewall
+from .json_output import JSONOutputConfig
 from .policy import BALANCED_POLICY, FirewallPolicy
 from .process_pool import ProcessScannerPoolConfig
 from .secret_catalog import BUILTIN_SECRET_CATALOG, SecretCatalog
@@ -55,6 +56,7 @@ class LLMFirewallManager:
         additional_secret_catalog: SecretCatalog | None = None,
         replacement_secret_catalog: SecretCatalog | None = None,
         banned_substring_catalog: BannedSubstringCatalog | None = None,
+        json_output_config: JSONOutputConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
         request_timeout_seconds: float | None = 5.0,
     ) -> None:
@@ -63,6 +65,7 @@ class LLMFirewallManager:
         self._policy = policy
         self._request_timeout_seconds = request_timeout_seconds
         self._banned_substring_catalog = banned_substring_catalog
+        self._json_output_config = json_output_config
         initial = self._build_firewall(
             additional_secret_catalog=additional_secret_catalog,
             replacement_secret_catalog=replacement_secret_catalog,
@@ -86,6 +89,7 @@ class LLMFirewallManager:
             additional_secret_catalog=additional_secret_catalog,
             replacement_secret_catalog=replacement_secret_catalog,
             banned_substring_catalog=self._banned_substring_catalog,
+            json_output_config=self._json_output_config,
             policy=self._policy,
             request_timeout_seconds=self._request_timeout_seconds,
         )

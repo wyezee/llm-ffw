@@ -3,6 +3,7 @@
 from .capabilities import (
     BannedSubstringCatalogCapability,
     FirewallCapabilities,
+    JSONOutputCapability,
     RuleCapability,
     SecretCatalogCapability,
 )
@@ -21,6 +22,7 @@ from .inspection import (
     InspectionFeatureUnavailableError,
     ScanScope,
 )
+from .json_output import JSONOutputConfig
 from .manager import (
     FirewallManagerState,
     FirewallReloadError,
@@ -50,6 +52,7 @@ from .secret_catalog import (
 )
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.banned_substrings import BannedSubstringsRule
+from .rules.json_output import JSONOutputRule
 
 __all__ = [
     "Action",
@@ -73,6 +76,9 @@ __all__ = [
     "InspectionFeature",
     "InspectionFeatureUnavailableError",
     "InvisibleCharactersRule",
+    "JSONOutputConfig",
+    "JSONOutputCapability",
+    "JSONOutputRule",
     "LLMFirewall",
     "LLMFirewallManager",
     "LiteralMatchMode",

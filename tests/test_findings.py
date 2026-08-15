@@ -4,8 +4,9 @@ from llm_ffw import Action, Finding, Severity, Span
 
 
 class SpanTests(unittest.TestCase):
-    def test_rejects_empty_or_reversed_span(self) -> None:
-        for start, end in ((0, 0), (2, 1), (-1, 2)):
+    def test_allows_empty_diagnostic_span_and_rejects_invalid_span(self) -> None:
+        self.assertEqual(Span(0, 0), Span(0, 0))
+        for start, end in ((2, 1), (-1, 2)):
             with self.subTest(start=start, end=end), self.assertRaises(ValueError):
                 Span(start, end)
 

@@ -16,10 +16,12 @@ from .banned_substring_catalog import BannedSubstringCatalog
 from .engine import Scanner
 from .findings import Action, Finding, Severity, Span
 from .inspection import ScanScope
+from .json_output import JSONOutputConfig
 from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult
 from .rules.secrets import SecretsRule
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.invisible_characters import InvisibleCharactersRule
+from .rules.json_output import JSONOutputRule
 from .secret_catalog import BUILTIN_SECRET_CATALOG, SecretCatalog
 
 
@@ -116,9 +118,14 @@ def _initialize_worker(
     scanner_config: ScannerConfig,
     secret_catalog: SecretCatalog | None,
     banned_substring_catalog: BannedSubstringCatalog | None,
+    json_output_config: JSONOutputConfig | None,
 ) -> None:
     global _WORKER_SCANNER
-    if secret_catalog is None and banned_substring_catalog is None:
+    if (
+        secret_catalog is None
+        and banned_substring_catalog is None
+        and json_output_config is None
+    ):
         _WORKER_SCANNER = Scanner(config=scanner_config)
     else:
         rules = [SecretsRule(secret_catalog or BUILTIN_SECRET_CATALOG)]
@@ -126,6 +133,8 @@ def _initialize_worker(
             rules.append(InvisibleCharactersRule())
         if banned_substring_catalog is not None:
             rules.append(BannedSubstringsRule(banned_substring_catalog))
+        if json_output_config is not None:
+            rules.append(JSONOutputRule(json_output_config))
         _WORKER_SCANNER = Scanner(
             rules=rules,
             config=scanner_config,
@@ -198,6 +207,7 @@ class ProcessScannerPool:
         pool_config: ProcessScannerPoolConfig | None = None,
         secret_catalog: SecretCatalog | None = None,
         banned_substring_catalog: BannedSubstringCatalog | None = None,
+        json_output_config: JSONOutputConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
     ) -> None:
         if scanner_config is not None and not isinstance(scanner_config, ScannerConfig):
@@ -219,6 +229,12 @@ class ProcessScannerPool:
                 "banned_substring_catalog must be a "
                 "BannedSubstringCatalog or None"
             )
+        if json_output_config is not None and not isinstance(
+            json_output_config, JSONOutputConfig
+        ):
+            raise TypeError(
+                "json_output_config must be a JSONOutputConfig or None"
+            )
         if not isinstance(policy, FirewallPolicy):
             raise TypeError("policy must be a FirewallPolicy")
         resolved_scanner_config = scanner_config or ScannerConfig()
@@ -236,11 +252,17 @@ class ProcessScannerPool:
                         if banned_substring_catalog is not None
                         else ()
                     ),
+                    *(
+                        ("output.json.validity",)
+                        if json_output_config is not None
+                        else ()
+                    ),
                 )
             ),
             supported_rule_ids=frozenset(
                 (
                     "content.banned_substrings",
+                    "output.json.validity",
                     "secrets.detected",
                     "unicode.invisible_characters",
                 )
@@ -251,6 +273,12 @@ class ProcessScannerPool:
         self._configured_secret_catalog = secret_catalog
         self._secret_catalog = secret_catalog or BUILTIN_SECRET_CATALOG
         self._banned_substring_catalog = banned_substring_catalog
+        self._json_output_config = json_output_config
+        self._json_output_rule = (
+            JSONOutputRule(json_output_config)
+            if json_output_config is not None
+            else None
+        )
         self._policy = policy
         self._state = ProcessPoolState.NEW
         self._state_lock = Lock()
@@ -283,6 +311,10 @@ class ProcessScannerPool:
     def banned_substring_catalog(self) -> BannedSubstringCatalog | None:
         return self._banned_substring_catalog
 
+    @property
+    def json_output_config(self) -> JSONOutputConfig | None:
+        return self._json_output_config
+
     def start(self) -> "ProcessScannerPool":
         """Start workers eagerly and fail before accepting traffic if startup fails."""
 
@@ -303,6 +335,7 @@ class ProcessScannerPool:
                         self._scanner_config,
                         self._configured_secret_catalog,
                         self._banned_substring_catalog,
+                        self._json_output_config,
                     ),
                     max_tasks_per_child=self._pool_config.max_tasks_per_child,
                 )
@@ -491,12 +524,18 @@ class ProcessScannerPool:
                 admission_timeout=admission_timeout,
             )
 
-        return self._policy.apply_with_rescan(
+        result = self._policy.apply_with_rescan(
             text,
             findings,
             scope=scope,
             redaction_text=self._scanner_config.redaction_text,
             rescan=rescan,
+        )
+        return self._policy.enforce_json_postcondition(
+            text,
+            result,
+            validator=self._json_output_rule,
+            redaction_text=self._scanner_config.redaction_text,
         )
 
     def shutdown(

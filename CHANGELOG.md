@@ -6,6 +6,12 @@ All notable changes are recorded here before a tagged release.
 
 ### Added
 
+- Opt-in `JSONOutputRule` for strict complete-document validation with bounded
+  depth and structure, safe failure metadata, process propagation, and
+  conditional post-policy validation after transformations.
+- Built-in policy profiles `1.2.0` block invalid expected JSON by default and
+  report it under audit policy.
+
 - Optional `BannedSubstringsRule` with versioned caller-owned literal catalogs,
   prefix-factored matching, bounded findings, process propagation, and safe
   capability summaries.

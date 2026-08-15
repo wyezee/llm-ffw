@@ -84,6 +84,30 @@ class BannedSubstringCatalogCapability:
 
 
 @dataclass(frozen=True, slots=True)
+class JSONOutputCapability:
+    """Disclosure-safe JSON validation limits pinned to the facade."""
+
+    max_document_chars: int
+    max_depth: int
+    max_structure_tokens: int
+    max_number_chars: int
+    reject_duplicate_keys: bool
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "max_document_chars",
+            "max_depth",
+            "max_structure_tokens",
+            "max_number_chars",
+        ):
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{field_name} must be a positive integer")
+        if not isinstance(self.reject_duplicate_keys, bool):
+            raise TypeError("reject_duplicate_keys must be a boolean")
+
+
+@dataclass(frozen=True, slots=True)
 class FirewallCapabilities:
     """Safe summary of the rules, catalog, and policy pinned to one facade."""
 
@@ -92,6 +116,7 @@ class FirewallCapabilities:
     policy_id: str
     policy_version: str
     banned_substring_catalog: BannedSubstringCatalogCapability | None = None
+    json_output: JSONOutputCapability | None = None
 
     def __post_init__(self) -> None:
         try:
@@ -114,6 +139,12 @@ class FirewallCapabilities:
                 "banned_substring_catalog must be a "
                 "BannedSubstringCatalogCapability or None"
             )
+        if self.json_output is not None and not isinstance(
+            self.json_output, JSONOutputCapability
+        ):
+            raise TypeError(
+                "json_output must be a JSONOutputCapability or None"
+            )
         object.__setattr__(
             self,
             "rules",
@@ -128,6 +159,7 @@ class FirewallCapabilities:
 __all__ = [
     "BannedSubstringCatalogCapability",
     "FirewallCapabilities",
+    "JSONOutputCapability",
     "RuleCapability",
     "SecretCatalogCapability",
 ]

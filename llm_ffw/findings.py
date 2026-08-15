@@ -39,8 +39,8 @@ class Span:
             raise TypeError("span end must be an integer")
         if self.start < 0:
             raise ValueError("span start must not be negative")
-        if self.end <= self.start:
-            raise ValueError("span end must be greater than start")
+        if self.end < self.start:
+            raise ValueError("span end must not be less than start")
 
 
 @dataclass(frozen=True, slots=True)

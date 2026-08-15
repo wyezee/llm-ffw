@@ -9,6 +9,7 @@ from typing import Callable, Mapping
 from .engine import Scanner
 from .findings import Action, Finding, Span
 from .inspection import ScanScope
+from .rules.json_output import JSONOutputRule
 from .redaction import sanitize_findings
 
 
@@ -214,6 +215,16 @@ class FirewallPolicy:
         unknown = sorted({item.rule_id for item in self.overrides} - supported)
         if unknown:
             raise ValueError(f"policy contains unknown rule_id: {unknown[0]}")
+        invalid_json_actions = tuple(
+            item.action
+            for item in self.overrides
+            if item.rule_id == "output.json.validity"
+            and item.action not in (Action.BLOCK, Action.REVIEW)
+        )
+        if invalid_json_actions:
+            raise ValueError(
+                "output.json.validity policy action must be BLOCK or REVIEW"
+            )
 
     def apply(
         self,
@@ -312,6 +323,55 @@ class FirewallPolicy:
             redaction_text=redaction_text,
         )
 
+    def enforce_json_postcondition(
+        self,
+        text: str,
+        result: FirewallResult,
+        *,
+        validator: JSONOutputRule | None,
+        redaction_text: str,
+    ) -> FirewallResult:
+        """Revalidate only transformed JSON output and block unsafe results."""
+
+        if validator is None:
+            return result
+        if not isinstance(validator, JSONOutputRule):
+            raise TypeError("validator must be a JSONOutputRule or None")
+        if not isinstance(result, FirewallResult):
+            raise TypeError("result must be a FirewallResult")
+        if (
+            result.blocked
+            or result.scope is not ScanScope.OUTPUT
+            or result.processed_text == text
+        ):
+            return result
+        if result.processed_text is None:
+            raise RuntimeError("non-blocked result has no processed text")
+        matches = validator.scan_text(result.processed_text)
+        if not matches:
+            return result
+        postcondition_findings = tuple(
+            Finding(
+                rule_id=validator.rule_id,
+                severity=match.severity,
+                action=match.action,
+                span=Span(0, 0),
+                message=match.message,
+                redacted_preview=match.redacted_preview,
+                metadata={
+                    **dict(match.metadata),
+                    "validation_phase": "post_policy",
+                },
+            )
+            for match in matches
+        )
+        return self.apply(
+            text,
+            (*result.findings, *postcondition_findings),
+            scope=result.scope,
+            redaction_text=redaction_text,
+        )
+
     def _effective_findings(
         self,
         findings: tuple[Finding, ...],
@@ -368,6 +428,7 @@ def _builtin_policy(
     input_action: Action,
     output_action: Action,
     invisible_action: Action | None,
+    json_output_action: Action,
 ) -> FirewallPolicy:
     invisible_overrides = (
         (
@@ -382,11 +443,16 @@ def _builtin_policy(
     )
     return FirewallPolicy(
         policy_id=policy_id,
-        version="1.1.0",
+        version="1.2.0",
         overrides=(
             PolicyOverride("secrets.detected", ScanScope.INPUT, input_action),
             PolicyOverride("secrets.detected", ScanScope.OUTPUT, output_action),
             *invisible_overrides,
+            PolicyOverride(
+                "output.json.validity",
+                ScanScope.OUTPUT,
+                json_output_action,
+            ),
         ),
     )
 
@@ -396,18 +462,21 @@ BALANCED_POLICY = _builtin_policy(
     input_action=Action.REDACT,
     output_action=Action.REDACT,
     invisible_action=None,
+    json_output_action=Action.BLOCK,
 )
 STRICT_POLICY = _builtin_policy(
     "llm_ffw.strict",
     input_action=Action.BLOCK,
     output_action=Action.REDACT,
     invisible_action=Action.BLOCK,
+    json_output_action=Action.BLOCK,
 )
 AUDIT_POLICY = _builtin_policy(
     "llm_ffw.audit",
     input_action=Action.REVIEW,
     output_action=Action.REVIEW,
     invisible_action=Action.REVIEW,
+    json_output_action=Action.REVIEW,
 )
 
 
@@ -431,11 +500,20 @@ class Firewall:
                 (
                     "secrets.detected",
                     "unicode.invisible_characters",
+                    "output.json.validity",
                     *(rule.rule_id for rule in self._scanner.rules),
                 )
             ),
         )
         self._policy = policy
+        self._json_output_rule = next(
+            (
+                rule
+                for rule in self._scanner.rules
+                if isinstance(rule, JSONOutputRule)
+            ),
+            None,
+        )
 
     @property
     def scanner(self) -> Scanner:
@@ -459,7 +537,7 @@ class Firewall:
             scope=scope,
             prompt_context=prompt_context,
         )
-        return self._policy.apply_with_rescan(
+        result = self._policy.apply_with_rescan(
             text,
             findings,
             scope=scope,
@@ -469,6 +547,12 @@ class Firewall:
                 scope=scope,
                 prompt_context=prompt_context,
             ),
+        )
+        return self._policy.enforce_json_postcondition(
+            text,
+            result,
+            validator=self._json_output_rule,
+            redaction_text=self._scanner.config.redaction_text,
         )
 
 

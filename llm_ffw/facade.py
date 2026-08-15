@@ -6,6 +6,7 @@ import math
 from .capabilities import (
     BannedSubstringCatalogCapability,
     FirewallCapabilities,
+    JSONOutputCapability,
     RuleCapability,
     SecretCatalogCapability,
 )
@@ -13,6 +14,7 @@ from .banned_substring_catalog import BannedSubstringCatalog
 from .config import ScannerConfig
 from .findings import Finding
 from .inspection import ScanScope
+from .json_output import JSONOutputConfig
 from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult
 from .process_pool import (
     ProcessPoolNotRunningError,
@@ -24,6 +26,7 @@ from .process_pool import (
 from .rules.secrets import SecretsRule
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.invisible_characters import InvisibleCharactersRule
+from .rules.json_output import JSONOutputRule
 from .secret_catalog import (
     BUILTIN_SECRET_CATALOG,
     SecretCatalog,
@@ -124,6 +127,7 @@ class LLMFirewall:
         additional_secret_catalog: SecretCatalog | None = None,
         replacement_secret_catalog: SecretCatalog | None = None,
         banned_substring_catalog: BannedSubstringCatalog | None = None,
+        json_output_config: JSONOutputConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
         request_timeout_seconds: float | None = 5.0,
     ) -> None:
@@ -141,6 +145,7 @@ class LLMFirewall:
                 None if catalog is BUILTIN_SECRET_CATALOG else catalog
             ),
             banned_substring_catalog=banned_substring_catalog,
+            json_output_config=json_output_config,
             policy=policy,
         )
         catalog = self._pool.secret_catalog
@@ -168,6 +173,14 @@ class LLMFirewall:
                     scopes=tuple(literal_catalog.scopes),
                 )
             )
+        if self._pool.json_output_config is not None:
+            rule_capabilities.append(
+                RuleCapability(
+                    rule_id=JSONOutputRule.RULE_ID,
+                    purpose=JSONOutputRule.PURPOSE,
+                    scopes=tuple(JSONOutputRule.SCOPES),
+                )
+            )
         self._capabilities = FirewallCapabilities(
             rules=tuple(rule_capabilities),
             secret_catalog=SecretCatalogCapability(
@@ -190,6 +203,25 @@ class LLMFirewall:
                     pattern_count=len(literal_catalog.patterns),
                 )
                 if literal_catalog is not None
+                else None
+            ),
+            json_output=(
+                JSONOutputCapability(
+                    max_document_chars=(
+                        self._pool.json_output_config.max_document_chars
+                    ),
+                    max_depth=self._pool.json_output_config.max_depth,
+                    max_structure_tokens=(
+                        self._pool.json_output_config.max_structure_tokens
+                    ),
+                    max_number_chars=(
+                        self._pool.json_output_config.max_number_chars
+                    ),
+                    reject_duplicate_keys=(
+                        self._pool.json_output_config.reject_duplicate_keys
+                    ),
+                )
+                if self._pool.json_output_config is not None
                 else None
             ),
         )

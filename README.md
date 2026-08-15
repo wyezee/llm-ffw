@@ -104,6 +104,22 @@ or ASCII-word matching for input and output. It defaults to redaction and never
 accepts caller regex. See
 [`docs/banned-substrings.md`](docs/banned-substrings.md).
 
+## Opt-in JSON output validation
+
+Applications that require a complete JSON response can enable the bounded,
+output-only `JSONOutputRule`:
+
+```python
+from llm_ffw import JSONOutputConfig, LLMFirewall
+
+firewall = LLMFirewall(json_output_config=JSONOutputConfig())
+```
+
+Malformed syntax, duplicate keys, non-standard non-finite constants, and
+configured resource-limit violations block by default. The rule does not
+extract JSON from Markdown or repair malformed output. See
+[`docs/json-output.md`](docs/json-output.md).
+
 ## Supported secret signatures
 
 Built-in catalog `3.0.0` has 28 constrained signatures and 47 prefixes for
