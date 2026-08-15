@@ -76,6 +76,27 @@ headroom for a typical one-million-token text context. Token-to-character ratios
 vary by model, language, and content; callers should still set an explicit limit
 appropriate to their deployment and memory budget.
 
+### Opt-in invisible-character canonicalization
+
+The opt-in `InvisibleCharactersRule` removes a U+200B zero-width-space
+run only when it is embedded between ASCII token characters, then rescans the
+cleaned input through every enabled rule. Clean ASCII requests retain a single
+scan. The rule is input-only and disabled by default:
+
+```python
+from llm_ffw import LLMFirewall, ScannerConfig
+
+firewall = LLMFirewall(
+    scanner_config=ScannerConfig(enable_invisible_characters=True),
+)
+```
+
+More than 64 contextual runs produces one bounded `BLOCK` recommendation.
+Balanced and strict policies enforce that block; audit or a custom policy may
+override it. Other format, joining, bidi, private-use, and unassigned
+characters are not removed. See
+[`docs/invisible-characters.md`](docs/invisible-characters.md).
+
 ## Supported secret signatures
 
 Built-in catalog `3.0.0` has 28 constrained signatures and 47 prefixes for

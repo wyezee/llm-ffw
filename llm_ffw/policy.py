@@ -1,14 +1,15 @@
 """Immutable policy enforcement for deterministic scanner findings."""
 
 from dataclasses import dataclass, field, replace
+from bisect import bisect_left, bisect_right
 import re
 from types import MappingProxyType
-from typing import Mapping
+from typing import Callable, Mapping
 
 from .engine import Scanner
-from .findings import Action, Finding
+from .findings import Action, Finding, Span
 from .inspection import ScanScope
-from .redaction import redact_findings
+from .redaction import sanitize_findings
 
 
 _IDENTIFIER = re.compile(r"[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?\Z")
@@ -16,9 +17,68 @@ _VERSION = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9._-]{0,62}[A-Za-z0-9])?\Z")
 _ACTION_PRIORITY = {
     Action.ALLOW: 0,
     Action.REVIEW: 1,
-    Action.REDACT: 2,
-    Action.BLOCK: 3,
+    Action.REMOVE: 2,
+    Action.REDACT: 3,
+    Action.BLOCK: 4,
 }
+
+
+@dataclass(frozen=True, slots=True)
+class _RemovalMap:
+    text: str
+    clean_positions: tuple[int, ...]
+    cumulative_removed: tuple[int, ...]
+
+    def original_span(self, span: Span) -> Span:
+        start_index = bisect_right(self.clean_positions, span.start) - 1
+        end_index = bisect_left(self.clean_positions, span.end) - 1
+        start_shift = (
+            self.cumulative_removed[start_index]
+            if start_index >= 0
+            else 0
+        )
+        end_shift = (
+            self.cumulative_removed[end_index]
+            if end_index >= 0
+            else 0
+        )
+        return Span(span.start + start_shift, span.end + end_shift)
+
+
+def _remove_effective_findings(
+    text: str,
+    findings: tuple[Finding, ...],
+) -> _RemovalMap:
+    spans = sorted(
+        finding.span
+        for finding in findings
+        if finding.action is Action.REMOVE
+    )
+    merged: list[Span] = []
+    for span in spans:
+        if merged and span.start <= merged[-1].end:
+            previous = merged[-1]
+            merged[-1] = Span(previous.start, max(previous.end, span.end))
+        else:
+            merged.append(span)
+
+    parts: list[str] = []
+    clean_positions: list[int] = []
+    cumulative_removed: list[int] = []
+    cursor = 0
+    removed = 0
+    for span in merged:
+        parts.append(text[cursor : span.start])
+        clean_positions.append(span.start - removed)
+        removed += span.end - span.start
+        cumulative_removed.append(removed)
+        cursor = span.end
+    parts.append(text[cursor:])
+    return _RemovalMap(
+        text="".join(parts),
+        clean_positions=tuple(clean_positions),
+        cumulative_removed=tuple(cumulative_removed),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,12 +196,22 @@ class FirewallPolicy:
             raise TypeError("scope must be a ScanScope")
         return self._index.get((finding.rule_id, scope), finding.action)
 
-    def validate_rule_ids(self, rule_ids: frozenset[str]) -> None:
-        """Fail closed when an override names a rule absent from the scanner."""
+    def validate_rule_ids(
+        self,
+        rule_ids: frozenset[str],
+        *,
+        supported_rule_ids: frozenset[str] | None = None,
+    ) -> None:
+        """Fail closed when an override names an unsupported rule."""
 
         if any(not isinstance(rule_id, str) for rule_id in rule_ids):
             raise TypeError("rule_ids must contain strings")
-        unknown = sorted({item.rule_id for item in self.overrides} - rule_ids)
+        supported = rule_ids if supported_rule_ids is None else supported_rule_ids
+        if any(not isinstance(rule_id, str) for rule_id in supported):
+            raise TypeError("supported_rule_ids must contain strings")
+        if not rule_ids <= supported:
+            raise ValueError("active rule IDs must be supported")
+        unknown = sorted({item.rule_id for item in self.overrides} - supported)
         if unknown:
             raise ValueError(f"policy contains unknown rule_id: {unknown[0]}")
 
@@ -166,16 +236,107 @@ class FirewallPolicy:
         except TypeError as exc:
             raise TypeError("findings must be iterable") from exc
 
+        effective_findings = self._effective_findings(selected, scope, len(text))
+        return self._apply_effective(
+            text,
+            effective_findings,
+            scope=scope,
+            redaction_text=redaction_text,
+        )
+
+    def apply_with_rescan(
+        self,
+        text: str,
+        findings: tuple[Finding, ...],
+        *,
+        scope: ScanScope,
+        redaction_text: str,
+        rescan: Callable[[str], tuple[Finding, ...]],
+    ) -> FirewallResult:
+        """Remove approved spans, rescan once, and enforce all findings."""
+
+        if not isinstance(text, str):
+            raise TypeError("text must be a string")
+        if not isinstance(scope, ScanScope):
+            raise TypeError("scope must be a ScanScope")
+        if not isinstance(redaction_text, str) or not redaction_text:
+            raise ValueError("redaction_text must be a non-empty string")
+        if not callable(rescan):
+            raise TypeError("rescan must be callable")
+        try:
+            selected = tuple(findings)
+        except TypeError as exc:
+            raise TypeError("findings must be iterable") from exc
+        effective = self._effective_findings(selected, scope, len(text))
+        if any(item.action is Action.BLOCK for item in effective) or not any(
+            item.action is Action.REMOVE for item in effective
+        ):
+            return self._apply_effective(
+                text,
+                effective,
+                scope=scope,
+                redaction_text=redaction_text,
+            )
+
+        removal_map = _remove_effective_findings(text, effective)
+        rescanned = tuple(rescan(removal_map.text))
+        mapped: list[Finding] = []
+        for finding in rescanned:
+            if not isinstance(finding, Finding):
+                raise TypeError("rescan must return Finding instances")
+            mapped.append(
+                replace(
+                    finding,
+                    span=removal_map.original_span(finding.span),
+                )
+            )
+        combined = tuple(
+            sorted(
+                (
+                    *(item for item in effective if item.action is Action.REMOVE),
+                    *mapped,
+                ),
+                key=lambda finding: (
+                    finding.span.start,
+                    finding.span.end,
+                    finding.rule_id,
+                    tuple(sorted(finding.metadata.items())),
+                ),
+            )
+        )
+        final_effective = self._effective_findings(combined, scope, len(text))
+        return self._apply_effective(
+            text,
+            final_effective,
+            scope=scope,
+            redaction_text=redaction_text,
+        )
+
+    def _effective_findings(
+        self,
+        findings: tuple[Finding, ...],
+        scope: ScanScope,
+        text_length: int,
+    ) -> tuple[Finding, ...]:
         effective: list[Finding] = []
-        for finding in selected:
+        for finding in findings:
             if not isinstance(finding, Finding):
                 raise TypeError("findings must contain Finding instances")
-            if finding.span.end > len(text):
+            if finding.span.end > text_length:
                 raise ValueError("finding span is outside text")
             effective.append(
                 replace(finding, action=self.action_for(finding, scope))
             )
-        effective_findings = tuple(effective)
+        return tuple(effective)
+
+    def _apply_effective(
+        self,
+        text: str,
+        effective_findings: tuple[Finding, ...],
+        *,
+        scope: ScanScope,
+        redaction_text: str,
+    ) -> FirewallResult:
         decision = max(
             (item.action for item in effective_findings),
             key=_ACTION_PRIORITY.__getitem__,
@@ -183,8 +344,8 @@ class FirewallPolicy:
         )
         if decision is Action.BLOCK:
             processed_text = None
-        elif decision is Action.REDACT:
-            processed_text = redact_findings(
+        elif decision in (Action.REMOVE, Action.REDACT):
+            processed_text = sanitize_findings(
                 text,
                 effective_findings,
                 redaction_text,
@@ -201,36 +362,52 @@ class FirewallPolicy:
         )
 
 
-def _secret_policy(
+def _builtin_policy(
     policy_id: str,
     *,
     input_action: Action,
     output_action: Action,
+    invisible_action: Action | None,
 ) -> FirewallPolicy:
+    invisible_overrides = (
+        (
+            PolicyOverride(
+                "unicode.invisible_characters",
+                ScanScope.INPUT,
+                invisible_action,
+            ),
+        )
+        if invisible_action is not None
+        else ()
+    )
     return FirewallPolicy(
         policy_id=policy_id,
-        version="1.0.0",
+        version="1.1.0",
         overrides=(
             PolicyOverride("secrets.detected", ScanScope.INPUT, input_action),
             PolicyOverride("secrets.detected", ScanScope.OUTPUT, output_action),
+            *invisible_overrides,
         ),
     )
 
 
-BALANCED_POLICY = _secret_policy(
+BALANCED_POLICY = _builtin_policy(
     "llm_ffw.balanced",
     input_action=Action.REDACT,
     output_action=Action.REDACT,
+    invisible_action=None,
 )
-STRICT_POLICY = _secret_policy(
+STRICT_POLICY = _builtin_policy(
     "llm_ffw.strict",
     input_action=Action.BLOCK,
     output_action=Action.REDACT,
+    invisible_action=Action.BLOCK,
 )
-AUDIT_POLICY = _secret_policy(
+AUDIT_POLICY = _builtin_policy(
     "llm_ffw.audit",
     input_action=Action.REVIEW,
     output_action=Action.REVIEW,
+    invisible_action=Action.REVIEW,
 )
 
 
@@ -249,7 +426,14 @@ class Firewall:
             raise TypeError("policy must be a FirewallPolicy")
         self._scanner = scanner or Scanner()
         policy.validate_rule_ids(
-            frozenset(rule.rule_id for rule in self._scanner.rules)
+            frozenset(rule.rule_id for rule in self._scanner.rules),
+            supported_rule_ids=frozenset(
+                (
+                    "secrets.detected",
+                    "unicode.invisible_characters",
+                    *(rule.rule_id for rule in self._scanner.rules),
+                )
+            ),
         )
         self._policy = policy
 
@@ -275,11 +459,16 @@ class Firewall:
             scope=scope,
             prompt_context=prompt_context,
         )
-        return self._policy.apply(
+        return self._policy.apply_with_rescan(
             text,
             findings,
             scope=scope,
             redaction_text=self._scanner.config.redaction_text,
+            rescan=lambda cleaned: self._scanner.scan(
+                cleaned,
+                scope=scope,
+                prompt_context=prompt_context,
+            ),
         )
 
 

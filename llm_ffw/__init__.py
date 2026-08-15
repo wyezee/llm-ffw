@@ -42,6 +42,7 @@ from .secret_catalog import (
     SecretSignature,
     SignatureStatus,
 )
+from .rules.invisible_characters import InvisibleCharactersRule
 
 __all__ = [
     "Action",
@@ -60,6 +61,7 @@ __all__ = [
     "Inspection",
     "InspectionFeature",
     "InspectionFeatureUnavailableError",
+    "InvisibleCharactersRule",
     "LLMFirewall",
     "LLMFirewallManager",
     "ProcessPoolNotRunningError",

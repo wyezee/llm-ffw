@@ -6,6 +6,17 @@ All notable changes are recorded here before a tagged release.
 
 ### Added
 
+- Opt-in `InvisibleCharactersRule` with contextual U+200B removal, bounded
+  findings, compact original-span mapping, and one remove-then-rescan pass.
+- Explicit `REMOVE` policy action and focused clean/dirty/process performance
+  benchmark with Windows/Linux release tripwires.
+- Built-in policy profiles `1.1.0` with balanced remove, strict block, and
+  audit review handling for the opt-in rule.
+
+## 0.1.0 - 2026-08-15
+
+### Added
+
 - High-level `LLMFirewall` facade with simple input/output sanitization, managed
   process lifecycle, and safe block/unavailable exceptions.
 - Immutable facade capability summaries and deployment-pinned custom secret

@@ -20,6 +20,7 @@ from .process_pool import (
     ProcessScannerPoolConfig,
 )
 from .rules.secrets import SecretsRule
+from .rules.invisible_characters import InvisibleCharactersRule
 from .secret_catalog import (
     BUILTIN_SECRET_CATALOG,
     SecretCatalog,
@@ -138,14 +139,23 @@ class LLMFirewall:
             policy=policy,
         )
         catalog = self._pool.secret_catalog
-        self._capabilities = FirewallCapabilities(
-            rules=(
+        rule_capabilities = [
+            RuleCapability(
+                rule_id=SecretsRule.RULE_ID,
+                purpose=SecretsRule.PURPOSE,
+                scopes=tuple(SecretsRule.SCOPES),
+            )
+        ]
+        if self._pool.scanner_config.enable_invisible_characters:
+            rule_capabilities.append(
                 RuleCapability(
-                    rule_id=SecretsRule.RULE_ID,
-                    purpose=SecretsRule.PURPOSE,
-                    scopes=tuple(SecretsRule.SCOPES),
-                ),
-            ),
+                    rule_id=InvisibleCharactersRule.RULE_ID,
+                    purpose=InvisibleCharactersRule.PURPOSE,
+                    scopes=tuple(InvisibleCharactersRule.SCOPES),
+                )
+            )
+        self._capabilities = FirewallCapabilities(
+            rules=tuple(rule_capabilities),
             secret_catalog=SecretCatalogCapability(
                 catalog_id=catalog.catalog_id,
                 version=catalog.version,

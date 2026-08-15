@@ -5,8 +5,9 @@ from collections.abc import Iterable
 from .config import ScannerConfig
 from .findings import Finding
 from .inspection import InspectionFeature, ScanScope, build_inspection
-from .redaction import redact_findings
+from .redaction import sanitize_findings
 from .rules.base import Rule, RuleMatch
+from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.secrets import SecretsRule
 
 
@@ -22,7 +23,13 @@ class Scanner:
         if not isinstance(self._config, ScannerConfig):
             raise TypeError("config must be a ScannerConfig")
 
-        selected_rules = (SecretsRule(),) if rules is None else tuple(rules)
+        if rules is None:
+            defaults: list[Rule] = [SecretsRule()]
+            if self._config.enable_invisible_characters:
+                defaults.append(InvisibleCharactersRule())
+            selected_rules = tuple(defaults)
+        else:
+            selected_rules = tuple(rules)
         rule_ids: set[str] = set()
         rule_contracts: list[
             tuple[Rule, frozenset[ScanScope], frozenset[InspectionFeature]]
@@ -137,7 +144,7 @@ class Scanner:
         scope: ScanScope = ScanScope.INPUT,
         prompt_context: str | None = None,
     ) -> str:
-        """Replace finding spans without reading or exposing their contents."""
+        """Apply REMOVE and REDACT spans without exposing their contents."""
 
         self._validate_request(text, scope, prompt_context)
         selected = (
@@ -145,7 +152,7 @@ class Scanner:
             if findings is None
             else tuple(findings)
         )
-        return redact_findings(text, selected, self._config.redaction_text)
+        return sanitize_findings(text, selected, self._config.redaction_text)
 
     def _validate_request(
         self,

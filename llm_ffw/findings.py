@@ -20,6 +20,7 @@ class Action(str, Enum):
 
     ALLOW = "allow"
     REVIEW = "review"
+    REMOVE = "remove"
     REDACT = "redact"
     BLOCK = "block"
 

@@ -8,6 +8,7 @@ import math
 import multiprocessing
 import os
 from threading import BoundedSemaphore, Lock
+import time
 from typing import TypeAlias
 
 from .config import ScannerConfig
@@ -16,6 +17,7 @@ from .findings import Action, Finding, Severity, Span
 from .inspection import ScanScope
 from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult
 from .rules.secrets import SecretsRule
+from .rules.invisible_characters import InvisibleCharactersRule
 from .secret_catalog import BUILTIN_SECRET_CATALOG, SecretCatalog
 
 
@@ -116,8 +118,11 @@ def _initialize_worker(
     if secret_catalog is None:
         _WORKER_SCANNER = Scanner(config=scanner_config)
     else:
+        rules = [SecretsRule(secret_catalog)]
+        if scanner_config.enable_invisible_characters:
+            rules.append(InvisibleCharactersRule())
         _WORKER_SCANNER = Scanner(
-            rules=(SecretsRule(secret_catalog),),
+            rules=rules,
             config=scanner_config,
         )
 
@@ -203,8 +208,23 @@ class ProcessScannerPool:
             raise TypeError("secret_catalog must be a SecretCatalog or None")
         if not isinstance(policy, FirewallPolicy):
             raise TypeError("policy must be a FirewallPolicy")
-        policy.validate_rule_ids(frozenset(("secrets.detected",)))
-        self._scanner_config = scanner_config or ScannerConfig()
+        resolved_scanner_config = scanner_config or ScannerConfig()
+        policy.validate_rule_ids(
+            frozenset(
+                (
+                    "secrets.detected",
+                    *(
+                        ("unicode.invisible_characters",)
+                        if resolved_scanner_config.enable_invisible_characters
+                        else ()
+                    ),
+                )
+            ),
+            supported_rule_ids=frozenset(
+                ("secrets.detected", "unicode.invisible_characters")
+            ),
+        )
+        self._scanner_config = resolved_scanner_config
         self._pool_config = pool_config or ProcessScannerPoolConfig()
         self._configured_secret_catalog = secret_catalog
         self._secret_catalog = secret_catalog or BUILTIN_SECRET_CATALOG
@@ -416,18 +436,39 @@ class ProcessScannerPool:
     ) -> FirewallResult:
         """Scan in a worker and enforce parent-side policy on the request."""
 
+        validated_timeout = _validate_timeout(timeout, "timeout")
+        started = time.monotonic()
         findings = self.scan(
             text,
             scope=scope,
             prompt_context=prompt_context,
-            timeout=timeout,
+            timeout=validated_timeout,
             admission_timeout=admission_timeout,
         )
-        return self._policy.apply(
+
+        def rescan(cleaned: str) -> tuple[Finding, ...]:
+            remaining = (
+                None
+                if validated_timeout is None
+                else max(
+                    0.0,
+                    validated_timeout - (time.monotonic() - started),
+                )
+            )
+            return self.scan(
+                cleaned,
+                scope=scope,
+                prompt_context=prompt_context,
+                timeout=remaining,
+                admission_timeout=admission_timeout,
+            )
+
+        return self._policy.apply_with_rescan(
             text,
             findings,
             scope=scope,
             redaction_text=self._scanner_config.redaction_text,
+            rescan=rescan,
         )
 
     def shutdown(

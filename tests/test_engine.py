@@ -12,6 +12,7 @@ def _key(marker: str) -> str:
 class ScannerTests(unittest.TestCase):
     def test_default_limit_supports_large_contexts(self) -> None:
         self.assertEqual(ScannerConfig().max_input_chars, 8_000_000)
+        self.assertFalse(ScannerConfig().enable_invisible_characters)
 
     def test_default_scanner_has_only_secrets_rule(self) -> None:
         scanner = Scanner()
@@ -96,3 +97,9 @@ class ScannerTests(unittest.TestCase):
     def test_rejects_non_string_input(self) -> None:
         with self.assertRaises(TypeError):
             Scanner().scan(None)  # type: ignore[arg-type]
+
+    def test_rejects_non_boolean_invisible_character_configuration(self) -> None:
+        with self.assertRaises(TypeError):
+            ScannerConfig(  # type: ignore[arg-type]
+                enable_invisible_characters=1,
+            )
