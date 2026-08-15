@@ -14,6 +14,11 @@ from typing import Protocol
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from llm_ffw.literal_matcher import (
+    LiteralDefinition as RuntimeLiteralDefinition,
+    LiteralMatcher as RuntimeLiteralMatcher,
+)
+
 
 _ASCII_LOWER = str.maketrans(string.ascii_uppercase, string.ascii_lowercase)
 _ASCII_WORD = frozenset(string.ascii_letters + string.digits + "_")
@@ -276,11 +281,50 @@ class AhoCorasickMatcher:
         return _resolve(matches)
 
 
+class ProductionTrieRegexMatcher:
+    """Adapter that validates the shipped matcher against the same workloads."""
+
+    def __init__(
+        self,
+        patterns: tuple[LiteralPattern, ...],
+        *,
+        case_sensitive: bool,
+    ) -> None:
+        selected = _validate_patterns(patterns, case_sensitive=case_sensitive)
+        self._matcher = RuntimeLiteralMatcher(
+            tuple(
+                RuntimeLiteralDefinition(
+                    item.pattern_id,
+                    item.value,
+                    case_sensitive=case_sensitive,
+                )
+                for item in selected
+            )
+        )
+
+    def find(
+        self,
+        text: str,
+        *,
+        word_boundary: bool = False,
+    ) -> tuple[LiteralSpan, ...]:
+        if word_boundary:
+            raise ValueError("production benchmark adapter expects substring mode")
+        result = self._matcher.find(text, max_matches=4_096)
+        if result.overflow:
+            raise RuntimeError("benchmark workload exceeded its match budget")
+        return tuple(
+            LiteralSpan(item.start, item.end, item.pattern_id)
+            for item in result.matches
+        )
+
+
 _MATCHERS = {
     "sequential": SequentialFindMatcher,
     "regex_flat": RegexAlternationMatcher,
     "regex_trie": TrieRegexMatcher,
     "aho": AhoCorasickMatcher,
+    "runtime_trie": ProductionTrieRegexMatcher,
 }
 
 
@@ -374,6 +418,12 @@ def main() -> None:
     parser.add_argument("--max-build-ms", type=float, default=250.0)
     parser.add_argument("--max-build-peak-mib", type=float, default=32.0)
     parser.add_argument("--max-request-peak-mib", type=float, default=64.0)
+    parser.add_argument(
+        "--candidate",
+        action="append",
+        choices=tuple(_MATCHERS),
+        help="measure only the named candidate; repeat to select multiple",
+    )
     parser.add_argument("--require-qualified", action="store_true")
     args = parser.parse_args()
     if args.size <= 0 or args.rounds <= 0:
@@ -389,7 +439,11 @@ def main() -> None:
         for workload, (text, case_sensitive, word_boundary) in workloads.items()
     }
     qualified: list[str] = []
-    for name, matcher_type in _MATCHERS.items():
+    selected_matchers = (
+        tuple(args.candidate) if args.candidate else tuple(_MATCHERS)
+    )
+    for name in selected_matchers:
+        matcher_type = _MATCHERS[name]
         re.purge()
         started = time.perf_counter()
         sensitive = matcher_type(patterns, case_sensitive=True)
