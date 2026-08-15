@@ -137,6 +137,22 @@ checks input and output by default; deployments can restrict its `scopes`.
 It performs no DNS, HTTP, reputation, model, or other network call. See
 [`docs/unsafe-urls.md`](docs/unsafe-urls.md).
 
+## Opt-in payment-card inspection
+
+Applications that may handle payment-card data can enable bounded Luhn-based
+inspection in both directions:
+
+```python
+from llm_ffw import LLMFirewall, PaymentCardConfig
+
+firewall = LLMFirewall(payment_card_config=PaymentCardConfig())
+```
+
+`PaymentCardRule` redacts structurally plausible 13–19 digit ASCII candidates
+under balanced policy. Luhn is a checksum, not proof that a card exists or is
+active, so this rule remains opt-in. See
+[`docs/payment-cards.md`](docs/payment-cards.md).
+
 ## Supported secret signatures
 
 Built-in catalog `3.0.0` has 28 constrained signatures and 47 prefixes for

@@ -7,6 +7,7 @@ from .capabilities import (
     RuleCapability,
     SecretCatalogCapability,
     UnsafeURLCapability,
+    PaymentCardCapability,
 )
 from .banned_substring_catalog import (
     BannedSubstring,
@@ -25,6 +26,7 @@ from .inspection import (
 )
 from .json_output import JSONOutputConfig
 from .unsafe_url import UnsafeURLConfig
+from .payment_card import PaymentCardConfig
 from .manager import (
     FirewallManagerState,
     FirewallReloadError,
@@ -56,6 +58,7 @@ from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.json_output import JSONOutputRule
 from .rules.unsafe_url import UnsafeURLRule
+from .rules.payment_card import PaymentCardRule
 
 __all__ = [
     "Action",
@@ -92,6 +95,9 @@ __all__ = [
     "ProcessScannerPoolConfig",
     "RuleCapability",
     "PolicyOverride",
+    "PaymentCardCapability",
+    "PaymentCardConfig",
+    "PaymentCardRule",
     "Scanner",
     "ScannerConfig",
     "ScanScope",

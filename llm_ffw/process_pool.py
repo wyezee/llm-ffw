@@ -18,12 +18,14 @@ from .findings import Action, Finding, Severity, Span
 from .inspection import ScanScope
 from .json_output import JSONOutputConfig
 from .unsafe_url import UnsafeURLConfig
+from .payment_card import PaymentCardConfig
 from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult
 from .rules.secrets import SecretsRule
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.json_output import JSONOutputRule
 from .rules.unsafe_url import UnsafeURLRule
+from .rules.payment_card import PaymentCardRule
 from .secret_catalog import BUILTIN_SECRET_CATALOG, SecretCatalog
 
 
@@ -122,6 +124,7 @@ def _initialize_worker(
     banned_substring_catalog: BannedSubstringCatalog | None,
     json_output_config: JSONOutputConfig | None,
     unsafe_url_config: UnsafeURLConfig | None,
+    payment_card_config: PaymentCardConfig | None,
 ) -> None:
     global _WORKER_SCANNER
     if (
@@ -129,6 +132,7 @@ def _initialize_worker(
         and banned_substring_catalog is None
         and json_output_config is None
         and unsafe_url_config is None
+        and payment_card_config is None
     ):
         _WORKER_SCANNER = Scanner(config=scanner_config)
     else:
@@ -141,6 +145,8 @@ def _initialize_worker(
             rules.append(JSONOutputRule(json_output_config))
         if unsafe_url_config is not None:
             rules.append(UnsafeURLRule(unsafe_url_config))
+        if payment_card_config is not None:
+            rules.append(PaymentCardRule(payment_card_config))
         _WORKER_SCANNER = Scanner(
             rules=rules,
             config=scanner_config,
@@ -215,6 +221,7 @@ class ProcessScannerPool:
         banned_substring_catalog: BannedSubstringCatalog | None = None,
         json_output_config: JSONOutputConfig | None = None,
         unsafe_url_config: UnsafeURLConfig | None = None,
+        payment_card_config: PaymentCardConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
     ) -> None:
         if scanner_config is not None and not isinstance(scanner_config, ScannerConfig):
@@ -248,6 +255,12 @@ class ProcessScannerPool:
             raise TypeError(
                 "unsafe_url_config must be an UnsafeURLConfig or None"
             )
+        if payment_card_config is not None and not isinstance(
+            payment_card_config, PaymentCardConfig
+        ):
+            raise TypeError(
+                "payment_card_config must be a PaymentCardConfig or None"
+            )
         if not isinstance(policy, FirewallPolicy):
             raise TypeError("policy must be a FirewallPolicy")
         resolved_scanner_config = scanner_config or ScannerConfig()
@@ -275,6 +288,11 @@ class ProcessScannerPool:
                         if unsafe_url_config is not None
                         else ()
                     ),
+                    *(
+                        ("pii.payment_card",)
+                        if payment_card_config is not None
+                        else ()
+                    ),
                 )
             ),
             supported_rule_ids=frozenset(
@@ -284,6 +302,7 @@ class ProcessScannerPool:
                     "secrets.detected",
                     "unicode.invisible_characters",
                     "url.unsafe",
+                    "pii.payment_card",
                 )
             ),
         )
@@ -294,6 +313,7 @@ class ProcessScannerPool:
         self._banned_substring_catalog = banned_substring_catalog
         self._json_output_config = json_output_config
         self._unsafe_url_config = unsafe_url_config
+        self._payment_card_config = payment_card_config
         self._json_output_rule = (
             JSONOutputRule(json_output_config)
             if json_output_config is not None
@@ -339,6 +359,10 @@ class ProcessScannerPool:
     def unsafe_url_config(self) -> UnsafeURLConfig | None:
         return self._unsafe_url_config
 
+    @property
+    def payment_card_config(self) -> PaymentCardConfig | None:
+        return self._payment_card_config
+
     def start(self) -> "ProcessScannerPool":
         """Start workers eagerly and fail before accepting traffic if startup fails."""
 
@@ -361,6 +385,7 @@ class ProcessScannerPool:
                         self._banned_substring_catalog,
                         self._json_output_config,
                         self._unsafe_url_config,
+                        self._payment_card_config,
                     ),
                     max_tasks_per_child=self._pool_config.max_tasks_per_child,
                 )

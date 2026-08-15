@@ -6,6 +6,14 @@ All notable changes are recorded here before a tagged release.
 
 ### Added
 
+- Opt-in input/output `PaymentCardRule` with bounded ASCII candidate matching,
+  Luhn validation, configurable scopes, safe full-span redaction, and no
+  issuer, network, or model lookup.
+- Built-in policy profiles `1.4.0` redact payment-card findings under balanced
+  policy, block them under strict policy, and report them under audit policy.
+- Cross-platform 8 MB payment-card clean, adversarial, redaction, memory, and
+  concurrent process-pool release gates.
+
 - Opt-in input/output `UnsafeURLRule` with configurable scopes and bounded
   structural parsing for dangerous schemes, embedded authority credentials,
   local targets, and ambiguous authorities; no DNS, HTTP, model, or reputation

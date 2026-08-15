@@ -122,6 +122,21 @@ class UnsafeURLCapability:
 
 
 @dataclass(frozen=True, slots=True)
+class PaymentCardCapability:
+    """Disclosure-safe payment-card inspection limits pinned to the facade."""
+
+    max_candidates: int
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.max_candidates, bool)
+            or not isinstance(self.max_candidates, int)
+            or self.max_candidates <= 0
+        ):
+            raise ValueError("max_candidates must be a positive integer")
+
+
+@dataclass(frozen=True, slots=True)
 class FirewallCapabilities:
     """Safe summary of the rules, catalog, and policy pinned to one facade."""
 
@@ -132,6 +147,7 @@ class FirewallCapabilities:
     banned_substring_catalog: BannedSubstringCatalogCapability | None = None
     json_output: JSONOutputCapability | None = None
     unsafe_url: UnsafeURLCapability | None = None
+    payment_card: PaymentCardCapability | None = None
 
     def __post_init__(self) -> None:
         try:
@@ -164,6 +180,12 @@ class FirewallCapabilities:
             self.unsafe_url, UnsafeURLCapability
         ):
             raise TypeError("unsafe_url must be an UnsafeURLCapability or None")
+        if self.payment_card is not None and not isinstance(
+            self.payment_card, PaymentCardCapability
+        ):
+            raise TypeError(
+                "payment_card must be a PaymentCardCapability or None"
+            )
         object.__setattr__(
             self,
             "rules",
@@ -179,6 +201,7 @@ __all__ = [
     "BannedSubstringCatalogCapability",
     "FirewallCapabilities",
     "JSONOutputCapability",
+    "PaymentCardCapability",
     "RuleCapability",
     "SecretCatalogCapability",
     "UnsafeURLCapability",

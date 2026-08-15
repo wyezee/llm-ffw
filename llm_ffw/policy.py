@@ -430,6 +430,7 @@ def _builtin_policy(
     invisible_action: Action | None,
     json_output_action: Action,
     unsafe_url_action: Action,
+    payment_card_action: Action,
 ) -> FirewallPolicy:
     invisible_overrides = (
         (
@@ -444,7 +445,7 @@ def _builtin_policy(
     )
     return FirewallPolicy(
         policy_id=policy_id,
-        version="1.3.0",
+        version="1.4.0",
         overrides=(
             PolicyOverride("secrets.detected", ScanScope.INPUT, input_action),
             PolicyOverride("secrets.detected", ScanScope.OUTPUT, output_action),
@@ -464,6 +465,16 @@ def _builtin_policy(
                 ScanScope.OUTPUT,
                 unsafe_url_action,
             ),
+            PolicyOverride(
+                "pii.payment_card",
+                ScanScope.INPUT,
+                payment_card_action,
+            ),
+            PolicyOverride(
+                "pii.payment_card",
+                ScanScope.OUTPUT,
+                payment_card_action,
+            ),
         ),
     )
 
@@ -475,6 +486,7 @@ BALANCED_POLICY = _builtin_policy(
     invisible_action=None,
     json_output_action=Action.BLOCK,
     unsafe_url_action=Action.REDACT,
+    payment_card_action=Action.REDACT,
 )
 STRICT_POLICY = _builtin_policy(
     "llm_ffw.strict",
@@ -483,6 +495,7 @@ STRICT_POLICY = _builtin_policy(
     invisible_action=Action.BLOCK,
     json_output_action=Action.BLOCK,
     unsafe_url_action=Action.BLOCK,
+    payment_card_action=Action.BLOCK,
 )
 AUDIT_POLICY = _builtin_policy(
     "llm_ffw.audit",
@@ -491,6 +504,7 @@ AUDIT_POLICY = _builtin_policy(
     invisible_action=Action.REVIEW,
     json_output_action=Action.REVIEW,
     unsafe_url_action=Action.REVIEW,
+    payment_card_action=Action.REVIEW,
 )
 
 
@@ -516,6 +530,7 @@ class Firewall:
                     "unicode.invisible_characters",
                     "output.json.validity",
                     "url.unsafe",
+                    "pii.payment_card",
                     *(rule.rule_id for rule in self._scanner.rules),
                 )
             ),
