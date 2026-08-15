@@ -1,0 +1,56 @@
+name: Release gates
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  production-envelope:
+    name: 8 MB envelope / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Python 3.14.7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14.7"
+          check-latest: false
+
+      - name: Run isolated wheel gate
+        run: python tools/release_smoke.py
+
+      - name: Run balanced-policy performance gate
+        run: python benchmarks/bench_policy.py --size 8000000 --rounds 3 --min-throughput-mib-s 5
+
+      - name: Run process soak and recycling gate
+        run: python benchmarks/bench_soak.py --size 8000000 --workers 4 --concurrency 8 --requests 32 --max-tasks-per-child 4 --min-requests-per-second 1
+
+      - name: Run peak-memory gate
+        run: python benchmarks/bench_memory.py --size 8000000 --max-peak-rss-mib 512
+
+      - name: Run atomic-reload lifecycle gate
+        run: >-
+          python benchmarks/bench_manager_reload.py
+          --size 8000000
+          --workers 2
+          --concurrency 4
+          --reloads 4
+          --min-requests 16
+          --max-tasks-per-child 8
+          --timeout 180
+          --memory-sample-ms 10
+          --max-peak-tree-rss-mib 768
+          --max-reload-seconds 30
+          --min-requests-per-second 0.5

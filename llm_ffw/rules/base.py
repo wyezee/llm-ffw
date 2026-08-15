@@ -6,6 +6,7 @@ from types import MappingProxyType
 from typing import Mapping
 
 from ..findings import Action, Severity, Span
+from ..inspection import Inspection, InspectionFeature, ScanScope
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +58,17 @@ class Rule(ABC):
     def purpose(self) -> str:
         """Return a concise description of the rule's behavior."""
 
+    @property
     @abstractmethod
-    def scan(self, text: str) -> tuple[RuleMatch, ...]:
-        """Return matches in normalized text without retaining matched values."""
+    def scopes(self) -> frozenset[ScanScope]:
+        """Return the input/output directions where this rule applies."""
+
+    @property
+    def inspection_features(self) -> frozenset[InspectionFeature]:
+        """Return shared derived data required by this rule."""
+
+        return frozenset()
+
+    @abstractmethod
+    def scan(self, inspection: Inspection) -> tuple[RuleMatch, ...]:
+        """Return normalized-text matches without retaining matched values."""

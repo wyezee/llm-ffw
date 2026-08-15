@@ -1,7 +1,7 @@
 from dataclasses import replace
 import unittest
 
-from llm_ffw import Action, Finding, Scanner, ScannerConfig, Span
+from llm_ffw import Action, Finding, Scanner, ScannerConfig, ScanScope, Span
 from llm_ffw.rules import SecretsRule
 
 
@@ -10,6 +10,9 @@ def _key(marker: str) -> str:
 
 
 class ScannerTests(unittest.TestCase):
+    def test_default_limit_supports_large_contexts(self) -> None:
+        self.assertEqual(ScannerConfig().max_input_chars, 8_000_000)
+
     def test_default_scanner_has_only_secrets_rule(self) -> None:
         scanner = Scanner()
 
@@ -17,6 +20,17 @@ class ScannerTests(unittest.TestCase):
             tuple(rule.rule_id for rule in scanner.rules),
             ("secrets.detected",),
         )
+        self.assertEqual(
+            scanner.rules[0].scopes,
+            frozenset((ScanScope.INPUT, ScanScope.OUTPUT)),
+        )
+
+    def test_secrets_rule_scans_input_and_output(self) -> None:
+        value = _key("S")
+        scanner = Scanner()
+
+        self.assertEqual(len(scanner.scan(value, scope=ScanScope.INPUT)), 1)
+        self.assertEqual(len(scanner.scan(value, scope=ScanScope.OUTPUT)), 1)
 
     def test_findings_are_ordered_by_original_span(self) -> None:
         first = _key("A")

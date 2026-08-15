@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-package:
+    name: Python 3.14.7 / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Python 3.14.7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14.7"
+          check-latest: false
+
+      - name: Verify interpreter
+        run: python -c "import sys; assert sys.version_info[:3] == (3, 14, 7), sys.version"
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Compile source and test modules
+        run: python -m compileall -q llm_ffw tests benchmarks tools
+
+      - name: Verify standard-library-only runtime imports
+        run: python tools/check_runtime_imports.py
+
+      - name: Build and smoke-test isolated wheel
+        run: python tools/release_smoke.py

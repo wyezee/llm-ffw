@@ -7,7 +7,7 @@ from dataclasses import dataclass
 class ScannerConfig:
     """Resource and redaction limits with conservative defaults."""
 
-    max_input_chars: int = 1_000_000
+    max_input_chars: int = 8_000_000
     redaction_text: str = "[REDACTED]"
 
     def __post_init__(self) -> None:

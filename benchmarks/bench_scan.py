@@ -1,4 +1,4 @@
-"""Dependency-free microbenchmark for the Milestone 1 scanning path."""
+"""Dependency-free microbenchmark for the default catalog scanning path."""
 
 import argparse
 from pathlib import Path

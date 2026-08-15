@@ -1,0 +1,310 @@
+"""High-level production facade for sanitized input and output text."""
+
+from concurrent.futures.process import BrokenProcessPool
+import math
+
+from .capabilities import (
+    FirewallCapabilities,
+    RuleCapability,
+    SecretCatalogCapability,
+)
+from .config import ScannerConfig
+from .findings import Finding
+from .inspection import ScanScope
+from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult
+from .process_pool import (
+    ProcessPoolNotRunningError,
+    ProcessPoolSaturatedError,
+    ProcessPoolState,
+    ProcessScannerPool,
+    ProcessScannerPoolConfig,
+)
+from .rules.secrets import SecretsRule
+from .secret_catalog import (
+    BUILTIN_SECRET_CATALOG,
+    SecretCatalog,
+)
+
+
+class ContentBlockedError(RuntimeError):
+    """Raised when policy blocks content without retaining the original text."""
+
+    def __init__(self, result: FirewallResult) -> None:
+        if not isinstance(result, FirewallResult) or not result.blocked:
+            raise ValueError("result must be a blocked FirewallResult")
+        super().__init__("content blocked by firewall policy")
+        self.policy_id = result.policy_id
+        self.policy_version = result.policy_version
+        self.scope = result.scope
+        self.findings: tuple[Finding, ...] = result.findings
+
+
+class FirewallUnavailableError(RuntimeError):
+    """Raised when content cannot be safely inspected."""
+
+    def __init__(self, cause_type: str) -> None:
+        super().__init__("content inspection unavailable")
+        self.cause_type = cause_type
+
+
+def _validate_request_timeout(value: object) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError("request_timeout_seconds must be numeric or None")
+    if value < 0 or not math.isfinite(value):
+        raise ValueError(
+            "request_timeout_seconds must be finite and not negative"
+        )
+    return float(value)
+
+
+def _resolve_secret_catalog(
+    additional_secret_catalog: SecretCatalog | None,
+    replacement_secret_catalog: SecretCatalog | None,
+) -> SecretCatalog:
+    for value, field_name in (
+        (additional_secret_catalog, "additional_secret_catalog"),
+        (replacement_secret_catalog, "replacement_secret_catalog"),
+    ):
+        if value is not None and not isinstance(value, SecretCatalog):
+            raise TypeError(f"{field_name} must be a SecretCatalog or None")
+    if (
+        additional_secret_catalog is not None
+        and replacement_secret_catalog is not None
+    ):
+        raise ValueError(
+            "additional_secret_catalog and replacement_secret_catalog "
+            "are mutually exclusive"
+        )
+    if replacement_secret_catalog is not None:
+        return replacement_secret_catalog
+    if additional_secret_catalog is None:
+        return BUILTIN_SECRET_CATALOG
+    builtin_prefixes = tuple(
+        prefix
+        for signature in BUILTIN_SECRET_CATALOG.signatures
+        for prefix in signature.prefixes
+    )
+    additional_prefixes = tuple(
+        prefix
+        for signature in additional_secret_catalog.signatures
+        for prefix in signature.prefixes
+    )
+    if any(
+        builtin.startswith(additional) or additional.startswith(builtin)
+        for builtin in builtin_prefixes
+        for additional in additional_prefixes
+    ):
+        raise ValueError(
+            "additional secret prefixes must not overlap built-in prefixes"
+        )
+    return SecretCatalog(
+        catalog_id=additional_secret_catalog.catalog_id,
+        version=additional_secret_catalog.version,
+        signatures=(
+            BUILTIN_SECRET_CATALOG.signatures
+            + additional_secret_catalog.signatures
+        ),
+    )
+
+
+class LLMFirewall:
+    """Sanitize text through one lifecycle-managed process scanner pool."""
+
+    def __init__(
+        self,
+        *,
+        scanner_config: ScannerConfig | None = None,
+        pool_config: ProcessScannerPoolConfig | None = None,
+        additional_secret_catalog: SecretCatalog | None = None,
+        replacement_secret_catalog: SecretCatalog | None = None,
+        policy: FirewallPolicy = BALANCED_POLICY,
+        request_timeout_seconds: float | None = 5.0,
+    ) -> None:
+        self._request_timeout_seconds = _validate_request_timeout(
+            request_timeout_seconds
+        )
+        catalog = _resolve_secret_catalog(
+            additional_secret_catalog,
+            replacement_secret_catalog,
+        )
+        self._pool = ProcessScannerPool(
+            scanner_config=scanner_config,
+            pool_config=pool_config,
+            secret_catalog=(
+                None if catalog is BUILTIN_SECRET_CATALOG else catalog
+            ),
+            policy=policy,
+        )
+        catalog = self._pool.secret_catalog
+        self._capabilities = FirewallCapabilities(
+            rules=(
+                RuleCapability(
+                    rule_id=SecretsRule.RULE_ID,
+                    purpose=SecretsRule.PURPOSE,
+                    scopes=tuple(SecretsRule.SCOPES),
+                ),
+            ),
+            secret_catalog=SecretCatalogCapability(
+                catalog_id=catalog.catalog_id,
+                version=catalog.version,
+                signature_count=len(catalog.signatures),
+                prefix_count=sum(
+                    len(signature.prefixes) for signature in catalog.signatures
+                ),
+                providers=tuple(
+                    signature.provider for signature in catalog.signatures
+                ),
+            ),
+            policy_id=self._pool.policy.policy_id,
+            policy_version=self._pool.policy.version,
+        )
+
+    @property
+    def state(self) -> ProcessPoolState:
+        """Return the underlying lifecycle state for readiness checks."""
+
+        return self._pool.state
+
+    def capabilities(self) -> FirewallCapabilities:
+        """Return an immutable summary without prefixes or source locations."""
+
+        return self._capabilities
+
+    def start(self) -> "LLMFirewall":
+        """Start workers once during application startup."""
+
+        if self._pool.state is ProcessPoolState.RUNNING:
+            return self
+        failure: FirewallUnavailableError | None = None
+        try:
+            self._pool.start()
+        except Exception as exc:
+            failure = self._unavailable_error(exc)
+        if failure is not None:
+            raise failure
+        return self
+
+    def close(self) -> None:
+        """Stop admission and close workers during graceful shutdown."""
+
+        failure: FirewallUnavailableError | None = None
+        try:
+            self._pool.shutdown(cancel_pending=True)
+        except Exception as exc:
+            failure = self._unavailable_error(exc)
+        if failure is not None:
+            raise failure
+
+    def terminate(self) -> None:
+        """Terminate workers at the service's graceful-shutdown deadline."""
+
+        failure: FirewallUnavailableError | None = None
+        try:
+            self._pool.terminate()
+        except Exception as exc:
+            failure = self._unavailable_error(exc)
+        if failure is not None:
+            raise failure
+
+    def kill(self) -> None:
+        """Kill workers at the service's final hard-stop deadline."""
+
+        failure: FirewallUnavailableError | None = None
+        try:
+            self._pool.kill()
+        except Exception as exc:
+            failure = self._unavailable_error(exc)
+        if failure is not None:
+            raise failure
+
+    def sanitize_input(self, text: str) -> str:
+        """Return input text after applying the configured firewall policy."""
+
+        self._validate_text(text, "text")
+        return self._sanitize(text, scope=ScanScope.INPUT)
+
+    def sanitize_output(
+        self,
+        text: str,
+        *,
+        prompt_context: str | None = None,
+    ) -> str:
+        """Return output text after applying the configured firewall policy."""
+
+        self._validate_text(text, "text")
+        if prompt_context is not None:
+            self._validate_text(prompt_context, "prompt_context")
+        return self._sanitize(
+            text,
+            scope=ScanScope.OUTPUT,
+            prompt_context=prompt_context,
+        )
+
+    def _sanitize(
+        self,
+        text: str,
+        *,
+        scope: ScanScope,
+        prompt_context: str | None = None,
+    ) -> str:
+        failure: FirewallUnavailableError | None = None
+        result: FirewallResult | None = None
+        try:
+            result = self._pool.process(
+                text,
+                scope=scope,
+                prompt_context=prompt_context,
+                timeout=self._request_timeout_seconds,
+            )
+        except Exception as exc:
+            failure = self._unavailable_error(exc)
+        if failure is not None:
+            raise failure
+        if result is None:
+            raise FirewallUnavailableError("InternalInspectionError")
+        if result.blocked:
+            raise ContentBlockedError(result)
+        if result.processed_text is None:
+            raise FirewallUnavailableError("InternalInspectionError")
+        return result.processed_text
+
+    def _validate_text(self, value: object, field_name: str) -> None:
+        if not isinstance(value, str):
+            raise TypeError(f"{field_name} must be a string")
+        if len(value) > self._pool.scanner_config.max_input_chars:
+            raise ValueError(
+                f"{field_name} exceeds max_input_chars="
+                f"{self._pool.scanner_config.max_input_chars}"
+            )
+
+    @staticmethod
+    def _unavailable_error(exc: Exception) -> FirewallUnavailableError:
+        known = (
+            BrokenProcessPool,
+            ProcessPoolNotRunningError,
+            ProcessPoolSaturatedError,
+            TimeoutError,
+        )
+        cause_type = type(exc).__name__
+        if not isinstance(exc, known):
+            cause_type = "InternalInspectionError"
+        return FirewallUnavailableError(cause_type)
+
+    def __enter__(self) -> "LLMFirewall":
+        return self.start()
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        try:
+            self.close()
+        except FirewallUnavailableError:
+            if exc_type is None:
+                raise
+
+
+__all__ = [
+    "ContentBlockedError",
+    "FirewallUnavailableError",
+    "LLMFirewall",
+]

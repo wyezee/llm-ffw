@@ -37,6 +37,10 @@ class SecretsRuleTests(unittest.TestCase):
                 self.assertEqual(finding.severity, Severity.HIGH)
                 self.assertEqual(finding.action, Action.REDACT)
                 self.assertEqual(finding.metadata["secret_type"], expected_type)
+                self.assertEqual(finding.metadata["catalog_id"], "llm_ffw.builtin.secrets")
+                self.assertEqual(finding.metadata["catalog_version"], "3.0.0")
+                self.assertTrue(finding.metadata["signature_id"])
+                self.assertTrue(finding.metadata["provider"])
                 self.assertEqual(
                     finding.redacted_preview,
                     f"[REDACTED:{expected_type}]",
