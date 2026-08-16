@@ -1,4 +1,4 @@
-"""Incremental, redacting inspection for constrained secret signatures."""
+"""Internal incremental inspection for constrained secret signatures."""
 
 from dataclasses import dataclass
 from enum import Enum
@@ -9,12 +9,11 @@ from .rules.secrets import SecretsRule
 from .secret_catalog import (
     SecretCatalog,
     SecretSignature,
-    _resolve_secret_catalog,
 )
 
 
-class SecretStreamState(str, Enum):
-    """Lifecycle state of a :class:`SecretStream`."""
+class _EngineState(str, Enum):
+    """Internal lifecycle state for the fused secrets engine."""
 
     OPEN = "open"
     FINISHED = "finished"
@@ -44,14 +43,8 @@ class _SegmentPlan:
     overflow_start: int | None = None
 
 
-class SecretStream:
-    """Redact catalog-shaped secrets while text arrives in chunks.
-
-    This specialized API runs only ``SecretsRule``-equivalent inspection. It
-    does not represent that other firewall rules inspected the stream. Catalog
-    actions must be ``REDACT`` because already-emitted text cannot be recalled.
-    Instances are stateful and must not be shared between concurrent callers.
-    """
+class _SecretStreamEngine:
+    """Internal fused redaction engine for catalog-shaped secrets."""
 
     MAX_PENDING_CANDIDATE_CHARS = 65_536
 
@@ -78,20 +71,12 @@ class SecretStream:
     def __init__(
         self,
         *,
-        additional_secret_catalog: SecretCatalog | None = None,
-        replacement_secret_catalog: SecretCatalog | None = None,
+        catalog: SecretCatalog,
         max_input_chars: int = 8_000_000,
         redaction_text: str = "[REDACTED]",
     ) -> None:
-        catalog = _resolve_secret_catalog(
-            additional_secret_catalog,
-            replacement_secret_catalog,
-        )
-        if any(
-            signature.action is not Action.REDACT
-            for signature in catalog.signatures
-        ):
-            raise ValueError("SecretStream supports REDACT secret actions only")
+        if not isinstance(catalog, SecretCatalog):
+            raise TypeError("catalog must be a SecretCatalog")
         for signature in catalog.signatures:
             if signature.max_suffix_chars is None and (
                 signature.suffix_ending
@@ -157,10 +142,10 @@ class SecretStream:
         self._received_chars = 0
         self._max_buffered_chars = 0
         self._findings: list[Finding] = []
-        self._state = SecretStreamState.OPEN
+        self._state = _EngineState.OPEN
 
     @property
-    def state(self) -> SecretStreamState:
+    def state(self) -> _EngineState:
         """Return the current stream lifecycle state."""
 
         return self._state
@@ -229,7 +214,7 @@ class SecretStream:
                 plan = self._plan_segment(self._pending, final=True)
                 parts.append(self._apply_plan(self._pending, plan))
                 self._pending = ""
-            self._state = SecretStreamState.FINISHED
+            self._state = _EngineState.FINISHED
             return "".join(parts)
         except BaseException:
             self.cancel()
@@ -238,14 +223,14 @@ class SecretStream:
     def cancel(self) -> None:
         """Cancel an open stream and release retained source text."""
 
-        if self._state is SecretStreamState.OPEN:
+        if self._state is _EngineState.OPEN:
             self._pending = ""
             self._previous_char = ""
             self._active_unbounded = None
-            self._state = SecretStreamState.CANCELLED
+            self._state = _EngineState.CANCELLED
 
     def _require_open(self) -> None:
-        if self._state is not SecretStreamState.OPEN:
+        if self._state is not _EngineState.OPEN:
             raise RuntimeError("stream is not open")
 
     def _consume(self, chunk: str, *, chunk_start: int) -> str:
@@ -472,7 +457,11 @@ class SecretStream:
             action=Action.REDACT,
             span=Span(start, end),
             message=f"Potential {signature.secret_type} detected.",
-            redacted_preview=f"[REDACTED:{signature.secret_type}]",
+            redacted_preview=(
+                f"[REDACTED:{signature.secret_type}]"
+                if signature.action is Action.REDACT
+                else None
+            ),
             metadata={
                 "secret_type": signature.secret_type,
                 "provider": signature.provider,
@@ -486,4 +475,4 @@ class SecretStream:
         )
 
 
-__all__ = ["SecretStream", "SecretStreamState"]
+__all__: list[str] = []

@@ -57,7 +57,7 @@ Choose the highest-level API that fits the integration:
 | `AsyncLLMFirewall` | The same production contract for asyncio applications |
 | `LLMFirewallManager` | The same facade with zero-downtime secret-catalog reloads |
 | `AsyncLLMFirewallManager` | Asyncio sanitization plus asynchronous catalog lifecycle |
-| `SecretStream` | Incremental redaction when only catalog-shaped secrets are required |
+| `FirewallStream` | Chunked input with explicit incremental or buffered enforcement |
 | `Firewall` | Same-process scanning plus policy application |
 | `Scanner` | Same-process detection when the host applies findings itself |
 | `ProcessScannerPool` | Advanced process orchestration and explicit overload control |
@@ -84,15 +84,18 @@ the context-manager form is convenient for scripts and batch jobs. Standalone
 programs must protect their entry point with `if __name__ == "__main__":`
 because the facade uses worker processes.
 
-### Incremental secret redaction
+### Unified streaming
 
-Use `SecretStream` when text must be forwarded incrementally and the required
-protection is specifically the versioned secret-signature catalog:
+`FirewallStream` accepts chunked text without changing the meaning of the
+configured scanner or policy. The default `AUTO` mode emits incrementally only
+when every active rule and effective action can safely do so; otherwise it
+buffers the request and applies the normal firewall at `finish()`:
 
 ```python
-from llm_ffw import SecretStream
+from llm_ffw import Firewall
 
-stream = SecretStream()
+firewall = Firewall()
+stream = firewall.stream()
 try:
     for chunk in incoming_chunks:
         safe_chunk = stream.feed(chunk)
@@ -104,41 +107,42 @@ try:
 except BaseException:
     stream.cancel()
     raise
-
-for finding in stream.findings:
-    record_metric(finding.rule_id, finding.action.value)
 ```
 
-`feed()` accepts one non-empty string and returns text that is safe to forward
-immediately. `finish()` resolves any prefix or credential ending at end of
-stream and must be called after the final chunk. Findings contain spans into
-the original concatenated input and safe metadata, never the matched value.
-The stream defaults to the built-in catalog, an 8,000,000-character cumulative
-limit, and `[REDACTED]`; these can be configured at construction time.
+With the default scanner, `execution_mode` is `StreamMode.BUFFERED` because
+several baseline rules require complete-document execution in this release.
+This preserves all configured protection instead of silently skipping rules.
+`feed()` therefore returns an empty string and `finish()` returns the complete
+sanitized result. A blocking policy raises `ContentBlockedError` from
+`finish()` without returning the original text.
 
-This is intentionally a secrets-only API. It does not run or claim coverage
-from invisible-character, Unicode-tag, payment-card, private-key, JWT, URL,
-banned-substring, or JSON rules. Those rules can require transformations or
-whole-document decisions that cannot safely be represented as early streaming
-output. Use `LLMFirewall` or `AsyncLLMFirewall` when the complete configured
-rule set is required.
-
-Only redacting secret catalogs are accepted because emitted text cannot be
-recalled after a later block decision. Deployment-specific signatures use the
-same explicit configuration contract as the main facade:
+Applications that require early output can request it explicitly. Construction
+fails with `IncrementalStreamingUnavailableError` if any active rule, catalog
+shape, or policy action cannot preserve semantics:
 
 ```python
-stream = SecretStream(additional_secret_catalog=application_secrets)
+from llm_ffw import Firewall, Scanner, StreamMode
+from llm_ffw.rules import SecretsRule
+
+firewall = Firewall(scanner=Scanner(rules=(SecretsRule(),)))
+stream = firewall.stream(mode=StreamMode.INCREMENTAL)
 ```
 
-`additional_secret_catalog` extends the built-ins;
-`replacement_secret_catalog` explicitly replaces them. They are mutually
-exclusive. Unbounded custom signatures are accepted only when their suffix and
-boundary character sets are identical and no required suffix ending is used;
-otherwise the stream rejects the catalog during construction rather than
-buffering attacker-sized candidate text. Bounded signatures are limited to
-65,536 suffix characters for the same reason. A stream is stateful, belongs to
-one request, and must not be shared between concurrent callers.
+The current release has a fused incremental implementation for `SecretsRule`.
+Other active rules are reported as `StreamingSupport.END_OF_STREAM` and cause
+`AUTO` to buffer or `INCREMENTAL` to reject. This is a capability boundary, not
+a security downgrade; more rules can gain incremental implementations behind
+the same API without changing client integration. Inspect `execution_mode` and
+`rule_capabilities` before accepting traffic when deployment behavior depends
+on early emission. `StreamMode.BUFFERED` can be selected to require full batch
+semantics explicitly.
+
+Incremental secret execution requires an effective `REDACT` action because
+previously emitted text cannot be recalled. Candidate shapes that would need
+attacker-sized retention also fall back to buffered execution in `AUTO` mode.
+Findings retain spans into the original concatenated text and disclosure-safe
+metadata. Each stream belongs to one request and must not be shared between
+concurrent callers.
 
 ### Async usage
 

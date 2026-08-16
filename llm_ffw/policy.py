@@ -4,13 +4,17 @@ from dataclasses import dataclass, field, replace
 from bisect import bisect_left, bisect_right
 import re
 from types import MappingProxyType
-from typing import Callable, Mapping
+from typing import TYPE_CHECKING, Callable, Mapping
 
 from .engine import Scanner
 from .findings import Action, Finding, Span
 from .inspection import ScanScope
 from .rules.json_output import JSONOutputRule
 from .redaction import sanitize_findings
+from .stream_types import StreamMode
+
+if TYPE_CHECKING:
+    from .streaming import FirewallStream
 
 
 _IDENTIFIER = re.compile(r"[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?\Z")
@@ -640,6 +644,25 @@ class Firewall:
     @property
     def policy(self) -> FirewallPolicy:
         return self._policy
+
+    def stream(
+        self,
+        *,
+        scope: ScanScope = ScanScope.INPUT,
+        mode: StreamMode = StreamMode.AUTO,
+        prompt_context: str | None = None,
+    ) -> "FirewallStream":
+        """Create a unified stream using this firewall's scanner and policy."""
+
+        from .streaming import FirewallStream
+
+        return FirewallStream(
+            scanner=self._scanner,
+            policy=self._policy,
+            scope=scope,
+            mode=mode,
+            prompt_context=prompt_context,
+        )
 
     def process(
         self,

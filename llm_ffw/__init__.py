@@ -64,7 +64,14 @@ from .secret_catalog import (
     SecretSignature,
     SignatureStatus,
 )
-from .secret_stream import SecretStream, SecretStreamState
+from .streaming import FirewallStream
+from .stream_types import (
+    FirewallStreamState,
+    IncrementalStreamingUnavailableError,
+    StreamingRuleCapability,
+    StreamingSupport,
+    StreamMode,
+)
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.banned_substrings import BannedSubstringsRule
@@ -128,12 +135,16 @@ __all__ = [
     "SecretCatalog",
     "SecretCatalogCapability",
     "SecretSignature",
-    "SecretStream",
-    "SecretStreamState",
+    "FirewallStream",
+    "FirewallStreamState",
+    "IncrementalStreamingUnavailableError",
     "Severity",
     "SignatureStatus",
     "Span",
     "STRICT_POLICY",
+    "StreamingRuleCapability",
+    "StreamingSupport",
+    "StreamMode",
     "UnsafeURLCapability",
     "UnsafeURLConfig",
     "UnsafeURLRule",

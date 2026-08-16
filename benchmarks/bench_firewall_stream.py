@@ -1,4 +1,4 @@
-"""Benchmark the production SecretStream against balanced batch inspection."""
+"""Benchmark incremental FirewallStream against balanced batch inspection."""
 
 import argparse
 from pathlib import Path
@@ -12,16 +12,21 @@ from benchmarks.synthetic_data import build_dataset
 from llm_ffw import (
     BALANCED_POLICY,
     Firewall,
+    FirewallStream,
     ScanScope,
     Scanner,
     ScannerConfig,
-    SecretStream,
+    StreamMode,
 )
 from llm_ffw.rules import SecretsRule
 
 
-def _stream_once(text: str, chunk_size: int) -> tuple[str, SecretStream]:
-    stream = SecretStream(max_input_chars=len(text))
+def _stream_once(
+    firewall: Firewall,
+    text: str,
+    chunk_size: int,
+) -> tuple[str, FirewallStream]:
+    stream = firewall.stream(mode=StreamMode.INCREMENTAL)
     parts: list[str] = []
     for start in range(0, len(text), chunk_size):
         parts.append(stream.feed(text[start : start + chunk_size]))
@@ -59,7 +64,7 @@ def main() -> None:
 
     batch_durations: list[float] = []
     stream_durations: list[float] = []
-    last_stream: SecretStream | None = None
+    last_stream: FirewallStream | None = None
     for _ in range(args.rounds):
         started = time.perf_counter()
         batch = firewall.process(text, scope=ScanScope.INPUT)
@@ -68,7 +73,7 @@ def main() -> None:
             raise RuntimeError("batch oracle changed between deterministic runs")
 
         started = time.perf_counter()
-        streamed_text, stream = _stream_once(text, args.chunk_size)
+        streamed_text, stream = _stream_once(firewall, text, args.chunk_size)
         stream_durations.append(time.perf_counter() - started)
         if streamed_text != oracle.processed_text:
             raise RuntimeError("streaming output differs from batch oracle")
@@ -86,9 +91,9 @@ def main() -> None:
         else 0.0
     )
     verdict = (
-        "secret_stream_performance_pass"
+        "firewall_stream_performance_pass"
         if overhead_percent <= args.max_overhead_percent
-        else "secret_stream_performance_fail"
+        else "firewall_stream_performance_fail"
     )
     print(f"size={len(text)}")
     print(f"chunk_size={args.chunk_size}")
@@ -100,7 +105,7 @@ def main() -> None:
     print(f"max_overhead_percent={args.max_overhead_percent:.2f}")
     print(f"verdict={verdict}")
     if overhead_percent > args.max_overhead_percent:
-        raise SystemExit("SecretStream overhead gate failed")
+        raise SystemExit("FirewallStream overhead gate failed")
 
 
 if __name__ == "__main__":
