@@ -138,6 +138,40 @@ class UnsafeURLRuleTests(unittest.TestCase):
                 finding = scanner.scan(text, scope=ScanScope.OUTPUT)[0]
                 self.assertEqual(finding.metadata["reason"], reason)
 
+    def test_detects_exact_cloud_metadata_hostnames_without_disclosure(self) -> None:
+        cases = (
+            "http://metadata.google.internal/computeMetadata/v1/private-value",
+            "https://metadata.tencentyun.com/latest/meta-data/private-value",
+            "http://METADATA.GOOGLE.INTERNAL./private-value",
+        )
+        scanner = _scanner()
+        for text in cases:
+            with self.subTest(text=text):
+                finding = scanner.scan(text, scope=ScanScope.OUTPUT)[0]
+                self.assertEqual(
+                    finding.metadata["reason"], "cloud_metadata_hostname"
+                )
+                self.assertIs(finding.action, Action.REDACT)
+                self.assertNotIn("private-value", finding.message)
+                self.assertNotIn(
+                    "private-value", repr(dict(finding.metadata))
+                )
+
+    def test_cloud_metadata_hostnames_require_an_exact_url_host(self) -> None:
+        safe = (
+            "https://metadata.google.internal.example.com/path",
+            "https://notmetadata.tencentyun.com/path",
+            "https://metadata.azure.com/path",
+            "metadata.google.internal",
+        )
+        scanner = _scanner()
+        for text in safe:
+            with self.subTest(text=text):
+                self.assertEqual(
+                    scanner.scan(text, scope=ScanScope.OUTPUT),
+                    (),
+                )
+
     def test_detects_ambiguous_authorities(self) -> None:
         cases = (
             ("http://2130706433/admin", "ambiguous_numeric_host"),

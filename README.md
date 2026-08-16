@@ -145,9 +145,10 @@ firewall = LLMFirewall(unsafe_url_config=UnsafeURLConfig())
 ```
 
 `UnsafeURLRule` redacts dangerous schemes, embedded URL user-info, local or
-non-public IP targets, and ambiguous authorities under balanced policy. It
-checks input and output by default; deployments can restrict its `scopes`.
-It performs no DNS, HTTP, reputation, model, or other network call. See
+non-public IP targets, exact documented cloud metadata hostnames, and ambiguous
+authorities under balanced policy. It checks input and output by default;
+deployments can restrict its `scopes`. It performs no DNS, HTTP, reputation,
+model, or other network call. See
 [`docs/unsafe-urls.md`](docs/unsafe-urls.md).
 
 ## Default payment-card inspection

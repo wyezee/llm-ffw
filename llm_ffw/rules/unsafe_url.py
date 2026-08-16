@@ -19,6 +19,9 @@ _URL_START = re.compile(
     re.IGNORECASE | re.ASCII,
 )
 _DANGEROUS_SCHEMES = frozenset(("javascript", "vbscript", "data", "file"))
+_CLOUD_METADATA_HOSTNAMES = frozenset(
+    ("metadata.google.internal", "metadata.tencentyun.com")
+)
 _END_DELIMITERS = frozenset(('"', "'", "<", ">", "`"))
 _TRAILING_PUNCTUATION = frozenset((".", ",", ";", "!", "?"))
 _NUMERIC_HOST = re.compile(
@@ -112,6 +115,8 @@ def _host_risks(candidate: str) -> tuple[str, ...]:
     lowered = hostname.lower().rstrip(".")
     if lowered == "localhost" or lowered.endswith(".localhost"):
         risks.append("local_hostname")
+    if lowered in _CLOUD_METADATA_HOSTNAMES:
+        risks.append("cloud_metadata_hostname")
 
     address_text = lowered
     if "%" in address_text:
