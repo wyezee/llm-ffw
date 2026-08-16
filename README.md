@@ -14,6 +14,28 @@ Unicode tag runs; and redacts Luhn-valid payment-card candidates. Findings
 retain original-text spans and safe category metadata rather than matched
 values.
 
+## Measured performance
+
+Release `0.2.0` was benchmarked on GitHub-hosted Ubuntu and Windows runners
+with Python 3.14.7. The test payload contains 8,000,000 synthetic ASCII
+characters (about 7.63 MiB), representative of a million-token-scale prompt.
+This is a size comparison rather than an exact token count: tokenization varies
+by model, tokenizer, language, and content.
+
+| Scenario | Ubuntu | Windows |
+| --- | ---: | ---: |
+| Single policy scan, median | 609 ms / 12.53 MiB/s | 637 ms / 11.97 MiB/s |
+| Concurrent soak, 4 workers and 8 callers | 3.33 requests/s | 3.19 requests/s |
+| Concurrent aggregate throughput | 25.41 MiB/s | 24.37 MiB/s |
+| Separate single-process memory benchmark, peak RSS | 47.22 MiB | 48.77 MiB |
+
+The concurrent soak processed 32 complete payloads, validated every result,
+and recycled each worker after four tasks. These are reproducible CI
+measurements, not universal latency guarantees; performance varies with input,
+enabled rules, policy, CPU, and concurrency. See the
+[exact release-gate run](https://github.com/wyezee/llm-ffw/actions/runs/31952014903)
+and the commands under [Development and validation](#development-and-validation).
+
 ## Usage
 
 Production integrations should use `LLMFirewall`. Its balanced default redacts
@@ -320,6 +342,9 @@ py -3.14 -m venv .venv
 .venv\Scripts\python benchmarks/bench_scan.py --size 1000000 --rounds 5
 .venv\Scripts\python benchmarks/generate_synthetic_dataset.py --size 8000000
 .venv\Scripts\python benchmarks/bench_concurrent_scan.py --size 8000000 --workers 4 --requests 8
+.venv\Scripts\python benchmarks/bench_policy.py --size 8000000 --rounds 3
+.venv\Scripts\python benchmarks/bench_soak.py --size 8000000 --workers 4 --concurrency 8 --requests 32 --max-tasks-per-child 4
+.venv\Scripts\python benchmarks/bench_memory.py --size 8000000
 .venv\Scripts\python benchmarks/bench_manager_reload.py --size 8000000 --workers 2 --concurrency 4 --reloads 4 --min-requests 16 --max-tasks-per-child 8
 ```
 
