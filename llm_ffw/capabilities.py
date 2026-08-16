@@ -137,6 +137,20 @@ class PaymentCardCapability:
 
 
 @dataclass(frozen=True, slots=True)
+class PrivateKeyCapability:
+    """Disclosure-safe private-key inspection limits pinned to the facade."""
+
+    max_candidates: int
+    max_block_chars: int
+
+    def __post_init__(self) -> None:
+        for field_name in ("max_candidates", "max_block_chars"):
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{field_name} must be a positive integer")
+
+
+@dataclass(frozen=True, slots=True)
 class FirewallCapabilities:
     """Safe summary of the rules, catalog, and policy pinned to one facade."""
 
@@ -148,6 +162,7 @@ class FirewallCapabilities:
     json_output: JSONOutputCapability | None = None
     unsafe_url: UnsafeURLCapability | None = None
     payment_card: PaymentCardCapability | None = None
+    private_key: PrivateKeyCapability | None = None
 
     def __post_init__(self) -> None:
         try:
@@ -186,6 +201,10 @@ class FirewallCapabilities:
             raise TypeError(
                 "payment_card must be a PaymentCardCapability or None"
             )
+        if self.private_key is not None and not isinstance(
+            self.private_key, PrivateKeyCapability
+        ):
+            raise TypeError("private_key must be a PrivateKeyCapability or None")
         object.__setattr__(
             self,
             "rules",
@@ -202,6 +221,7 @@ __all__ = [
     "FirewallCapabilities",
     "JSONOutputCapability",
     "PaymentCardCapability",
+    "PrivateKeyCapability",
     "RuleCapability",
     "SecretCatalogCapability",
     "UnsafeURLCapability",

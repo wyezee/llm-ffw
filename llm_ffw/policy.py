@@ -431,6 +431,7 @@ def _builtin_policy(
     json_output_action: Action,
     unsafe_url_action: Action,
     payment_card_action: Action,
+    private_key_action: Action,
 ) -> FirewallPolicy:
     invisible_overrides = (
         (
@@ -445,7 +446,7 @@ def _builtin_policy(
     )
     return FirewallPolicy(
         policy_id=policy_id,
-        version="1.4.0",
+        version="1.5.0",
         overrides=(
             PolicyOverride("secrets.detected", ScanScope.INPUT, input_action),
             PolicyOverride("secrets.detected", ScanScope.OUTPUT, output_action),
@@ -475,6 +476,16 @@ def _builtin_policy(
                 ScanScope.OUTPUT,
                 payment_card_action,
             ),
+            PolicyOverride(
+                "secrets.private_key",
+                ScanScope.INPUT,
+                private_key_action,
+            ),
+            PolicyOverride(
+                "secrets.private_key",
+                ScanScope.OUTPUT,
+                private_key_action,
+            ),
         ),
     )
 
@@ -487,6 +498,7 @@ BALANCED_POLICY = _builtin_policy(
     json_output_action=Action.BLOCK,
     unsafe_url_action=Action.REDACT,
     payment_card_action=Action.REDACT,
+    private_key_action=Action.REDACT,
 )
 STRICT_POLICY = _builtin_policy(
     "llm_ffw.strict",
@@ -496,6 +508,7 @@ STRICT_POLICY = _builtin_policy(
     json_output_action=Action.BLOCK,
     unsafe_url_action=Action.BLOCK,
     payment_card_action=Action.BLOCK,
+    private_key_action=Action.BLOCK,
 )
 AUDIT_POLICY = _builtin_policy(
     "llm_ffw.audit",
@@ -505,6 +518,7 @@ AUDIT_POLICY = _builtin_policy(
     json_output_action=Action.REVIEW,
     unsafe_url_action=Action.REVIEW,
     payment_card_action=Action.REVIEW,
+    private_key_action=Action.REVIEW,
 )
 
 
@@ -531,6 +545,7 @@ class Firewall:
                     "output.json.validity",
                     "url.unsafe",
                     "pii.payment_card",
+                    "secrets.private_key",
                     *(rule.rule_id for rule in self._scanner.rules),
                 )
             ),

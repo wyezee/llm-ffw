@@ -9,6 +9,7 @@ from .redaction import sanitize_findings
 from .rules.base import Rule, RuleMatch
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.payment_card import PaymentCardRule
+from .rules.private_key import PrivateKeyRule
 from .rules.secrets import SecretsRule
 
 
@@ -30,6 +31,8 @@ class Scanner:
                 defaults.append(InvisibleCharactersRule())
             if self._config.enable_payment_cards:
                 defaults.append(PaymentCardRule())
+            if self._config.enable_private_keys:
+                defaults.append(PrivateKeyRule())
             selected_rules = tuple(defaults)
         else:
             selected_rules = tuple(rules)

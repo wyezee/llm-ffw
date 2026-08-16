@@ -32,13 +32,15 @@ assert "additional_secret_catalog" in facade_parameters
 assert "replacement_secret_catalog" in facade_parameters
 assert "secret_catalog" not in facade_parameters
 capabilities = LLMFirewall().capabilities()
-assert capabilities.rule_count == 3
+assert capabilities.rule_count == 4
 assert tuple(rule.rule_id for rule in capabilities.rules) == (
     "pii.payment_card",
     "secrets.detected",
+    "secrets.private_key",
     "unicode.invisible_characters",
 )
 assert capabilities.payment_card.max_candidates == 128
+assert capabilities.private_key.max_candidates == 32
 assert capabilities.secret_catalog.signature_count == 28
 assert "sk-" not in repr(capabilities)
 assert "https://" not in repr(capabilities)
@@ -64,6 +66,15 @@ assert invisible.processed_text == "helloworld"
 payment = Firewall().process("Card 4242424242424242", scope=ScanScope.OUTPUT)
 assert payment.decision is Action.REDACT
 assert payment.processed_text == "Card [REDACTED]"
+private_key = (
+    "-----BEGIN PRIVATE KEY-----\\n"
+    "QUJDREVGR0hJSktMTU5PUA==\\n"
+    "-----END PRIVATE KEY-----"
+)
+key_result = Firewall().process(private_key, scope=ScanScope.OUTPUT)
+assert key_result.decision is Action.REDACT
+assert key_result.processed_text == "[REDACTED]"
+assert private_key not in repr(key_result.findings)
 """
 
 

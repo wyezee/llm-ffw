@@ -19,6 +19,7 @@ from .inspection import ScanScope
 from .json_output import JSONOutputConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
+from .private_key import PrivateKeyConfig
 from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult
 from .rules.secrets import SecretsRule
 from .rules.banned_substrings import BannedSubstringsRule
@@ -26,6 +27,7 @@ from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.json_output import JSONOutputRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
+from .rules.private_key import PrivateKeyRule
 from .secret_catalog import BUILTIN_SECRET_CATALOG, SecretCatalog
 
 
@@ -125,6 +127,7 @@ def _initialize_worker(
     json_output_config: JSONOutputConfig | None,
     unsafe_url_config: UnsafeURLConfig | None,
     payment_card_config: PaymentCardConfig | None,
+    private_key_config: PrivateKeyConfig | None,
 ) -> None:
     global _WORKER_SCANNER
     if (
@@ -133,6 +136,7 @@ def _initialize_worker(
         and json_output_config is None
         and unsafe_url_config is None
         and payment_card_config is None
+        and private_key_config is None
     ):
         _WORKER_SCANNER = Scanner(config=scanner_config)
     else:
@@ -147,6 +151,8 @@ def _initialize_worker(
             rules.append(UnsafeURLRule(unsafe_url_config))
         if payment_card_config is not None:
             rules.append(PaymentCardRule(payment_card_config))
+        if private_key_config is not None:
+            rules.append(PrivateKeyRule(private_key_config))
         _WORKER_SCANNER = Scanner(
             rules=rules,
             config=scanner_config,
@@ -222,6 +228,7 @@ class ProcessScannerPool:
         json_output_config: JSONOutputConfig | None = None,
         unsafe_url_config: UnsafeURLConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
+        private_key_config: PrivateKeyConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
     ) -> None:
         if scanner_config is not None and not isinstance(scanner_config, ScannerConfig):
@@ -261,6 +268,12 @@ class ProcessScannerPool:
             raise TypeError(
                 "payment_card_config must be a PaymentCardConfig or None"
             )
+        if private_key_config is not None and not isinstance(
+            private_key_config, PrivateKeyConfig
+        ):
+            raise TypeError(
+                "private_key_config must be a PrivateKeyConfig or None"
+            )
         if not isinstance(policy, FirewallPolicy):
             raise TypeError("policy must be a FirewallPolicy")
         resolved_scanner_config = scanner_config or ScannerConfig()
@@ -274,6 +287,18 @@ class ProcessScannerPool:
         resolved_payment_card_config = (
             (payment_card_config or PaymentCardConfig())
             if resolved_scanner_config.enable_payment_cards
+            else None
+        )
+        if (
+            not resolved_scanner_config.enable_private_keys
+            and private_key_config is not None
+        ):
+            raise ValueError(
+                "private_key_config requires enable_private_keys=True"
+            )
+        resolved_private_key_config = (
+            (private_key_config or PrivateKeyConfig())
+            if resolved_scanner_config.enable_private_keys
             else None
         )
         policy.validate_rule_ids(
@@ -305,6 +330,11 @@ class ProcessScannerPool:
                         if resolved_payment_card_config is not None
                         else ()
                     ),
+                    *(
+                        ("secrets.private_key",)
+                        if resolved_private_key_config is not None
+                        else ()
+                    ),
                 )
             ),
             supported_rule_ids=frozenset(
@@ -315,6 +345,7 @@ class ProcessScannerPool:
                     "unicode.invisible_characters",
                     "url.unsafe",
                     "pii.payment_card",
+                    "secrets.private_key",
                 )
             ),
         )
@@ -326,6 +357,7 @@ class ProcessScannerPool:
         self._json_output_config = json_output_config
         self._unsafe_url_config = unsafe_url_config
         self._payment_card_config = resolved_payment_card_config
+        self._private_key_config = resolved_private_key_config
         self._json_output_rule = (
             JSONOutputRule(json_output_config)
             if json_output_config is not None
@@ -375,6 +407,10 @@ class ProcessScannerPool:
     def payment_card_config(self) -> PaymentCardConfig | None:
         return self._payment_card_config
 
+    @property
+    def private_key_config(self) -> PrivateKeyConfig | None:
+        return self._private_key_config
+
     def start(self) -> "ProcessScannerPool":
         """Start workers eagerly and fail before accepting traffic if startup fails."""
 
@@ -398,6 +434,7 @@ class ProcessScannerPool:
                         self._json_output_config,
                         self._unsafe_url_config,
                         self._payment_card_config,
+                        self._private_key_config,
                     ),
                     max_tasks_per_child=self._pool_config.max_tasks_per_child,
                 )

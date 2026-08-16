@@ -52,12 +52,13 @@ class LLMFirewallTests(unittest.TestCase):
         capabilities = firewall.capabilities()
 
         self.assertIs(capabilities, firewall.capabilities())
-        self.assertEqual(capabilities.rule_count, 3)
+        self.assertEqual(capabilities.rule_count, 4)
         self.assertEqual(
             tuple(rule.rule_id for rule in capabilities.rules),
             (
                 "pii.payment_card",
                 "secrets.detected",
+                "secrets.private_key",
                 "unicode.invisible_characters",
             ),
         )
@@ -66,6 +67,7 @@ class LLMFirewallTests(unittest.TestCase):
         )
         self.assertEqual(tuple(scope.value for scope in secrets.scopes), ("input", "output"))
         self.assertEqual(capabilities.payment_card.max_candidates, 128)
+        self.assertEqual(capabilities.private_key.max_candidates, 32)
         self.assertEqual(
             capabilities.secret_catalog.catalog_id,
             "llm_ffw.builtin.secrets",
@@ -207,6 +209,7 @@ class LLMFirewallTests(unittest.TestCase):
             scanner_config=ScannerConfig(
                 enable_invisible_characters=False,
                 enable_payment_cards=False,
+                enable_private_keys=False,
             ),
             pool_config=_single_worker_config(),
         )

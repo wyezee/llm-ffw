@@ -116,7 +116,7 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
         ).process(text)
 
         self.assertEqual(balanced.decision, Action.REMOVE)
-        self.assertEqual(balanced.policy_version, "1.4.0")
+        self.assertEqual(balanced.policy_version, "1.5.0")
         self.assertEqual(balanced.processed_text, "helloworld")
         self.assertEqual(strict.decision, Action.BLOCK)
         self.assertIsNone(strict.processed_text)
@@ -251,12 +251,13 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
         )
 
         capabilities = firewall.capabilities()
-        self.assertEqual(capabilities.rule_count, 3)
+        self.assertEqual(capabilities.rule_count, 4)
         self.assertEqual(
             tuple(rule.rule_id for rule in capabilities.rules),
             (
                 "pii.payment_card",
                 "secrets.detected",
+                "secrets.private_key",
                 "unicode.invisible_characters",
             ),
         )

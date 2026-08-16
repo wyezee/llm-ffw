@@ -6,6 +6,11 @@ All notable changes are recorded here before a tagged release.
 
 ### Added
 
+- Default bounded `PrivateKeyRule` detection and redaction for armored PEM,
+  OpenSSH, and OpenPGP private-key blocks, including explicit opt-out,
+  disclosure-safe capabilities, malformed-block containment, and performance
+  coverage. Built-in policy profiles advance to `1.5.0`.
+
 - Input/output `PaymentCardRule` with bounded ASCII candidate matching,
   Luhn validation, configurable scopes, safe full-span redaction, and no
   issuer, network, or model lookup.

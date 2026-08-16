@@ -6,10 +6,11 @@ only the Python standard library: no model judge, network calls, probabilistic
 classification, or third-party packages.
 
 The default scanner ships a secure baseline: `SecretsRule`, input-only
-`InvisibleCharactersRule`, and `PaymentCardRule`. It detects constrained
-credential formats, canonicalizes contextual U+200B token obfuscation, and
-redacts Luhn-valid payment-card candidates. Findings retain original-text spans
-and safe category metadata rather than matched values.
+`InvisibleCharactersRule`, `PaymentCardRule`, and `PrivateKeyRule`. It detects
+constrained credential formats and armored private-key blocks, canonicalizes
+contextual U+200B token obfuscation, and redacts Luhn-valid payment-card
+candidates. Findings retain original-text spans and safe category metadata
+rather than matched values.
 
 ## Usage
 
@@ -155,6 +156,13 @@ cards can opt out with `ScannerConfig(enable_payment_cards=False)`. See
 [`docs/payment-cards.md`](docs/payment-cards.md).
 
 ## Supported secret signatures
+
+Armored private-key inspection is independently enabled by default for input
+and output. Balanced policy redacts complete blocks and safely contains
+malformed or oversized blocks. Applications can customize bounded limits with
+`PrivateKeyConfig` or explicitly opt out with
+`ScannerConfig(enable_private_keys=False)`. See
+[`docs/private-keys.md`](docs/private-keys.md).
 
 Built-in catalog `3.0.0` has 28 constrained signatures and 47 prefixes for
 OpenAI, GitHub, AWS, Anthropic, GitLab, Slack, Stripe, Hugging Face, Google,

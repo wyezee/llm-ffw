@@ -11,6 +11,7 @@ from .capabilities import (
     SecretCatalogCapability,
     UnsafeURLCapability,
     PaymentCardCapability,
+    PrivateKeyCapability,
 )
 from .banned_substring_catalog import BannedSubstringCatalog
 from .config import ScannerConfig
@@ -19,6 +20,7 @@ from .inspection import ScanScope
 from .json_output import JSONOutputConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
+from .private_key import PrivateKeyConfig
 from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult
 from .process_pool import (
     ProcessPoolNotRunningError,
@@ -33,6 +35,7 @@ from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.json_output import JSONOutputRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
+from .rules.private_key import PrivateKeyRule
 from .secret_catalog import (
     BUILTIN_SECRET_CATALOG,
     SecretCatalog,
@@ -136,6 +139,7 @@ class LLMFirewall:
         json_output_config: JSONOutputConfig | None = None,
         unsafe_url_config: UnsafeURLConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
+        private_key_config: PrivateKeyConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
         request_timeout_seconds: float | None = 5.0,
     ) -> None:
@@ -156,6 +160,7 @@ class LLMFirewall:
             json_output_config=json_output_config,
             unsafe_url_config=unsafe_url_config,
             payment_card_config=payment_card_config,
+            private_key_config=private_key_config,
             policy=policy,
         )
         catalog = self._pool.secret_catalog
@@ -205,6 +210,14 @@ class LLMFirewall:
                     rule_id=PaymentCardRule.RULE_ID,
                     purpose=PaymentCardRule.PURPOSE,
                     scopes=tuple(self._pool.payment_card_config.scopes),
+                )
+            )
+        if self._pool.private_key_config is not None:
+            rule_capabilities.append(
+                RuleCapability(
+                    rule_id=PrivateKeyRule.RULE_ID,
+                    purpose=PrivateKeyRule.PURPOSE,
+                    scopes=tuple(self._pool.private_key_config.scopes),
                 )
             )
         self._capabilities = FirewallCapabilities(
@@ -267,6 +280,18 @@ class LLMFirewall:
                     ),
                 )
                 if self._pool.payment_card_config is not None
+                else None
+            ),
+            private_key=(
+                PrivateKeyCapability(
+                    max_candidates=(
+                        self._pool.private_key_config.max_candidates
+                    ),
+                    max_block_chars=(
+                        self._pool.private_key_config.max_block_chars
+                    ),
+                )
+                if self._pool.private_key_config is not None
                 else None
             ),
         )
