@@ -1,9 +1,7 @@
 # LLM FFW
 
 **LLM FFW** (LLM Fast Firewall) is a high-speed deterministic rule engine for
-scanning inputs entering and outputs leaving an LLM runtime. Its runtime uses
-only the Python standard library: no model judge, network calls, probabilistic
-classification, or third-party packages.
+scanning inputs entering and outputs leaving an LLM runtime.
 
 The default scanner ships a secure baseline: `SecretsRule`, input-only
 `InvisibleCharactersRule`, input-only `UnicodeTagSmugglingRule`,
@@ -36,7 +34,29 @@ enabled rules, policy, CPU, and concurrency. See the
 [exact release-gate run](https://github.com/wyezee/llm-ffw/actions/runs/31952014903)
 and the commands under [Development and validation](#development-and-validation).
 
+## Installation
+
+LLM FFW requires Python 3.14.7 or a newer Python 3.14 patch release. It has no
+runtime dependencies outside the Python standard library.
+
+```console
+python -m pip install llm-ffw
+```
+
+Pin the version in production dependency files. To reproduce this README's API
+and benchmark results exactly, install `llm-ffw==0.2.0`.
+
 ## Usage
+
+Choose the highest-level API that fits the integration:
+
+| API | Use it for |
+| --- | --- |
+| `LLMFirewall` | Recommended production input/output sanitization and lifecycle |
+| `LLMFirewallManager` | The same facade with zero-downtime secret-catalog reloads |
+| `Firewall` | Same-process scanning plus policy application |
+| `Scanner` | Same-process detection when the host applies findings itself |
+| `ProcessScannerPool` | Advanced process orchestration and explicit overload control |
 
 Production integrations should use `LLMFirewall`. Its balanced default redacts
 detected secrets in both directions while preserving flow:
@@ -59,6 +79,8 @@ Call `start()` and `close()` from a long-lived application's lifecycle hooks;
 the context-manager form is convenient for scripts and batch jobs. Standalone
 programs must protect their entry point with `if __name__ == "__main__":`
 because the facade uses worker processes.
+
+### Results and failure handling
 
 `ContentBlockedError` represents a configured block decision.
 `FirewallUnavailableError` safely combines saturation, timeout, lifecycle, and
@@ -83,6 +105,42 @@ only policy-processed text rather than a second pre-inspection copy; an explicit
 audit policy can intentionally leave that text unchanged. Its representation
 always omits the text as an additional safeguard. Do not log `result.text` or
 recover matched content by slicing the original request with finding spans.
+
+`SanitizationResult` contains the following stable fields:
+
+| Field | Meaning |
+| --- | --- |
+| `text` | Policy-processed text that is safe to forward; excluded from `repr()` |
+| `policy_id`, `policy_version` | Identity of the policy that made the decision |
+| `scope` | `ScanScope.INPUT` or `ScanScope.OUTPUT` |
+| `decision` | Strongest effective `Action` across the findings |
+| `findings` | Immutable tuple of disclosure-safe `Finding` objects |
+
+Each finding contains `rule_id`, `severity`, `action`, a half-open original-text
+`span`, a safe `message`, an optional category-only `redacted_preview`, and
+string-only `metadata`. `finding.to_dict()` returns the same information in a
+JSON-compatible form without the matched value.
+
+Handle both failure modes explicitly and fail closed when inspection is
+unavailable:
+
+```python
+from llm_ffw import ContentBlockedError, FirewallUnavailableError
+
+try:
+    safe_prompt = firewall.sanitize_input(prompt)
+except ContentBlockedError as exc:
+    record_block(exc.policy_id, exc.scope, exc.findings)
+    reject_request()
+except FirewallUnavailableError as exc:
+    record_unavailable(exc.cause_type)
+    reject_request()
+```
+
+`ContentBlockedError` exposes policy identity, scope, and safe findings but not
+the submitted text. `FirewallUnavailableError.cause_type` is a bounded category
+such as `TimeoutError` or `ProcessPoolSaturatedError`; the original exception
+and submitted text are not retained.
 
 `Firewall`, `ProcessScannerPool`, and `Scanner` remain lower-level APIs for
 custom policy results, process orchestration, and detection-only evaluation.
@@ -123,6 +181,98 @@ headroom for a typical one-million-token text context. Token-to-character ratios
 vary by model, language, and content; callers should still set an explicit limit
 appropriate to their deployment and memory budget.
 
+## Facade configuration
+
+`LLMFirewall` accepts immutable startup configuration. Create and validate it
+once, then reuse the facade rather than rebuilding it per request.
+
+| Constructor parameter | Purpose |
+| --- | --- |
+| `scanner_config` | Input limit, redaction marker, and default-rule enable flags |
+| `pool_config` | Worker count, bounded in-flight capacity, recycling, and admission timeout |
+| `additional_secret_catalog` | Add organization signatures while retaining all built-ins |
+| `replacement_secret_catalog` | Deliberately replace the complete built-in secret catalog |
+| `banned_substring_catalog` | Enable a deployment-owned immutable literal catalog |
+| `json_output_config` | Enable bounded output-only JSON validation |
+| `unsafe_url_config` | Enable bounded input/output URL inspection |
+| `payment_card_config` | Customize enabled payment-card limits and scopes |
+| `private_key_config` | Customize enabled private-key limits and scopes |
+| `jwt_token_config` | Customize enabled JWT limits and scopes |
+| `policy` | Select balanced, strict, audit, or a versioned custom policy |
+| `request_timeout_seconds` | Per-request facade deadline; defaults to 5 seconds |
+
+The two secret-catalog parameters are mutually exclusive. Passing `None` for
+the opt-in banned-substring, JSON, and unsafe-URL configurations leaves those
+rules disabled. Payment-card, private-key, JWT, invisible-character, and Unicode
+tag rules are enabled by `ScannerConfig` defaults; their dedicated config
+objects customize bounds and scopes rather than enabling them.
+
+`ProcessScannerPoolConfig` controls `max_workers`, `max_in_flight`,
+`max_tasks_per_child`, and `admission_timeout_seconds`. Size these from measured
+deployment load and memory rather than constructing an unbounded queue.
+
+### Policies
+
+The default `BALANCED_POLICY` preserves flow by redacting or removing content
+where safe and blocks invalid JSON or unsafe malformed private-key cases.
+`STRICT_POLICY` increases blocking for security findings. `AUDIT_POLICY` changes
+findings to `REVIEW` and returns the original text, so use it only when another
+trusted enforcement layer consumes the findings.
+
+Select a complete built-in policy directly, for example
+`LLMFirewall(policy=STRICT_POLICY)`. Use a custom policy only when a deployment
+needs an explicit rule-and-scope exception:
+
+```python
+from llm_ffw import (
+    Action,
+    FirewallPolicy,
+    LLMFirewall,
+    PolicyOverride,
+    ScanScope,
+    UnsafeURLConfig,
+)
+
+policy = FirewallPolicy(
+    policy_id="acme.production",
+    version="1.0.0",
+    overrides=(
+        PolicyOverride(
+            rule_id="url.unsafe",
+            scope=ScanScope.OUTPUT,
+            action=Action.BLOCK,
+        ),
+    ),
+)
+firewall = LLMFirewall(
+    unsafe_url_config=UnsafeURLConfig(),
+    policy=policy,
+)
+```
+
+An override is exact to one stable `rule_id` and scope. Findings without an
+override retain the rule's recommended action. Duplicate overrides fail when
+the policy is constructed; unknown overrides fail when a firewall validates the
+policy. JSON validity can only be configured as `BLOCK` or `REVIEW` because
+malformed JSON cannot be safely redacted into valid output.
+
+## Rule configuration
+
+The table shows enabled state and effective behavior under the balanced policy.
+Strict and audit policies can change the effective action.
+
+| Rule ID | Default | Scope | Balanced behavior | Configuration |
+| --- | --- | --- | --- | --- |
+| `secrets.detected` | Enabled | Input/output | Redact | Secret catalog |
+| `unicode.invisible_characters` | Enabled | Input | Remove; block bounded overflow | `ScannerConfig` |
+| `unicode.tag_smuggling` | Enabled | Input | Remove; block bounded overflow | `ScannerConfig` |
+| `pii.payment_card` | Enabled | Input/output | Redact | `PaymentCardConfig` |
+| `secrets.private_key` | Enabled | Input/output | Redact complete blocks; block unsafe malformed cases | `PrivateKeyConfig` |
+| `secrets.jwt_token` | Enabled | Input/output | Redact | `JWTTokenConfig` |
+| `content.banned_substrings` | Opt-in | Catalog-defined | Pattern action; redact by default | `BannedSubstringCatalog` |
+| `output.json.validity` | Opt-in | Output | Block | `JSONOutputConfig` |
+| `url.unsafe` | Opt-in | Input/output by default | Redact | `UnsafeURLConfig` |
+
 ### Default invisible-character canonicalization
 
 `InvisibleCharactersRule` removes a U+200B zero-width-space
@@ -152,13 +302,47 @@ tag runs as findings. Applications can independently opt out with
 `ScannerConfig(enable_unicode_tag_smuggling=False)`. More than 64 relevant runs
 fails closed.
 
-## Deployment-defined banned substrings
+### Deployment-defined banned substrings
 
 An optional immutable `BannedSubstringCatalog` provides constrained substring
 or ASCII-word matching for input and output. It defaults to redaction and never
 accepts caller regex.
 
-## Opt-in JSON output validation
+```python
+from llm_ffw import (
+    Action,
+    BannedSubstring,
+    BannedSubstringCatalog,
+    LLMFirewall,
+    LiteralMatchMode,
+    ScanScope,
+)
+
+content_catalog = BannedSubstringCatalog(
+    catalog_id="acme.output_terms",
+    version="1.0.0",
+    scopes=(ScanScope.OUTPUT,),
+    patterns=(
+        BannedSubstring(
+            pattern_id="acme.internal_codename",
+            value="Project Northstar",
+            match_mode=LiteralMatchMode.SUBSTRING,
+            case_sensitive=False,
+            action=Action.REDACT,
+        ),
+    ),
+)
+firewall = LLMFirewall(banned_substring_catalog=content_catalog)
+```
+
+Catalogs accept 1–1,024 unique literals. Each value must contain 3–64 printable
+ASCII characters, and the complete catalog is bounded to 65,536 literal
+characters. `SUBSTRING` matches within text; `ASCII_WORD` additionally requires
+ASCII word boundaries. Matching can be case-sensitive or ASCII
+case-insensitive. The host owns and versions this trusted startup configuration;
+do not accept catalog definitions from ordinary request data.
+
+### Opt-in JSON output validation
 
 Applications that require a complete JSON response can enable the bounded,
 output-only `JSONOutputRule`:
@@ -173,7 +357,7 @@ Malformed syntax, duplicate keys, non-standard non-finite constants, and
 configured resource-limit violations block by default. The rule does not
 extract JSON from Markdown or repair malformed output.
 
-## Opt-in unsafe URL inspection
+### Opt-in unsafe URL inspection
 
 Applications that pass model-produced URLs to users or downstream tools can
 enable bounded structural URL inspection:
@@ -190,7 +374,7 @@ authorities under balanced policy. It checks input and output by default;
 deployments can restrict its `scopes`. It performs no DNS, HTTP, reputation,
 model, or other network call.
 
-## Default payment-card inspection
+### Default payment-card inspection
 
 Bounded Luhn-based payment-card inspection is enabled in both directions by
 default. Applications can customize its limits and scopes:
@@ -206,7 +390,7 @@ under balanced policy. Luhn is a checksum, not proof that a card exists or is
 active. Applications that intentionally pass checksum-valid identifiers or test
 cards can opt out with `ScannerConfig(enable_payment_cards=False)`.
 
-## Supported secret signatures
+### Supported secret signatures
 
 Armored private-key inspection is independently enabled by default for input
 and output. Balanced policy redacts complete blocks and safely contains
@@ -262,6 +446,26 @@ additional_catalog = SecretCatalog(
 )
 firewall = LLMFirewall(additional_secret_catalog=additional_catalog)
 ```
+
+The signature fields describe a constrained token shape:
+
+| Field | Meaning |
+| --- | --- |
+| `signature_id` | Stable lowercase identity used for catalog validation |
+| `provider`, `secret_type` | Safe category metadata returned with findings |
+| `prefixes` | One to sixteen literal token prefixes |
+| `suffix_chars` | Exact printable-ASCII alphabet accepted after a prefix |
+| `min_suffix_chars`, `max_suffix_chars` | Inclusive suffix-length bounds; prefer a finite maximum when the format defines one |
+| `suffix_ending` | Optional required suffix tail within the permitted alphabet |
+| `boundary_chars` | Token characters that prevent matching inside a larger identifier; must include all prefix and suffix characters |
+| `source` | Non-secret provenance reference used to justify the format |
+| `status` | `ACTIVE` or `LEGACY` lifecycle metadata |
+| `severity`, `action` | Recommended handling before policy overrides |
+
+Use the narrowest documented alphabet and length range. Broad alphabets or
+unbounded lengths increase false-positive risk. Prefixes are literal and cannot
+contain regex syntax; signature and catalog constructors reject invalid,
+duplicate, oversized, or conflicting definitions.
 
 The scanner never downloads or reads catalogs. The host application constructs
 and pins the catalog before scanning, making updates testable and rollbackable.
@@ -323,6 +527,12 @@ waits for requests already using the old generation, and closes the old workers.
 If candidate construction or startup fails, the old generation remains active.
 `reload_builtin_catalog()` removes application additions through the same safe
 generation transition.
+
+`reload()` returns the new immutable capabilities snapshot. On failure it raises
+`FirewallReloadError`, whose `activated` flag distinguishes a rejected candidate
+from a new generation that became active but encountered an old-generation
+cleanup failure. Its bounded `cause_type` is safe for operational metrics; do
+not treat a reload failure as permission to bypass inspection.
 
 Every update must provide a newly versioned full snapshot containing all desired
 application signatures, including previously configured ones. The manager does
