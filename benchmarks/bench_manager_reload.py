@@ -163,7 +163,13 @@ def _linux_process_table() -> dict[int, int]:
             value = (path / "stat").read_text(encoding="ascii")
             remainder = value[value.rfind(")") + 2 :].split()
             table[int(path.name)] = int(remainder[1])
-        except (FileNotFoundError, IndexError, PermissionError, ValueError):
+        except (
+            FileNotFoundError,
+            IndexError,
+            PermissionError,
+            ProcessLookupError,
+            ValueError,
+        ):
             continue
     return table
 
@@ -239,7 +245,7 @@ def _linux_rss_bytes(pid: int) -> int:
         for line in Path(f"/proc/{pid}/status").read_text(encoding="ascii").splitlines():
             if line.startswith("VmRSS:"):
                 return int(line.split()[1]) * 1024
-    except (FileNotFoundError, PermissionError, ValueError):
+    except (FileNotFoundError, PermissionError, ProcessLookupError, ValueError):
         pass
     return 0
 
@@ -264,7 +270,7 @@ def _persistent_runtime_helpers() -> set[int]:
     for pid in _descendant_pids(os.getpid()):
         try:
             command = Path(f"/proc/{pid}/cmdline").read_bytes()
-        except (FileNotFoundError, PermissionError):
+        except (FileNotFoundError, PermissionError, ProcessLookupError):
             continue
         if b"multiprocessing.resource_tracker" in command:
             helpers.add(pid)

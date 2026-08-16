@@ -2,8 +2,13 @@ import string
 from threading import Event, Thread
 import time
 import unittest
+from unittest.mock import patch
 
-from benchmarks.bench_manager_reload import run_manager_reload_gate
+from benchmarks.bench_manager_reload import (
+    _linux_process_table,
+    _linux_rss_bytes,
+    run_manager_reload_gate,
+)
 from llm_ffw import (
     FirewallManagerState,
     FirewallReloadError,
@@ -43,7 +48,28 @@ def _additional_catalog() -> SecretCatalog:
     )
 
 
+class _VanishedProcPath:
+    name = "123"
+
+    def iterdir(self) -> tuple["_VanishedProcPath", ...]:
+        return (self,)
+
+    def __truediv__(self, unused: object) -> "_VanishedProcPath":
+        return self
+
+    def read_text(self, **unused: object) -> str:
+        raise ProcessLookupError
+
+
 class LLMFirewallManagerTests(unittest.TestCase):
+    def test_linux_memory_sampling_ignores_vanished_processes(self) -> None:
+        with patch(
+            "benchmarks.bench_manager_reload.Path",
+            return_value=_VanishedProcPath(),
+        ):
+            self.assertEqual(_linux_process_table(), {})
+            self.assertEqual(_linux_rss_bytes(123), 0)
+
     def test_small_reload_stress_gate_accounts_for_every_result(self) -> None:
         result = run_manager_reload_gate(
             size=100_000,

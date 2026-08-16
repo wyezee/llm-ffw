@@ -61,6 +61,11 @@ All notable changes are recorded here before a tagged release.
   mappings lazily, preserving the clean-input fast path while keeping bounded
   remove-and-rescan behavior.
 
+### Fixed
+
+- Linux manager-reload memory sampling now tolerates worker processes exiting
+  between procfs enumeration and inspection.
+
 ## 0.1.0 - 2026-08-15
 
 ### Added
