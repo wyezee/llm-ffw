@@ -3,6 +3,7 @@ import unittest
 
 from llm_ffw import (
     FirewallCapabilities,
+    EmailAddressCapability,
     IPAddressCapability,
     RuleCapability,
     ScanScope,
@@ -78,6 +79,14 @@ class CapabilityValueTests(unittest.TestCase):
             IPAddressCapability(1, 1, True)  # type: ignore[arg-type]
         with self.assertRaises(ValueError):
             IPAddressCapability(1, False, False)
+
+    def test_email_address_capability_is_bounded_and_typed(self) -> None:
+        capability = EmailAddressCapability(max_candidates=128)
+        self.assertEqual(capability.max_candidates, 128)
+        with self.assertRaises(ValueError):
+            EmailAddressCapability(0)
+        with self.assertRaises(ValueError):
+            EmailAddressCapability(True)
 
 
 if __name__ == "__main__":

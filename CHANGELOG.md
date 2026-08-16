@@ -6,6 +6,9 @@ All notable changes are recorded here before a tagged release.
 
 ### Added
 
+- Opt-in bounded `EmailAddressRule` for conservative ASCII mailbox privacy
+  redaction, with input-only defaults, scope controls, safe metadata, policy
+  integration, public capabilities, and an 8 MB production envelope.
 - Opt-in bounded `IPAddressRule` for canonical IPv4 and IPv6 privacy
   redaction, with input-only defaults, family/scope controls, safe metadata,
   policy integration, public capabilities, and an 8 MB production envelope.

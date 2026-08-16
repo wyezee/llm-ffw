@@ -131,6 +131,19 @@ jobs:
           --max-peak-mib 128
           --min-process-requests-per-second 0.5
 
+      - name: Run email-address production envelope
+        run: >-
+          python benchmarks/bench_email_addresses.py
+          --size 8000000
+          --rounds 3
+          --workers 2
+          --concurrency 4
+          --process-requests 8
+          --min-throughput-mib-s 3
+          --min-email-throughput-mib-s 2.5
+          --max-peak-mib 128
+          --min-process-requests-per-second 0.5
+
       - name: Run unified streaming production envelope
         run: >-
           python benchmarks/bench_firewall_stream.py

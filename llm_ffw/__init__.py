@@ -3,6 +3,7 @@
 from .capabilities import (
     BannedSubstringCatalogCapability,
     FirewallCapabilities,
+    EmailAddressCapability,
     JSONOutputCapability,
     IPAddressCapability,
     RuleCapability,
@@ -34,6 +35,7 @@ from .inspection import (
 )
 from .json_output import JSONOutputConfig
 from .ip_address import IPAddressConfig
+from .email_address import EmailAddressConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
 from .private_key import PrivateKeyConfig
@@ -79,6 +81,7 @@ from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.json_output import JSONOutputRule
 from .rules.ip_address import IPAddressRule
+from .rules.email_address import EmailAddressRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
 from .rules.private_key import PrivateKeyRule
@@ -96,6 +99,9 @@ __all__ = [
     "BannedSubstringsRule",
     "BUILTIN_SECRET_CATALOG",
     "ContentBlockedError",
+    "EmailAddressCapability",
+    "EmailAddressConfig",
+    "EmailAddressRule",
     "Finding",
     "Firewall",
     "FirewallCapabilities",

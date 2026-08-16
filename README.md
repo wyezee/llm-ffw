@@ -300,6 +300,7 @@ rebuilding it per request.
 | `json_output_config` | Enable bounded output-only JSON validation |
 | `unsafe_url_config` | Enable bounded input/output URL inspection |
 | `ip_address_config` | Enable bounded canonical IP-address inspection |
+| `email_address_config` | Enable bounded conservative email inspection |
 | `payment_card_config` | Customize enabled payment-card limits and scopes |
 | `private_key_config` | Customize enabled private-key limits and scopes |
 | `jwt_token_config` | Customize enabled JWT limits and scopes |
@@ -307,8 +308,9 @@ rebuilding it per request.
 | `request_timeout_seconds` | Per-request facade deadline; defaults to 5 seconds |
 
 The two secret-catalog parameters are mutually exclusive. Passing `None` for
-the opt-in banned-substring, JSON, unsafe-URL, and IP-address configurations
-leaves those rules disabled. Payment-card, private-key, JWT,
+the opt-in banned-substring, JSON, unsafe-URL, IP-address, and email-address
+configurations leaves each corresponding rule disabled. Payment-card,
+private-key, JWT,
 invisible-character, and Unicode tag rules are enabled by `ScannerConfig`
 defaults; their dedicated config objects customize bounds and scopes rather
 than enabling them.
@@ -379,6 +381,7 @@ Strict and audit policies can change the effective action.
 | `output.json.validity` | Opt-in | Output | Block | `JSONOutputConfig` |
 | `url.unsafe` | Opt-in | Input/output by default | Redact | `UnsafeURLConfig` |
 | `pii.ip_address` | Opt-in | Input by default | Redact | `IPAddressConfig` |
+| `pii.email_address` | Opt-in | Input by default | Redact | `EmailAddressConfig` |
 
 ### Default invisible-character canonicalization
 
@@ -502,6 +505,29 @@ configured otherwise, redacts under balanced policy, and can independently
 disable either address family. It intentionally does not normalize obfuscated
 addresses or claim complete PII detection; the high-precision default targets
 accidental disclosure with predictable false-positive and performance bounds.
+
+### Opt-in email-address inspection
+
+Applications that treat email addresses as personal data can enable bounded,
+deterministic inspection:
+
+```python
+from llm_ffw import EmailAddressConfig, LLMFirewall, ScanScope
+
+firewall = LLMFirewall(
+    email_address_config=EmailAddressConfig(
+        scopes=(ScanScope.INPUT, ScanScope.OUTPUT),
+    )
+)
+```
+
+`EmailAddressRule` recognizes a conservative ASCII mailbox subset with
+DNS-style domains and common dot, underscore, percent, plus, and hyphen local
+parts. It requires at least one domain dot, enforces standard local-part,
+label, domain, and total-length bounds, and redacts under balanced policy. It
+does not attempt RFC-complete quoted local parts, comments, address literals,
+Unicode mailbox syntax, DNS ownership checks, or obfuscation repair. These
+limits deliberately favor predictable high-precision privacy protection.
 
 ### Default payment-card inspection
 

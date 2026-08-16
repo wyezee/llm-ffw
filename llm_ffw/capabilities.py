@@ -159,6 +159,21 @@ class IPAddressCapability:
 
 
 @dataclass(frozen=True, slots=True)
+class EmailAddressCapability:
+    """Disclosure-safe email-address inspection configuration."""
+
+    max_candidates: int
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.max_candidates, bool)
+            or not isinstance(self.max_candidates, int)
+            or self.max_candidates <= 0
+        ):
+            raise ValueError("max_candidates must be a positive integer")
+
+
+@dataclass(frozen=True, slots=True)
 class PrivateKeyCapability:
     """Disclosure-safe private-key inspection limits pinned to the facade."""
 
@@ -205,6 +220,7 @@ class FirewallCapabilities:
     json_output: JSONOutputCapability | None = None
     unsafe_url: UnsafeURLCapability | None = None
     ip_address: IPAddressCapability | None = None
+    email_address: EmailAddressCapability | None = None
     payment_card: PaymentCardCapability | None = None
     private_key: PrivateKeyCapability | None = None
     jwt_token: JWTTokenCapability | None = None
@@ -246,6 +262,12 @@ class FirewallCapabilities:
             raise TypeError(
                 "ip_address must be an IPAddressCapability or None"
             )
+        if self.email_address is not None and not isinstance(
+            self.email_address, EmailAddressCapability
+        ):
+            raise TypeError(
+                "email_address must be an EmailAddressCapability or None"
+            )
         if self.payment_card is not None and not isinstance(
             self.payment_card, PaymentCardCapability
         ):
@@ -274,6 +296,7 @@ class FirewallCapabilities:
 __all__ = [
     "BannedSubstringCatalogCapability",
     "FirewallCapabilities",
+    "EmailAddressCapability",
     "JSONOutputCapability",
     "IPAddressCapability",
     "PaymentCardCapability",
