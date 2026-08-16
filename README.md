@@ -6,11 +6,12 @@ only the Python standard library: no model judge, network calls, probabilistic
 classification, or third-party packages.
 
 The default scanner ships a secure baseline: `SecretsRule`, input-only
-`InvisibleCharactersRule`, `PaymentCardRule`, and `PrivateKeyRule`. It detects
-constrained credential formats and armored private-key blocks, canonicalizes
-contextual U+200B token obfuscation, and redacts Luhn-valid payment-card
-candidates. Findings retain original-text spans and safe category metadata
-rather than matched values.
+`InvisibleCharactersRule`, `PaymentCardRule`, `PrivateKeyRule`, and
+`JWTTokenRule`. It detects constrained credential formats, armored private-key
+blocks, and structurally credible compact JWTs, canonicalizes contextual U+200B
+token obfuscation, and redacts Luhn-valid payment-card candidates. Findings
+retain original-text spans and safe category metadata rather than matched
+values.
 
 ## Usage
 
@@ -163,6 +164,14 @@ malformed or oversized blocks. Applications can customize bounded limits with
 `PrivateKeyConfig` or explicitly opt out with
 `ScannerConfig(enable_private_keys=False)`. See
 [`docs/private-keys.md`](docs/private-keys.md).
+
+Compact JWT inspection is also enabled by default. It validates canonical
+Base64URL, unique-member JSON header/payload objects, algorithm/signature
+consistency, and JWT-specific type or registered-claim evidence before
+redaction. It does not verify signatures or trust claims. Applications can
+customize bounded limits with `JWTTokenConfig` or opt out with
+`ScannerConfig(enable_jwt_tokens=False)`. See
+[`docs/jwt-tokens.md`](docs/jwt-tokens.md).
 
 Built-in catalog `3.0.0` has 28 constrained signatures and 47 prefixes for
 OpenAI, GitHub, AWS, Anthropic, GitLab, Slack, Stripe, Hugging Face, Google,

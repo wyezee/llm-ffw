@@ -10,6 +10,7 @@ from .rules.base import Rule, RuleMatch
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.payment_card import PaymentCardRule
 from .rules.private_key import PrivateKeyRule
+from .rules.jwt_token import JWTTokenRule
 from .rules.secrets import SecretsRule
 
 
@@ -33,6 +34,8 @@ class Scanner:
                 defaults.append(PaymentCardRule())
             if self._config.enable_private_keys:
                 defaults.append(PrivateKeyRule())
+            if self._config.enable_jwt_tokens:
+                defaults.append(JWTTokenRule())
             selected_rules = tuple(defaults)
         else:
             selected_rules = tuple(rules)

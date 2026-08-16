@@ -151,6 +151,27 @@ class PrivateKeyCapability:
 
 
 @dataclass(frozen=True, slots=True)
+class JWTTokenCapability:
+    """Disclosure-safe JWT inspection limits pinned to the facade."""
+
+    max_candidates: int
+    max_token_chars: int
+    max_json_depth: int
+    max_json_structure_tokens: int
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "max_candidates",
+            "max_token_chars",
+            "max_json_depth",
+            "max_json_structure_tokens",
+        ):
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{field_name} must be a positive integer")
+
+
+@dataclass(frozen=True, slots=True)
 class FirewallCapabilities:
     """Safe summary of the rules, catalog, and policy pinned to one facade."""
 
@@ -163,6 +184,7 @@ class FirewallCapabilities:
     unsafe_url: UnsafeURLCapability | None = None
     payment_card: PaymentCardCapability | None = None
     private_key: PrivateKeyCapability | None = None
+    jwt_token: JWTTokenCapability | None = None
 
     def __post_init__(self) -> None:
         try:
@@ -205,6 +227,10 @@ class FirewallCapabilities:
             self.private_key, PrivateKeyCapability
         ):
             raise TypeError("private_key must be a PrivateKeyCapability or None")
+        if self.jwt_token is not None and not isinstance(
+            self.jwt_token, JWTTokenCapability
+        ):
+            raise TypeError("jwt_token must be a JWTTokenCapability or None")
         object.__setattr__(
             self,
             "rules",
@@ -222,6 +248,7 @@ __all__ = [
     "JSONOutputCapability",
     "PaymentCardCapability",
     "PrivateKeyCapability",
+    "JWTTokenCapability",
     "RuleCapability",
     "SecretCatalogCapability",
     "UnsafeURLCapability",

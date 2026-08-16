@@ -15,6 +15,7 @@ class ScannerTests(unittest.TestCase):
         self.assertTrue(ScannerConfig().enable_invisible_characters)
         self.assertTrue(ScannerConfig().enable_payment_cards)
         self.assertTrue(ScannerConfig().enable_private_keys)
+        self.assertTrue(ScannerConfig().enable_jwt_tokens)
 
     def test_default_scanner_has_secure_baseline_rules(self) -> None:
         scanner = Scanner()
@@ -24,6 +25,7 @@ class ScannerTests(unittest.TestCase):
             (
                 "pii.payment_card",
                 "secrets.detected",
+                "secrets.jwt_token",
                 "secrets.private_key",
                 "unicode.invisible_characters",
             ),
@@ -43,6 +45,7 @@ class ScannerTests(unittest.TestCase):
                 enable_invisible_characters=False,
                 enable_payment_cards=False,
                 enable_private_keys=False,
+                enable_jwt_tokens=False,
             )
         )
 
@@ -128,6 +131,7 @@ class ScannerTests(unittest.TestCase):
             "enable_invisible_characters",
             "enable_payment_cards",
             "enable_private_keys",
+            "enable_jwt_tokens",
         ):
             with self.subTest(field_name=field_name), self.assertRaises(TypeError):
                 ScannerConfig(**{field_name: 1})  # type: ignore[arg-type]

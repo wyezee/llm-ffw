@@ -9,6 +9,7 @@ from .capabilities import (
     UnsafeURLCapability,
     PaymentCardCapability,
     PrivateKeyCapability,
+    JWTTokenCapability,
 )
 from .banned_substring_catalog import (
     BannedSubstring,
@@ -29,6 +30,7 @@ from .json_output import JSONOutputConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
 from .private_key import PrivateKeyConfig
+from .jwt_token import JWTTokenConfig
 from .manager import (
     FirewallManagerState,
     FirewallReloadError,
@@ -62,6 +64,7 @@ from .rules.json_output import JSONOutputRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
 from .rules.private_key import PrivateKeyRule
+from .rules.jwt_token import JWTTokenRule
 
 __all__ = [
     "Action",
@@ -104,6 +107,9 @@ __all__ = [
     "PrivateKeyCapability",
     "PrivateKeyConfig",
     "PrivateKeyRule",
+    "JWTTokenCapability",
+    "JWTTokenConfig",
+    "JWTTokenRule",
     "Scanner",
     "ScannerConfig",
     "ScanScope",

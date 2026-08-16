@@ -12,6 +12,7 @@ from .capabilities import (
     UnsafeURLCapability,
     PaymentCardCapability,
     PrivateKeyCapability,
+    JWTTokenCapability,
 )
 from .banned_substring_catalog import BannedSubstringCatalog
 from .config import ScannerConfig
@@ -21,6 +22,7 @@ from .json_output import JSONOutputConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
 from .private_key import PrivateKeyConfig
+from .jwt_token import JWTTokenConfig
 from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult
 from .process_pool import (
     ProcessPoolNotRunningError,
@@ -36,6 +38,7 @@ from .rules.json_output import JSONOutputRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
 from .rules.private_key import PrivateKeyRule
+from .rules.jwt_token import JWTTokenRule
 from .secret_catalog import (
     BUILTIN_SECRET_CATALOG,
     SecretCatalog,
@@ -140,6 +143,7 @@ class LLMFirewall:
         unsafe_url_config: UnsafeURLConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
+        jwt_token_config: JWTTokenConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
         request_timeout_seconds: float | None = 5.0,
     ) -> None:
@@ -161,6 +165,7 @@ class LLMFirewall:
             unsafe_url_config=unsafe_url_config,
             payment_card_config=payment_card_config,
             private_key_config=private_key_config,
+            jwt_token_config=jwt_token_config,
             policy=policy,
         )
         catalog = self._pool.secret_catalog
@@ -218,6 +223,14 @@ class LLMFirewall:
                     rule_id=PrivateKeyRule.RULE_ID,
                     purpose=PrivateKeyRule.PURPOSE,
                     scopes=tuple(self._pool.private_key_config.scopes),
+                )
+            )
+        if self._pool.jwt_token_config is not None:
+            rule_capabilities.append(
+                RuleCapability(
+                    rule_id=JWTTokenRule.RULE_ID,
+                    purpose=JWTTokenRule.PURPOSE,
+                    scopes=tuple(self._pool.jwt_token_config.scopes),
                 )
             )
         self._capabilities = FirewallCapabilities(
@@ -292,6 +305,18 @@ class LLMFirewall:
                     ),
                 )
                 if self._pool.private_key_config is not None
+                else None
+            ),
+            jwt_token=(
+                JWTTokenCapability(
+                    max_candidates=self._pool.jwt_token_config.max_candidates,
+                    max_token_chars=self._pool.jwt_token_config.max_token_chars,
+                    max_json_depth=self._pool.jwt_token_config.max_json_depth,
+                    max_json_structure_tokens=(
+                        self._pool.jwt_token_config.max_json_structure_tokens
+                    ),
+                )
+                if self._pool.jwt_token_config is not None
                 else None
             ),
         )
