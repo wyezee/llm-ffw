@@ -4,6 +4,8 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.2.0rc3 - 2026-08-16
+
 ### Changed
 
 - Unsafe URL candidate discovery is linear for overlapping scheme markers, and

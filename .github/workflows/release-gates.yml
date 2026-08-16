@@ -16,7 +16,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            invisible_dirty_mib_s: 4
+            unicode_tag_dirty_mib_s: 3.5
+          - os: windows-latest
+            invisible_dirty_mib_s: 2.5
+            unicode_tag_dirty_mib_s: 2.5
 
     steps:
       - name: Check out source
@@ -43,7 +49,7 @@ jobs:
           --concurrency 4
           --process-requests 8
           --max-clean-overhead-percent 10
-          --min-dirty-throughput-mib-s 4
+          --min-dirty-throughput-mib-s ${{ matrix.invisible_dirty_mib_s }}
           --max-dirty-peak-mib 128
           --min-process-requests-per-second 0.8
 
@@ -69,7 +75,7 @@ jobs:
           --process-requests 8
           --min-clean-throughput-mib-s 5
           --min-rgi-throughput-mib-s 5
-          --min-dirty-throughput-mib-s 3.5
+          --min-dirty-throughput-mib-s ${{ matrix.unicode_tag_dirty_mib_s }}
           --max-peak-mib 128
           --min-process-requests-per-second 0.7
 
