@@ -25,6 +25,9 @@ from llm_ffw import (
 assert version("llm-ffw") == "0.2.0rc1"
 assert metadata("llm-ffw").get_all("Requires-Dist") is None
 assert metadata("llm-ffw")["License-Expression"] == "Apache-2.0"
+assert "Development Status :: 4 - Beta" in metadata("llm-ffw").get_all(
+    "Classifier"
+)
 assert any(str(path).endswith("licenses/LICENSE") for path in files("llm-ffw"))
 assert LLMFirewall.__module__ == "llm_ffw.facade"
 facade_parameters = signature(LLMFirewall).parameters
