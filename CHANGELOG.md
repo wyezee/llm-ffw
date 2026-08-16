@@ -4,6 +4,13 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.2.0 - 2026-08-16
+
+### Changed
+
+- Promote the fully validated `0.2.0rc3` code to the stable `0.2.0` release
+  without runtime behavior changes.
+
 ## 0.2.0rc3 - 2026-08-16
 
 ### Changed
