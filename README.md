@@ -53,7 +53,9 @@ Choose the highest-level API that fits the integration:
 | API | Use it for |
 | --- | --- |
 | `LLMFirewall` | Recommended production input/output sanitization and lifecycle |
+| `AsyncLLMFirewall` | The same production contract for asyncio applications |
 | `LLMFirewallManager` | The same facade with zero-downtime secret-catalog reloads |
+| `AsyncLLMFirewallManager` | Asyncio sanitization plus asynchronous catalog lifecycle |
 | `Firewall` | Same-process scanning plus policy application |
 | `Scanner` | Same-process detection when the host applies findings itself |
 | `ProcessScannerPool` | Advanced process orchestration and explicit overload control |
@@ -79,6 +81,41 @@ Call `start()` and `close()` from a long-lived application's lifecycle hooks;
 the context-manager form is convenient for scripts and batch jobs. Standalone
 programs must protect their entry point with `if __name__ == "__main__":`
 because the facade uses worker processes.
+
+### Async usage
+
+Asyncio applications should use `AsyncLLMFirewall` directly instead of wrapping
+the synchronous facade with `asyncio.to_thread()`:
+
+```python
+from llm_ffw import AsyncLLMFirewall
+
+async def handle_request(firewall: AsyncLLMFirewall, prompt: str) -> str:
+    safe_prompt = await firewall.sanitize_input(prompt)
+    model_output = await call_model_async(safe_prompt)
+    return await firewall.sanitize_output(
+        model_output,
+        prompt_context=safe_prompt,
+    )
+
+async def main(prompt: str) -> None:
+    async with AsyncLLMFirewall() as firewall:
+        response = await handle_request(firewall, prompt)
+```
+
+In a service, create and start one async facade during application startup,
+reuse it for requests, and await `close()` during shutdown. It supports async
+`start()`, `close()`, `terminate()`, `kill()`, input/output sanitization, and
+structured-result methods. `capabilities()` and `state` remain synchronous
+because they return in-memory metadata without blocking.
+
+The async facade uses the same process scanner, policies, configuration,
+timeouts, and exceptions as `LLMFirewall`. Its private request executor and
+async admission gate are both bounded by `ProcessScannerPoolConfig`; it never
+blocks the event loop while waiting for CPU workers. One instance belongs to
+one event loop. Canceling an await does not abandon its running scan: the scan
+finishes under the configured request timeout and retains its capacity slot
+until completion, preventing cancellation-driven queue growth.
 
 ### Results and failure handling
 
@@ -183,8 +220,9 @@ appropriate to their deployment and memory budget.
 
 ## Facade configuration
 
-`LLMFirewall` accepts immutable startup configuration. Create and validate it
-once, then reuse the facade rather than rebuilding it per request.
+`LLMFirewall` and `AsyncLLMFirewall` accept the same immutable startup
+configuration. Create and validate one facade, then reuse it rather than
+rebuilding it per request.
 
 | Constructor parameter | Purpose |
 | --- | --- |
@@ -521,6 +559,23 @@ safe_prompt = manager.sanitize_input(prompt)
 safe_output = manager.sanitize_output(model_output)
 ```
 
+Asyncio services use the matching manager contract:
+
+```python
+from llm_ffw import AsyncLLMFirewallManager
+
+async def update_catalog(prompt: str) -> str:
+    async with AsyncLLMFirewallManager() as manager:
+        capabilities = await manager.reload(
+            additional_secret_catalog=updated_additional_catalog,
+        )
+        return await manager.sanitize_input(prompt)
+```
+
+`reload()`, `reload_builtin_catalog()`, `restart()`, and `close()` complete their
+underlying lifecycle transition before propagating task cancellation, so a
+caller never has to guess which generation became active.
+
 Reload starts and verifies a new worker generation while the current generation
 continues serving. It then atomically directs new requests to the new generation,
 waits for requests already using the old generation, and closes the old workers.
@@ -554,6 +609,7 @@ py -3.14 -m venv .venv
 .venv\Scripts\python benchmarks/bench_concurrent_scan.py --size 8000000 --workers 4 --requests 8
 .venv\Scripts\python benchmarks/bench_policy.py --size 8000000 --rounds 3
 .venv\Scripts\python benchmarks/bench_soak.py --size 8000000 --workers 4 --concurrency 8 --requests 32 --max-tasks-per-child 4
+.venv\Scripts\python benchmarks/bench_async_facade.py --size 8000000 --workers 4 --concurrency 8 --requests 16 --max-tasks-per-child 4
 .venv\Scripts\python benchmarks/bench_memory.py --size 8000000
 .venv\Scripts\python benchmarks/bench_manager_reload.py --size 8000000 --workers 2 --concurrency 4 --reloads 4 --min-requests 16 --max-tasks-per-child 8
 ```

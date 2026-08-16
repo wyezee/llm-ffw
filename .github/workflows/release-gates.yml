@@ -147,6 +147,16 @@ jobs:
       - name: Run process soak and recycling gate
         run: python benchmarks/bench_soak.py --size 8000000 --workers 4 --concurrency 8 --requests 32 --max-tasks-per-child 4 --min-requests-per-second 1
 
+      - name: Run async facade responsiveness and throughput gate
+        run: >-
+          python benchmarks/bench_async_facade.py
+          --size 8000000
+          --workers 4
+          --concurrency 8
+          --requests 16
+          --max-tasks-per-child 4
+          --min-requests-per-second 1
+
       - name: Run peak-memory gate
         run: python benchmarks/bench_memory.py --size 8000000 --max-peak-rss-mib 512
 

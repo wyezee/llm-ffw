@@ -41,6 +41,7 @@ from .manager import (
     FirewallReloadError,
     LLMFirewallManager,
 )
+from .async_facade import AsyncLLMFirewall, AsyncLLMFirewallManager
 from .policy import (
     AUDIT_POLICY,
     BALANCED_POLICY,
@@ -75,6 +76,8 @@ from .rules.jwt_token import JWTTokenRule
 __all__ = [
     "Action",
     "AUDIT_POLICY",
+    "AsyncLLMFirewall",
+    "AsyncLLMFirewallManager",
     "BALANCED_POLICY",
     "BannedSubstring",
     "BannedSubstringCatalog",

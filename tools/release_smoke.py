@@ -15,6 +15,8 @@ from importlib.metadata import files, metadata, version
 from inspect import signature
 from llm_ffw import (
     Action,
+    AsyncLLMFirewall,
+    AsyncLLMFirewallManager,
     Firewall,
     LLMFirewall,
     LLMFirewallManager,
@@ -31,6 +33,8 @@ assert "Development Status :: 4 - Beta" in metadata("llm-ffw").get_all(
 )
 assert any(str(path).endswith("licenses/LICENSE") for path in files("llm-ffw"))
 assert LLMFirewall.__module__ == "llm_ffw.facade"
+assert AsyncLLMFirewall.__module__ == "llm_ffw.async_facade"
+assert AsyncLLMFirewallManager.__module__ == "llm_ffw.async_facade"
 assert SanitizationResult.__module__ == "llm_ffw.facade"
 facade_parameters = signature(LLMFirewall).parameters
 assert "additional_secret_catalog" in facade_parameters
