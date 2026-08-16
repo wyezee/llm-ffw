@@ -7,8 +7,11 @@ from .facade import ContentBlockedError
 from .findings import Action, Finding, Severity, Span
 from .inspection import ScanScope
 from .policy import BALANCED_POLICY, Firewall, FirewallPolicy
+from .rules.payment_card import PaymentCardRule
 from .rules.secrets import SecretsRule
-from ._secret_stream import _SecretStreamEngine
+from ._incremental_stream import _IncrementalRedactionEngine
+from ._payment_card_stream import _PaymentCardStreamDetector
+from ._stream_coordinator import _IncrementalStreamCoordinator
 from .stream_types import (
     FirewallStreamState,
     IncrementalStreamingUnavailableError,
@@ -95,6 +98,14 @@ class FirewallStream:
             ),
             None,
         )
+        payment_card_rule = next(
+            (
+                rule
+                for rule in active_rules
+                if type(rule) is PaymentCardRule
+            ),
+            None,
+        )
         if secret_rule is not None and not self._secret_actions_are_redacting(
             secret_rule,
             policy,
@@ -104,6 +115,18 @@ class FirewallStream:
             capabilities = self._replace_capability(
                 capabilities,
                 secret_rule.rule_id,
+                "effective policy action requires end-of-stream enforcement",
+            )
+        if payment_card_rule is not None and not self._actions_are_redacting(
+            payment_card_rule.rule_id,
+            (Action.REDACT, Action.BLOCK),
+            policy,
+            scope,
+        ):
+            incompatible.add(payment_card_rule.rule_id)
+            capabilities = self._replace_capability(
+                capabilities,
+                payment_card_rule.rule_id,
                 "effective policy action requires end-of-stream enforcement",
             )
         if type(selected_scanner) is not Scanner:
@@ -126,22 +149,41 @@ class FirewallStream:
         )
 
         engine = None
-        if execution_mode is StreamMode.INCREMENTAL and secret_rule is not None:
+        if execution_mode is StreamMode.INCREMENTAL and (
+            secret_rule is not None or payment_card_rule is not None
+        ):
             try:
-                engine = _SecretStreamEngine(
-                    catalog=secret_rule.catalog,
+                redaction_engine = _IncrementalRedactionEngine(
+                    catalog=(
+                        secret_rule.catalog
+                        if secret_rule is not None
+                        else None
+                    ),
                     max_input_chars=selected_scanner.config.max_input_chars,
                     redaction_text=selected_scanner.config.redaction_text,
                 )
+                engine = _IncrementalStreamCoordinator(
+                    engine=redaction_engine,
+                    payment_detector=(
+                        _PaymentCardStreamDetector(payment_card_rule)
+                        if payment_card_rule is not None
+                        else None
+                    ),
+                )
             except ValueError:
+                incompatible_rule_id = (
+                    secret_rule.rule_id
+                    if secret_rule is not None
+                    else payment_card_rule.rule_id
+                )
                 if mode is StreamMode.INCREMENTAL:
                     raise IncrementalStreamingUnavailableError(
-                        (secret_rule.rule_id,)
+                        (incompatible_rule_id,)
                     ) from None
                 execution_mode = StreamMode.BUFFERED
                 capabilities = self._replace_capability(
                     capabilities,
-                    secret_rule.rule_id,
+                    incompatible_rule_id,
                     "catalog shape requires end-of-stream execution",
                 )
 
@@ -327,7 +369,7 @@ class FirewallStream:
 
     @staticmethod
     def _capability_for(rule: object) -> StreamingRuleCapability:
-        if type(rule) is SecretsRule:
+        if type(rule) in (SecretsRule, PaymentCardRule):
             return StreamingRuleCapability(
                 rule_id=rule.rule_id,
                 support=StreamingSupport.INCREMENTAL,
@@ -362,13 +404,26 @@ class FirewallStream:
         policy: FirewallPolicy,
         scope: ScanScope,
     ) -> bool:
-        recommended_actions = (
-            *(signature.action for signature in rule.catalog.signatures),
-            Action.BLOCK,
+        return FirewallStream._actions_are_redacting(
+            rule.rule_id,
+            (
+                *(signature.action for signature in rule.catalog.signatures),
+                Action.BLOCK,
+            ),
+            policy,
+            scope,
         )
+
+    @staticmethod
+    def _actions_are_redacting(
+        rule_id: str,
+        recommended_actions: tuple[Action, ...],
+        policy: FirewallPolicy,
+        scope: ScanScope,
+    ) -> bool:
         for action in recommended_actions:
             representative = Finding(
-                rule_id=rule.rule_id,
+                rule_id=rule_id,
                 severity=Severity.HIGH,
                 action=action,
                 span=Span(0, 0),

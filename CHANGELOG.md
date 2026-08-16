@@ -4,6 +4,12 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Added
+
+- Unified incremental `FirewallStream` execution for `SecretsRule` and
+  `PaymentCardRule`, with batch-equivalent findings, merged redaction,
+  boundary-safe chunk handling, and bounded normal-path buffering.
+
 ## 0.3.0 - 2026-08-16
 
 ### Added

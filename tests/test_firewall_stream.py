@@ -11,9 +11,11 @@ from llm_ffw import (
     BUILTIN_SECRET_CATALOG,
     ContentBlockedError,
     Firewall,
+    FirewallResult,
     FirewallStream,
     FirewallStreamState,
     IncrementalStreamingUnavailableError,
+    PaymentCardConfig,
     ScanScope,
     Scanner,
     ScannerConfig,
@@ -24,7 +26,11 @@ from llm_ffw import (
     StreamingSupport,
     StreamMode,
 )
-from llm_ffw.rules import InvisibleCharactersRule, SecretsRule
+from llm_ffw.rules import (
+    InvisibleCharactersRule,
+    PaymentCardRule,
+    SecretsRule,
+)
 
 
 def _custom_catalog(
@@ -105,6 +111,37 @@ def _run_incremental(
     return "".join(parts), stream
 
 
+def _rule_scanner(
+    text_length: int,
+    *rules,
+    redaction_text: str = "[REDACTED]",
+) -> Scanner:
+    return Scanner(
+        rules=rules,
+        config=ScannerConfig(
+            max_input_chars=max(1, text_length),
+            redaction_text=redaction_text,
+        ),
+    )
+
+
+def _run_rule_stream(
+    text: str,
+    chunks: tuple[str, ...],
+    *rules,
+    policy=BALANCED_POLICY,
+) -> tuple[FirewallResult, str, FirewallStream]:
+    firewall = Firewall(
+        scanner=_rule_scanner(len(text), *rules),
+        policy=policy,
+    )
+    oracle = firewall.process(text, scope=ScanScope.INPUT)
+    stream = firewall.stream(mode=StreamMode.INCREMENTAL)
+    parts = [stream.feed(chunk) for chunk in chunks if chunk]
+    parts.append(stream.finish())
+    return oracle, "".join(parts), stream
+
+
 class FirewallStreamContractTests(unittest.TestCase):
     def test_rule_specific_stream_is_not_a_public_api(self) -> None:
         self.assertFalse(hasattr(llm_ffw, "SecretStream"))
@@ -132,6 +169,10 @@ class FirewallStreamContractTests(unittest.TestCase):
         }
         self.assertEqual(
             capabilities[SecretsRule.RULE_ID],
+            StreamingSupport.INCREMENTAL,
+        )
+        self.assertEqual(
+            capabilities[PaymentCardRule.RULE_ID],
             StreamingSupport.INCREMENTAL,
         )
         self.assertEqual(
@@ -252,6 +293,25 @@ class FirewallStreamContractTests(unittest.TestCase):
             (SecretsRule.RULE_ID,),
         )
 
+    def test_payment_card_policy_must_resolve_all_actions_to_redact(self) -> None:
+        scanner = _rule_scanner(128, PaymentCardRule())
+        automatic = FirewallStream(scanner=scanner, policy=STRICT_POLICY)
+        self.assertEqual(automatic.execution_mode, StreamMode.BUFFERED)
+        self.assertEqual(
+            automatic.rule_capabilities[0].support,
+            StreamingSupport.END_OF_STREAM,
+        )
+        with self.assertRaises(IncrementalStreamingUnavailableError) as caught:
+            FirewallStream(
+                scanner=scanner,
+                policy=AUDIT_POLICY,
+                mode=StreamMode.INCREMENTAL,
+            )
+        self.assertEqual(
+            caught.exception.incompatibilities,
+            (PaymentCardRule.RULE_ID,),
+        )
+
     def test_audit_policy_auto_buffers_and_preserves_original_text(self) -> None:
         text = "sk-" + "A" * 20
         stream = FirewallStream(
@@ -293,6 +353,121 @@ class FirewallStreamContractTests(unittest.TestCase):
 
 
 class FirewallStreamParityTests(unittest.TestCase):
+    def test_payment_card_formats_match_batch_at_every_chunk_boundary(self) -> None:
+        values = (
+            "4111111111111111",
+            "4111-1111-1111-1111",
+            "4111 1111 1111 1111",
+            "1234567890123",
+            "41111111111111111",
+        )
+        for value in values:
+            text = f"before {value} after"
+            for split in range(len(text) + 1):
+                oracle, streamed, stream = _run_rule_stream(
+                    text,
+                    (text[:split], text[split:]),
+                    PaymentCardRule(),
+                )
+                with self.subTest(value=value, split=split):
+                    self.assertEqual(streamed, oracle.processed_text)
+                    self.assertEqual(stream.findings, oracle.findings)
+
+    def test_payment_card_output_scope_matches_batch(self) -> None:
+        text = "model returned 4111-1111-1111-1111"
+        context = "disclosure-safe context"
+        scanner = _rule_scanner(len(text), PaymentCardRule())
+        firewall = Firewall(scanner=scanner)
+        oracle = firewall.process(
+            text,
+            scope=ScanScope.OUTPUT,
+            prompt_context=context,
+        )
+        stream = firewall.stream(
+            scope=ScanScope.OUTPUT,
+            mode=StreamMode.INCREMENTAL,
+            prompt_context=context,
+        )
+        streamed = stream.feed(text[:17]) + stream.feed(text[17:])
+        streamed += stream.finish()
+        self.assertEqual(streamed, oracle.processed_text)
+        self.assertEqual(stream.findings, oracle.findings)
+
+    def test_secret_and_card_overlap_and_adjacency_match_batch(self) -> None:
+        secret = "sk-" + "A" * 20
+        texts = (
+            "sk_live_4111111111111111",
+            "4111111111111111" + secret,
+            secret + "4111111111111111",
+            secret + " 4111111111111111",
+        )
+        for text in texts:
+            for width in range(1, len(text) + 1):
+                chunks = tuple(
+                    text[index : index + width]
+                    for index in range(0, len(text), width)
+                )
+                oracle, streamed, stream = _run_rule_stream(
+                    text,
+                    chunks,
+                    SecretsRule(),
+                    PaymentCardRule(),
+                )
+                with self.subTest(text=text, width=width):
+                    self.assertEqual(streamed, oracle.processed_text)
+                    self.assertEqual(stream.findings, oracle.findings)
+
+    def test_payment_card_candidate_overflow_matches_batch(self) -> None:
+        rule = PaymentCardRule(PaymentCardConfig(max_candidates=2))
+        text = (
+            "4111111111111111 x 1234567890123 x "
+            "5555555555554444 trailing private suffix"
+        )
+        chunks = tuple(
+            text[index : index + 5]
+            for index in range(0, len(text), 5)
+        )
+        oracle, streamed, stream = _run_rule_stream(text, chunks, rule)
+        self.assertEqual(streamed, oracle.processed_text)
+        self.assertEqual(stream.findings, oracle.findings)
+        self.assertEqual(
+            stream.findings[-1].metadata["reason"],
+            "candidate_limit_exceeded",
+        )
+
+    def test_seeded_mixed_rule_chunk_plans_match_batch(self) -> None:
+        generator = random.Random(2_026_08_17)
+        secret = "sk-" + "A" * 20
+        fragments = (
+            "plain text ",
+            "4111111111111111",
+            "4111-1111-1111-1111",
+            "1234567890123",
+            secret,
+            "sk_live_4111111111111111",
+            "\r\n",
+        )
+        for case in range(200):
+            text = "".join(
+                generator.choice(fragments)
+                for _ in range(generator.randint(1, 12))
+            )
+            chunks: list[str] = []
+            position = 0
+            while position < len(text):
+                width = generator.randint(1, 31)
+                chunks.append(text[position : position + width])
+                position += width
+            oracle, streamed, stream = _run_rule_stream(
+                text,
+                tuple(chunks),
+                SecretsRule(),
+                PaymentCardRule(),
+            )
+            with self.subTest(case=case):
+                self.assertEqual(streamed, oracle.processed_text)
+                self.assertEqual(stream.findings, oracle.findings)
+
     def test_every_builtin_prefix_matches_batch_across_token_splits(self) -> None:
         for signature in BUILTIN_SECRET_CATALOG.signatures:
             for prefix in signature.prefixes:
@@ -379,6 +554,33 @@ class FirewallStreamParityTests(unittest.TestCase):
 
 
 class FirewallStreamLifecycleTests(unittest.TestCase):
+    def test_payment_card_stream_emits_behind_a_bounded_watermark(self) -> None:
+        text = "4111111111111111" + " safe" * 20
+        scanner = _rule_scanner(len(text), PaymentCardRule())
+        stream = FirewallStream(
+            scanner=scanner,
+            mode=StreamMode.INCREMENTAL,
+        )
+        emitted = stream.feed(text)
+        self.assertTrue(emitted.startswith("[REDACTED]"))
+        self.assertLessEqual(stream.buffered_chars, 100)
+        oracle = Firewall(scanner=scanner).process(text)
+        self.assertEqual(emitted + stream.finish(), oracle.processed_text)
+
+    def test_payment_card_adversarial_numeric_input_has_bounded_memory(self) -> None:
+        text = "7" * 1_000_000
+        stream = FirewallStream(
+            scanner=_rule_scanner(len(text), PaymentCardRule()),
+            mode=StreamMode.INCREMENTAL,
+        )
+        parts = []
+        for index in range(0, len(text), 4_096):
+            parts.append(stream.feed(text[index : index + 4_096]))
+        parts.append(stream.finish())
+        self.assertEqual("".join(parts), text)
+        self.assertLessEqual(stream.max_buffered_chars, 4_200)
+        self.assertEqual(stream.buffered_chars, 0)
+
     def test_incremental_stream_emits_safe_text_and_redacts_early(self) -> None:
         stream = FirewallStream(
             scanner=_secret_scanner(128),

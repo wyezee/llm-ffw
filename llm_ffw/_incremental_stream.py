@@ -1,4 +1,4 @@
-"""Internal incremental inspection for constrained secret signatures."""
+"""Internal incremental redaction with optional secret detection."""
 
 from dataclasses import dataclass
 from enum import Enum
@@ -13,7 +13,7 @@ from .secret_catalog import (
 
 
 class _EngineState(str, Enum):
-    """Internal lifecycle state for the fused secrets engine."""
+    """Internal lifecycle state for incremental redaction."""
 
     OPEN = "open"
     FINISHED = "finished"
@@ -43,14 +43,16 @@ class _SegmentPlan:
     overflow_start: int | None = None
 
 
-class _SecretStreamEngine:
-    """Internal fused redaction engine for catalog-shaped secrets."""
+class _IncrementalRedactionEngine:
+    """Fuse secret detection with externally finalized redaction findings."""
 
     MAX_PENDING_CANDIDATE_CHARS = 65_536
 
     __slots__ = (
         "_active_unbounded",
         "_catalog",
+        "_external_findings",
+        "_external_pending",
         "_findings",
         "_max_buffered_chars",
         "_max_input_chars",
@@ -62,6 +64,7 @@ class _SecretStreamEngine:
         "_pending_offset",
         "_prefix_pattern",
         "_previous_char",
+        "_redaction_at_boundary",
         "_received_chars",
         "_redaction_text",
         "_signatures_by_prefix",
@@ -71,13 +74,14 @@ class _SecretStreamEngine:
     def __init__(
         self,
         *,
-        catalog: SecretCatalog,
+        catalog: SecretCatalog | None,
         max_input_chars: int = 8_000_000,
         redaction_text: str = "[REDACTED]",
     ) -> None:
-        if not isinstance(catalog, SecretCatalog):
-            raise TypeError("catalog must be a SecretCatalog")
-        for signature in catalog.signatures:
+        if catalog is not None and not isinstance(catalog, SecretCatalog):
+            raise TypeError("catalog must be a SecretCatalog or None")
+        signatures = catalog.signatures if catalog is not None else ()
+        for signature in signatures:
             if signature.max_suffix_chars is None and (
                 signature.suffix_ending
                 or set(signature.boundary_chars) != set(signature.suffix_chars)
@@ -111,14 +115,18 @@ class _SecretStreamEngine:
             sorted(
                 (
                     (prefix, signature)
-                    for signature in catalog.signatures
+                    for signature in signatures
                     for prefix in signature.prefixes
                 ),
                 key=lambda item: (-len(item[0]), item[0]),
             )
         )
         alternatives = "|".join(re.escape(prefix) for prefix, _ in entries)
-        self._prefix_pattern = re.compile(f"({alternatives})", re.ASCII)
+        self._prefix_pattern = (
+            re.compile(f"({alternatives})", re.ASCII)
+            if alternatives
+            else None
+        )
         self._signatures_by_prefix = dict(entries)
         partial_owners: dict[str, list[SecretSignature]] = {}
         for prefix, signature in entries:
@@ -128,7 +136,10 @@ class _SecretStreamEngine:
             fragment: tuple(owners)
             for fragment, owners in partial_owners.items()
         }
-        self._max_prefix_chars = max(len(prefix) for prefix, _ in entries)
+        self._max_prefix_chars = max(
+            (len(prefix) for prefix, _ in entries),
+            default=0,
+        )
 
         self._catalog = catalog
         self._max_input_chars = max_input_chars
@@ -136,12 +147,15 @@ class _SecretStreamEngine:
         self._pending = ""
         self._pending_offset = 0
         self._previous_char = ""
+        self._redaction_at_boundary = False
         self._active_unbounded: _UnboundedCandidate | None = None
         self._overflow_start: int | None = None
         self._overflow_finding_added = False
         self._received_chars = 0
         self._max_buffered_chars = 0
         self._findings: list[Finding] = []
+        self._external_findings: list[Finding] = []
+        self._external_pending: list[Finding] = []
         self._state = _EngineState.OPEN
 
     @property
@@ -151,8 +165,8 @@ class _SecretStreamEngine:
         return self._state
 
     @property
-    def catalog(self) -> SecretCatalog:
-        """Return the immutable catalog pinned to this stream."""
+    def catalog(self) -> SecretCatalog | None:
+        """Return the immutable secret catalog, when enabled."""
 
         return self._catalog
 
@@ -160,7 +174,17 @@ class _SecretStreamEngine:
     def findings(self) -> tuple[Finding, ...]:
         """Return completed disclosure-safe findings in source order."""
 
-        return tuple(self._findings)
+        return tuple(
+            sorted(
+                (*self._findings, *self._external_findings),
+                key=lambda finding: (
+                    finding.span.start,
+                    finding.span.end,
+                    finding.rule_id,
+                    tuple(sorted(finding.metadata.items())),
+                ),
+            )
+        )
 
     @property
     def received_chars(self) -> int:
@@ -180,7 +204,12 @@ class _SecretStreamEngine:
 
         return self._max_buffered_chars
 
-    def feed(self, chunk: str) -> str:
+    def feed(
+        self,
+        chunk: str,
+        *,
+        external_findings: tuple[Finding, ...] = (),
+    ) -> str:
         """Inspect one non-empty chunk and return text safe to forward now."""
 
         self._require_open()
@@ -192,6 +221,20 @@ class _SecretStreamEngine:
         if new_total > self._max_input_chars:
             self.cancel()
             raise ValueError("stream exceeds max_input_chars")
+        try:
+            selected_external = tuple(external_findings)
+        except TypeError as exc:
+            raise TypeError("external_findings must be iterable") from exc
+        for finding in selected_external:
+            if not isinstance(finding, Finding):
+                raise TypeError("external_findings must contain Finding values")
+            if finding.action is not Action.REDACT:
+                raise ValueError("external findings must have REDACT action")
+            if finding.span.end > new_total:
+                raise ValueError("external finding extends beyond received text")
+        self._external_findings.extend(selected_external)
+        self._external_pending.extend(selected_external)
+        self._external_pending.sort(key=lambda finding: finding.span)
         chunk_start = self._received_chars
         self._received_chars = new_total
         try:
@@ -209,6 +252,7 @@ class _SecretStreamEngine:
             if self._overflow_start is not None:
                 self._add_overflow_finding()
             elif self._active_unbounded is not None:
+                self._drop_external_covered_through(self._received_chars)
                 self._complete_unbounded(self._received_chars)
             elif self._pending:
                 plan = self._plan_segment(self._pending, final=True)
@@ -226,7 +270,9 @@ class _SecretStreamEngine:
         if self._state is _EngineState.OPEN:
             self._pending = ""
             self._previous_char = ""
+            self._redaction_at_boundary = False
             self._active_unbounded = None
+            self._external_pending.clear()
             self._state = _EngineState.CANCELLED
 
     def _require_open(self) -> None:
@@ -252,6 +298,7 @@ class _SecretStreamEngine:
             len(self._pending),
         )
         plan = self._plan_segment(text, final=False)
+        plan = self._constrain_plan(plan)
         return self._apply_plan(text, plan)
 
     def _consume_unbounded(self, chunk: str, *, chunk_start: int) -> str:
@@ -270,10 +317,22 @@ class _SecretStreamEngine:
         )
         self._active_unbounded = active
         if end == len(chunk):
+            self._drop_external_covered_through(active.end)
             return ""
+        covered_until = self._consume_external_overlap(active.end)
         self._complete_unbounded(active.end)
-        self._previous_char = active.last_char
-        return self._consume(chunk[end:], chunk_start=chunk_start + end)
+        covered_chars = covered_until - active.end
+        if covered_chars:
+            self._previous_char = chunk[end + covered_chars - 1]
+        else:
+            self._previous_char = active.last_char
+        remainder_start = end + covered_chars
+        if remainder_start == len(chunk):
+            return ""
+        return self._consume(
+            chunk[remainder_start:],
+            chunk_start=chunk_start + remainder_start,
+        )
 
     def _complete_unbounded(self, end: int) -> None:
         active = self._active_unbounded
@@ -284,10 +343,32 @@ class _SecretStreamEngine:
         )
         self._active_unbounded = None
 
+    def _drop_external_covered_through(self, end: int) -> None:
+        self._external_pending = [
+            finding
+            for finding in self._external_pending
+            if finding.span.end > end
+        ]
+
+    def _consume_external_overlap(self, covered_until: int) -> int:
+        remaining: list[Finding] = []
+        for finding in self._external_pending:
+            if finding.span.start <= covered_until:
+                covered_until = max(covered_until, finding.span.end)
+            else:
+                remaining.append(finding)
+        self._external_pending = remaining
+        return covered_until
+
     def _plan_segment(self, text: str, *, final: bool) -> _SegmentPlan:
         matches: list[_PlannedMatch] = []
         next_position = 0
-        for prefix_match in self._prefix_pattern.finditer(text):
+        prefix_matches = (
+            self._prefix_pattern.finditer(text)
+            if self._prefix_pattern is not None
+            else ()
+        )
+        for prefix_match in prefix_matches:
             position = prefix_match.start()
             if position < next_position:
                 continue
@@ -375,6 +456,8 @@ class _SecretStreamEngine:
         return _SegmentPlan(len(text), tuple(matches))
 
     def _trailing_partial_start(self, text: str) -> int | None:
+        if self._max_prefix_chars == 0:
+            return None
         maximum = min(len(text), self._max_prefix_chars - 1)
         for length in range(maximum, 0, -1):
             fragment = text[-length:]
@@ -390,16 +473,72 @@ class _SecretStreamEngine:
                 return position
         return None
 
+    def _constrain_plan(self, plan: _SegmentPlan) -> _SegmentPlan:
+        absolute_safe = self._pending_offset + plan.safe_end
+        constrained_safe = plan.safe_end
+        for finding in self._external_pending:
+            if finding.span.start < absolute_safe < finding.span.end:
+                constrained_safe = min(
+                    constrained_safe,
+                    max(0, finding.span.start - self._pending_offset),
+                )
+        if constrained_safe == plan.safe_end:
+            return plan
+        return _SegmentPlan(
+            safe_end=constrained_safe,
+            matches=tuple(
+                match
+                for match in plan.matches
+                if match.end <= constrained_safe
+            ),
+        )
+
     def _apply_plan(self, text: str, plan: _SegmentPlan) -> str:
+        absolute_safe = self._pending_offset + plan.safe_end
+        redactions = [Span(match.start, match.end) for match in plan.matches]
+        for match in plan.matches:
+            self._findings.append(match.finding)
+        remaining_external: list[Finding] = []
+        for finding in self._external_pending:
+            if finding.span.end <= absolute_safe:
+                redactions.append(
+                    Span(
+                        finding.span.start - self._pending_offset,
+                        finding.span.end - self._pending_offset,
+                    )
+                )
+            else:
+                remaining_external.append(finding)
+        self._external_pending = remaining_external
+
+        merged: list[Span] = []
+        for span in sorted(redactions):
+            if merged and span.start <= merged[-1].end:
+                previous = merged[-1]
+                merged[-1] = Span(previous.start, max(previous.end, span.end))
+            else:
+                merged.append(span)
         parts: list[str] = []
         cursor = 0
-        for match in plan.matches:
-            parts.append(text[cursor : match.start])
-            parts.append(self._redaction_text)
-            cursor = match.end
-            self._findings.append(match.finding)
+        suppress_first_marker = bool(
+            self._redaction_at_boundary
+            and merged
+            and merged[0].start == 0
+        )
+        for index, span in enumerate(merged):
+            parts.append(text[cursor : span.start])
+            if not (index == 0 and suppress_first_marker):
+                parts.append(self._redaction_text)
+            cursor = span.end
         parts.append(text[cursor : plan.safe_end])
         emission = "".join(parts)
+        redaction_reaches_safe_end = bool(
+            merged and merged[-1].end == plan.safe_end
+        )
+        redaction_continues = bool(
+            redaction_reaches_safe_end
+            or (self._redaction_at_boundary and plan.safe_end == 0)
+        )
 
         if plan.safe_end:
             self._previous_char = text[plan.safe_end - 1]
@@ -409,15 +548,20 @@ class _SecretStreamEngine:
         if plan.overflow_start is not None:
             self._overflow_start = plan.overflow_start
             self._pending = ""
-            parts.append(self._redaction_text)
-            emission = "".join(parts)
+            if not redaction_continues:
+                emission += self._redaction_text
+            self._redaction_at_boundary = True
         elif plan.unbounded is not None:
             if len(self._findings) >= SecretsRule.MAX_CANDIDATES:
                 self._overflow_start = plan.unbounded.start
             else:
                 self._active_unbounded = plan.unbounded
             self._pending = ""
-            emission += self._redaction_text
+            if not redaction_continues:
+                emission += self._redaction_text
+            self._redaction_at_boundary = True
+        elif plan.safe_end:
+            self._redaction_at_boundary = redaction_reaches_safe_end
         return emission
 
     def _add_overflow_finding(self) -> None:
@@ -426,6 +570,8 @@ class _SecretStreamEngine:
         start = self._overflow_start
         if start is None:
             raise RuntimeError("overflow state is missing")
+        if self._catalog is None:
+            raise RuntimeError("secret catalog is missing")
         self._findings.append(
             Finding(
                 rule_id=SecretsRule.RULE_ID,

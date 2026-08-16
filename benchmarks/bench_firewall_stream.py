@@ -18,7 +18,7 @@ from llm_ffw import (
     ScannerConfig,
     StreamMode,
 )
-from llm_ffw.rules import SecretsRule
+from llm_ffw.rules import PaymentCardRule, SecretsRule
 
 
 def _stream_once(
@@ -53,7 +53,7 @@ def main() -> None:
     text = build_dataset(args.size).text
     firewall = Firewall(
         scanner=Scanner(
-            rules=(SecretsRule(),),
+            rules=(SecretsRule(), PaymentCardRule()),
             config=ScannerConfig(max_input_chars=len(text)),
         ),
         policy=BALANCED_POLICY,

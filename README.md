@@ -122,27 +122,31 @@ shape, or policy action cannot preserve semantics:
 
 ```python
 from llm_ffw import Firewall, Scanner, StreamMode
-from llm_ffw.rules import SecretsRule
+from llm_ffw.rules import PaymentCardRule, SecretsRule
 
-firewall = Firewall(scanner=Scanner(rules=(SecretsRule(),)))
+firewall = Firewall(
+    scanner=Scanner(rules=(SecretsRule(), PaymentCardRule()))
+)
 stream = firewall.stream(mode=StreamMode.INCREMENTAL)
 ```
 
-The current release has a fused incremental implementation for `SecretsRule`.
-Other active rules are reported as `StreamingSupport.END_OF_STREAM` and cause
-`AUTO` to buffer or `INCREMENTAL` to reject. This is a capability boundary, not
-a security downgrade; more rules can gain incremental implementations behind
-the same API without changing client integration. Inspect `execution_mode` and
-`rule_capabilities` before accepting traffic when deployment behavior depends
-on early emission. `StreamMode.BUFFERED` can be selected to require full batch
-semantics explicitly.
+The current release has fused incremental implementations for `SecretsRule`
+and `PaymentCardRule`. Other active rules are reported as
+`StreamingSupport.END_OF_STREAM` and cause `AUTO` to buffer or `INCREMENTAL` to
+reject. This is a capability boundary, not a security downgrade; more rules can
+gain incremental implementations behind the same API without changing client
+integration. Inspect `execution_mode` and `rule_capabilities` before accepting
+traffic when deployment behavior depends on early emission.
+`StreamMode.BUFFERED` can be selected to require full batch semantics
+explicitly.
 
-Incremental secret execution requires an effective `REDACT` action because
-previously emitted text cannot be recalled. Candidate shapes that would need
-attacker-sized retention also fall back to buffered execution in `AUTO` mode.
-Findings retain spans into the original concatenated text and disclosure-safe
-metadata. Each stream belongs to one request and must not be shared between
-concurrent callers.
+Incremental execution requires an effective `REDACT` action because previously
+emitted text cannot be recalled. Payment-card inspection emits behind a bounded
+watermark so candidates split across chunks have exactly the same result as a
+batch scan. Candidate shapes that would need attacker-sized retention fall
+back to buffered execution in `AUTO` mode. Findings retain spans into the
+original concatenated text and disclosure-safe metadata. Each stream belongs
+to one request and must not be shared between concurrent callers.
 
 ### Async usage
 
