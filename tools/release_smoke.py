@@ -158,6 +158,25 @@ def main() -> None:
             env=clean_env,
         )
         _run([str(python), "-I", "-c", SMOKE_CODE], cwd=work, env=clean_env)
+        _run(
+            [
+                str(python),
+                "-I",
+                str(ROOT / "tools" / "rc_acceptance.py"),
+                "--workers",
+                "1",
+                "--concurrency",
+                "2",
+                "--rounds",
+                "1",
+                "--max-tasks-per-child",
+                "4",
+                "--max-p99-latency-ms",
+                "10000",
+            ],
+            cwd=work,
+            env=clean_env,
+        )
 
     print(f"isolated_wheel_smoke=passed version={EXPECTED_VERSION}")
 
