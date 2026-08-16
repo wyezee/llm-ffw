@@ -4,6 +4,8 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.4.0 - 2026-08-16
+
 ### Added
 
 - Unified incremental `FirewallStream` execution for `SecretsRule` and

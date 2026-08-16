@@ -9,7 +9,7 @@ import venv
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "0.3.0"
+EXPECTED_VERSION = "0.4.0"
 SMOKE_CODE = """
 from importlib.metadata import files, metadata, version
 from inspect import signature
@@ -18,14 +18,19 @@ from llm_ffw import (
     AsyncLLMFirewall,
     AsyncLLMFirewallManager,
     Firewall,
+    FirewallStream,
     LLMFirewall,
     LLMFirewallManager,
+    PaymentCardRule,
     ScanScope,
+    Scanner,
     SanitizationResult,
+    StreamMode,
     UnsafeURLConfig,
 )
+from llm_ffw.rules import SecretsRule
 
-assert version("llm-ffw") == "0.3.0"
+assert version("llm-ffw") == "0.4.0"
 assert metadata("llm-ffw").get_all("Requires-Dist") is None
 assert metadata("llm-ffw")["License-Expression"] == "Apache-2.0"
 assert "Development Status :: 4 - Beta" in metadata("llm-ffw").get_all(
@@ -36,6 +41,7 @@ assert LLMFirewall.__module__ == "llm_ffw.facade"
 assert AsyncLLMFirewall.__module__ == "llm_ffw.async_facade"
 assert AsyncLLMFirewallManager.__module__ == "llm_ffw.async_facade"
 assert SanitizationResult.__module__ == "llm_ffw.facade"
+assert FirewallStream.__module__ == "llm_ffw.streaming"
 facade_parameters = signature(LLMFirewall).parameters
 assert "additional_secret_catalog" in facade_parameters
 assert "replacement_secret_catalog" in facade_parameters
@@ -100,6 +106,21 @@ jwt_result = Firewall().process(jwt, scope=ScanScope.INPUT)
 assert jwt_result.decision is Action.REDACT
 assert jwt_result.processed_text == "[REDACTED]"
 assert jwt not in repr(jwt_result.findings)
+streaming_firewall = Firewall(
+    scanner=Scanner(rules=(SecretsRule(), PaymentCardRule()))
+)
+streaming_text = "Card 4242424242424242 and sk-" + "A" * 20
+streaming_oracle = streaming_firewall.process(
+    streaming_text,
+    scope=ScanScope.INPUT,
+)
+stream = streaming_firewall.stream(mode=StreamMode.INCREMENTAL)
+streaming_output = stream.feed(streaming_text[:13])
+streaming_output += stream.feed(streaming_text[13:31])
+streaming_output += stream.feed(streaming_text[31:])
+streaming_output += stream.finish()
+assert streaming_output == streaming_oracle.processed_text
+assert stream.findings == streaming_oracle.findings
 """
 
 

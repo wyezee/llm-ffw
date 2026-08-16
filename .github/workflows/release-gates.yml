@@ -118,6 +118,14 @@ jobs:
           --max-peak-mib 128
           --min-process-requests-per-second 0.5
 
+      - name: Run unified streaming production envelope
+        run: >-
+          python benchmarks/bench_firewall_stream.py
+          --size 8000000
+          --chunk-size 16384
+          --rounds 5
+          --max-overhead-percent 15
+
       - name: Run private-key production envelope
         run: >-
           python benchmarks/bench_private_keys.py

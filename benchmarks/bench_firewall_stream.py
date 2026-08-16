@@ -62,8 +62,22 @@ def main() -> None:
     if oracle.processed_text is None:
         raise RuntimeError("batch oracle unexpectedly blocked the dataset")
 
+    warm_batch = firewall.process(text, scope=ScanScope.INPUT)
+    warm_streamed_text, warm_stream = _stream_once(
+        firewall,
+        text,
+        args.chunk_size,
+    )
+    if warm_batch != oracle:
+        raise RuntimeError("batch warm-up differs from deterministic oracle")
+    if warm_streamed_text != oracle.processed_text:
+        raise RuntimeError("streaming warm-up differs from batch oracle")
+    if warm_stream.findings != oracle.findings:
+        raise RuntimeError("streaming warm-up findings differ from batch oracle")
+
     batch_durations: list[float] = []
     stream_durations: list[float] = []
+    overhead_percentages: list[float] = []
     last_stream: FirewallStream | None = None
     for _ in range(args.rounds):
         started = time.perf_counter()
@@ -79,17 +93,20 @@ def main() -> None:
             raise RuntimeError("streaming output differs from batch oracle")
         if stream.findings != oracle.findings:
             raise RuntimeError("streaming findings differ from batch oracle")
+        overhead_percentages.append(
+            (stream_durations[-1] - batch_durations[-1])
+            / batch_durations[-1]
+            * 100
+            if batch_durations[-1]
+            else 0.0
+        )
         last_stream = stream
 
     if last_stream is None:
         raise RuntimeError("streaming benchmark did not execute")
     batch_seconds = median(batch_durations)
     stream_seconds = median(stream_durations)
-    overhead_percent = (
-        (stream_seconds - batch_seconds) / batch_seconds * 100
-        if batch_seconds
-        else 0.0
-    )
+    overhead_percent = median(overhead_percentages)
     verdict = (
         "firewall_stream_performance_pass"
         if overhead_percent <= args.max_overhead_percent
