@@ -145,10 +145,10 @@ def main() -> None:
     parser.add_argument("--process-requests", type=int, default=8)
     parser.add_argument("--min-clean-throughput-mib-s", type=float, default=5.0)
     parser.add_argument("--min-rgi-throughput-mib-s", type=float, default=5.0)
-    parser.add_argument("--min-dirty-throughput-mib-s", type=float, default=2.0)
+    parser.add_argument("--min-dirty-throughput-mib-s", type=float, default=3.5)
     parser.add_argument("--max-peak-mib", type=float, default=128.0)
     parser.add_argument(
-        "--min-process-requests-per-second", type=float, default=0.4
+        "--min-process-requests-per-second", type=float, default=0.7
     )
     args = parser.parse_args()
     if min(

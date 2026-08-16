@@ -8,6 +8,7 @@ from llm_ffw import (
     BUILTIN_SECRET_CATALOG,
     STRICT_POLICY,
     Action,
+    Firewall,
     ProcessPoolNotRunningError,
     ProcessPoolSaturatedError,
     ProcessPoolState,
@@ -157,6 +158,25 @@ class ProcessScannerPoolTests(unittest.TestCase):
         self.assertEqual(result.decision, Action.REDACT)
         self.assertEqual(result.processed_text, "[REDACTED]")
         self.assertNotIn(value, result.processed_text or "")
+
+    def test_process_canonicalization_matches_direct_findings_and_spans(self) -> None:
+        text = "prefix sk-\u200b" + "H" * 20 + " suffix"
+        expected = Firewall().process(text)
+        pool = ProcessScannerPool(
+            pool_config=ProcessScannerPoolConfig(
+                max_workers=1,
+                max_tasks_per_child=1,
+            )
+        )
+
+        with pool:
+            actual = pool.process(text, timeout=20)
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            tuple(finding.rule_id for finding in actual.findings),
+            ("secrets.detected", "unicode.invisible_characters"),
+        )
 
     def test_strict_block_does_not_stop_process_pool(self) -> None:
         value = "sk-" + "B" * 20

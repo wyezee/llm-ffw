@@ -141,14 +141,23 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
         scanner = _enabled_scanner()
         firewall = Firewall(scanner=scanner)
 
-        with patch.object(scanner, "scan", wraps=scanner.scan) as scan:
+        with (
+            patch.object(scanner, "scan", wraps=scanner.scan) as rescan,
+            patch.object(
+                scanner,
+                "_scan_remaining",
+                wraps=scanner._scan_remaining,
+            ) as remaining,
+        ):
             self.assertEqual(firewall.process("safe").processed_text, "safe")
-            self.assertEqual(scan.call_count, 1)
+            self.assertEqual(rescan.call_count, 0)
+            self.assertEqual(remaining.call_count, 1)
             self.assertEqual(
                 firewall.process("hello" + _ZWSP + "world").processed_text,
                 "helloworld",
             )
-            self.assertEqual(scan.call_count, 3)
+            self.assertEqual(rescan.call_count, 1)
+            self.assertEqual(remaining.call_count, 1)
 
     def test_balanced_policy_removes_then_rescans_secrets(self) -> None:
         firewall = Firewall(scanner=_enabled_scanner())

@@ -323,6 +323,47 @@ class FirewallPolicy:
             redaction_text=redaction_text,
         )
 
+    def _apply_staged_with_rescan(
+        self,
+        text: str,
+        canonical_findings: tuple[Finding, ...],
+        *,
+        scope: ScanScope,
+        redaction_text: str,
+        scan_remaining: Callable[[str], tuple[Finding, ...]],
+        rescan: Callable[[str], tuple[Finding, ...]],
+    ) -> FirewallResult:
+        """Skip the original non-canonical scan when removal triggers a rescan."""
+
+        if not callable(scan_remaining):
+            raise TypeError("scan_remaining must be callable")
+        try:
+            selected = tuple(canonical_findings)
+        except TypeError as exc:
+            raise TypeError("canonical_findings must be iterable") from exc
+        actions = tuple(self.action_for(finding, scope) for finding in selected)
+        if Action.BLOCK not in actions and Action.REMOVE in actions:
+            findings = selected
+        else:
+            findings = tuple(
+                sorted(
+                    (*selected, *tuple(scan_remaining(text))),
+                    key=lambda finding: (
+                        finding.span.start,
+                        finding.span.end,
+                        finding.rule_id,
+                        tuple(sorted(finding.metadata.items())),
+                    ),
+                )
+            )
+        return self.apply_with_rescan(
+            text,
+            findings,
+            scope=scope,
+            redaction_text=redaction_text,
+            rescan=rescan,
+        )
+
     def enforce_json_postcondition(
         self,
         text: str,
@@ -609,16 +650,48 @@ class Firewall:
     ) -> FirewallResult:
         """Detect and enforce the configured action for each finding."""
 
-        findings = self._scanner.scan(
+        if (
+            type(self._scanner) is not Scanner
+            or not self._scanner._supports_staged_canonicalization
+        ):
+            findings = self._scanner.scan(
+                text,
+                scope=scope,
+                prompt_context=prompt_context,
+            )
+            result = self._policy.apply_with_rescan(
+                text,
+                findings,
+                scope=scope,
+                redaction_text=self._scanner.config.redaction_text,
+                rescan=lambda cleaned: self._scanner.scan(
+                    cleaned,
+                    scope=scope,
+                    prompt_context=prompt_context,
+                ),
+            )
+            return self._policy.enforce_json_postcondition(
+                text,
+                result,
+                validator=self._json_output_rule,
+                redaction_text=self._scanner.config.redaction_text,
+            )
+
+        canonical_findings = self._scanner._scan_canonicalizers(
             text,
             scope=scope,
             prompt_context=prompt_context,
         )
-        result = self._policy.apply_with_rescan(
+        result = self._policy._apply_staged_with_rescan(
             text,
-            findings,
+            canonical_findings,
             scope=scope,
             redaction_text=self._scanner.config.redaction_text,
+            scan_remaining=lambda original: self._scanner._scan_remaining(
+                original,
+                scope=scope,
+                prompt_context=prompt_context,
+            ),
             rescan=lambda cleaned: self._scanner.scan(
                 cleaned,
                 scope=scope,

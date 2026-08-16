@@ -2,6 +2,7 @@
 
 from concurrent.futures import Future, InvalidStateError, ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 import math
@@ -21,7 +22,7 @@ from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
 from .private_key import PrivateKeyConfig
 from .jwt_token import JWTTokenConfig
-from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult
+from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult, PolicyOverride
 from .rules.secrets import SecretsRule
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.invisible_characters import InvisibleCharactersRule
@@ -121,6 +122,7 @@ _SerializedFinding: TypeAlias = tuple[
 ]
 
 _WORKER_SCANNER: Scanner | None = None
+_WORKER_POLICY: FirewallPolicy | None = None
 
 
 def _initialize_worker(
@@ -132,8 +134,12 @@ def _initialize_worker(
     payment_card_config: PaymentCardConfig | None,
     private_key_config: PrivateKeyConfig | None,
     jwt_token_config: JWTTokenConfig | None,
+    policy_id: str,
+    policy_version: str,
+    policy_overrides: tuple[PolicyOverride, ...],
 ) -> None:
-    global _WORKER_SCANNER
+    global _WORKER_POLICY, _WORKER_SCANNER
+    _WORKER_POLICY = FirewallPolicy(policy_id, policy_version, policy_overrides)
     if (
         secret_catalog is None
         and banned_substring_catalog is None
@@ -179,6 +185,18 @@ def _scan_in_worker(
 ) -> tuple[_SerializedFinding, ...]:
     if _WORKER_SCANNER is None:
         raise RuntimeError("scanner worker was not initialized")
+    return _serialize_findings(
+        _WORKER_SCANNER.scan(
+            text,
+            scope=scope,
+            prompt_context=prompt_context,
+        )
+    )
+
+
+def _serialize_findings(
+    findings: tuple[Finding, ...],
+) -> tuple[_SerializedFinding, ...]:
     return tuple(
         (
             finding.rule_id,
@@ -190,12 +208,55 @@ def _scan_in_worker(
             finding.redacted_preview,
             tuple(finding.metadata.items()),
         )
-        for finding in _WORKER_SCANNER.scan(
-            text,
-            scope=scope,
-            prompt_context=prompt_context,
-        )
+        for finding in findings
     )
+
+
+def _scan_for_policy_in_worker(
+    text: str,
+    scope: ScanScope,
+    prompt_context: str | None,
+) -> tuple[_SerializedFinding, ...]:
+    if _WORKER_SCANNER is None or _WORKER_POLICY is None:
+        raise RuntimeError("scanner worker was not initialized")
+    if not _WORKER_SCANNER._supports_staged_canonicalization:
+        return _serialize_findings(
+            _WORKER_SCANNER.scan(
+                text,
+                scope=scope,
+                prompt_context=prompt_context,
+            )
+        )
+    canonical = _WORKER_SCANNER._scan_canonicalizers(
+        text,
+        scope=scope,
+        prompt_context=prompt_context,
+    )
+    actions = tuple(
+        _WORKER_POLICY.action_for(finding, scope) for finding in canonical
+    )
+    if Action.BLOCK not in actions and Action.REMOVE in actions:
+        findings = canonical
+    else:
+        findings = tuple(
+            sorted(
+                (
+                    *canonical,
+                    *_WORKER_SCANNER._scan_remaining(
+                        text,
+                        scope=scope,
+                        prompt_context=prompt_context,
+                    ),
+                ),
+                key=lambda finding: (
+                    finding.span.start,
+                    finding.span.end,
+                    finding.rule_id,
+                    tuple(sorted(finding.metadata.items())),
+                ),
+            )
+        )
+    return _serialize_findings(findings)
 
 
 def _deserialize_findings(
@@ -479,6 +540,9 @@ class ProcessScannerPool:
                         self._payment_card_config,
                         self._private_key_config,
                         self._jwt_token_config,
+                        self._policy.policy_id,
+                        self._policy.version,
+                        self._policy.overrides,
                     ),
                     max_tasks_per_child=self._pool_config.max_tasks_per_child,
                 )
@@ -513,6 +577,25 @@ class ProcessScannerPool:
     ) -> Future[tuple[Finding, ...]]:
         """Admit one bounded request and return a future containing safe findings."""
 
+        return self._submit(
+            text,
+            scope=scope,
+            prompt_context=prompt_context,
+            admission_timeout=admission_timeout,
+            worker_function=_scan_in_worker,
+        )
+
+    def _submit(
+        self,
+        text: str,
+        *,
+        scope: ScanScope,
+        prompt_context: str | None,
+        admission_timeout: float | None,
+        worker_function: Callable[
+            [str, ScanScope, str | None], tuple[_SerializedFinding, ...]
+        ],
+    ) -> Future[tuple[Finding, ...]]:
         if not isinstance(text, str):
             raise TypeError("text must be a string")
         if len(text) > self._scanner_config.max_input_chars:
@@ -556,7 +639,7 @@ class ProcessScannerPool:
                 if self._executor is None:
                     raise RuntimeError("running pool has no executor")
                 raw_future = self._executor.submit(
-                    _scan_in_worker,
+                    worker_function,
                     text,
                     scope,
                     prompt_context,
@@ -629,6 +712,28 @@ class ProcessScannerPool:
             future.cancel()
             raise
 
+    def _scan_for_policy(
+        self,
+        text: str,
+        *,
+        scope: ScanScope,
+        prompt_context: str | None,
+        timeout: float | None,
+        admission_timeout: float | None,
+    ) -> tuple[Finding, ...]:
+        future = self._submit(
+            text,
+            scope=scope,
+            prompt_context=prompt_context,
+            admission_timeout=admission_timeout,
+            worker_function=_scan_for_policy_in_worker,
+        )
+        try:
+            return future.result(timeout=timeout)
+        except TimeoutError:
+            future.cancel()
+            raise
+
     def process(
         self,
         text: str,
@@ -642,7 +747,7 @@ class ProcessScannerPool:
 
         validated_timeout = _validate_timeout(timeout, "timeout")
         started = time.monotonic()
-        findings = self.scan(
+        findings = self._scan_for_policy(
             text,
             scope=scope,
             prompt_context=prompt_context,

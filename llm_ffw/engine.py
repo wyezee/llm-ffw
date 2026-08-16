@@ -7,12 +7,15 @@ from .findings import Finding
 from .inspection import InspectionFeature, ScanScope, build_inspection
 from .redaction import sanitize_findings
 from .rules.base import Rule, RuleMatch
+from .rules.banned_substrings import BannedSubstringsRule
 from .rules.invisible_characters import InvisibleCharactersRule
+from .rules.json_output import JSONOutputRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.payment_card import PaymentCardRule
 from .rules.private_key import PrivateKeyRule
 from .rules.jwt_token import JWTTokenRule
 from .rules.secrets import SecretsRule
+from .rules.unsafe_url import UnsafeURLRule
 
 
 class Scanner:
@@ -78,6 +81,31 @@ class Scanner:
             sorted(rule_contracts, key=lambda item: item[0].rule_id)
         )
         self._rules = tuple(item[0] for item in self._rule_contracts)
+        canonicalizer_types = (InvisibleCharactersRule, UnicodeTagSmugglingRule)
+        self._canonicalizer_contracts = tuple(
+            contract
+            for contract in self._rule_contracts
+            if isinstance(contract[0], canonicalizer_types)
+        )
+        self._remaining_contracts = tuple(
+            contract
+            for contract in self._rule_contracts
+            if not isinstance(contract[0], canonicalizer_types)
+        )
+        staged_safe_types = (
+            BannedSubstringsRule,
+            InvisibleCharactersRule,
+            JSONOutputRule,
+            JWTTokenRule,
+            PaymentCardRule,
+            PrivateKeyRule,
+            SecretsRule,
+            UnicodeTagSmugglingRule,
+            UnsafeURLRule,
+        )
+        self._supports_staged_canonicalization = all(
+            type(rule) in staged_safe_types for rule in self._rules
+        )
 
     @property
     def config(self) -> ScannerConfig:
@@ -96,10 +124,58 @@ class Scanner:
     ) -> tuple[Finding, ...]:
         """Scan text and return immutable findings using original-text spans."""
 
-        self._validate_request(text, scope, prompt_context)
+        return self._scan_contracts(
+            text,
+            scope=scope,
+            prompt_context=prompt_context,
+            contracts=self._rule_contracts,
+        )
 
+    def _scan_canonicalizers(
+        self,
+        text: str,
+        *,
+        scope: ScanScope = ScanScope.INPUT,
+        prompt_context: str | None = None,
+    ) -> tuple[Finding, ...]:
+        """Scan only built-in rules that can remove text before a rescan."""
+
+        return self._scan_contracts(
+            text,
+            scope=scope,
+            prompt_context=prompt_context,
+            contracts=self._canonicalizer_contracts,
+        )
+
+    def _scan_remaining(
+        self,
+        text: str,
+        *,
+        scope: ScanScope = ScanScope.INPUT,
+        prompt_context: str | None = None,
+    ) -> tuple[Finding, ...]:
+        """Scan rules not handled by the canonicalization stage."""
+
+        return self._scan_contracts(
+            text,
+            scope=scope,
+            prompt_context=prompt_context,
+            contracts=self._remaining_contracts,
+        )
+
+    def _scan_contracts(
+        self,
+        text: str,
+        *,
+        scope: ScanScope,
+        prompt_context: str | None,
+        contracts: tuple[
+            tuple[Rule, frozenset[ScanScope], frozenset[InspectionFeature]], ...
+        ],
+    ) -> tuple[Finding, ...]:
+        self._validate_request(text, scope, prompt_context)
         active_contracts = tuple(
-            contract for contract in self._rule_contracts if scope in contract[1]
+            contract for contract in contracts if scope in contract[1]
         )
         if not active_contracts:
             return ()
