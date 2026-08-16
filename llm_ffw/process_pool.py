@@ -18,6 +18,7 @@ from .engine import Scanner
 from .findings import Action, Finding, Severity, Span
 from .inspection import ScanScope
 from .json_output import JSONOutputConfig
+from .ip_address import IPAddressConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
 from .private_key import PrivateKeyConfig
@@ -28,6 +29,7 @@ from .rules.banned_substrings import BannedSubstringsRule
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.json_output import JSONOutputRule
+from .rules.ip_address import IPAddressRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
 from .rules.private_key import PrivateKeyRule
@@ -131,6 +133,7 @@ def _initialize_worker(
     banned_substring_catalog: BannedSubstringCatalog | None,
     json_output_config: JSONOutputConfig | None,
     unsafe_url_config: UnsafeURLConfig | None,
+    ip_address_config: IPAddressConfig | None,
     payment_card_config: PaymentCardConfig | None,
     private_key_config: PrivateKeyConfig | None,
     jwt_token_config: JWTTokenConfig | None,
@@ -145,6 +148,7 @@ def _initialize_worker(
         and banned_substring_catalog is None
         and json_output_config is None
         and unsafe_url_config is None
+        and ip_address_config is None
         and payment_card_config is None
         and private_key_config is None
         and jwt_token_config is None
@@ -162,6 +166,8 @@ def _initialize_worker(
             rules.append(JSONOutputRule(json_output_config))
         if unsafe_url_config is not None:
             rules.append(UnsafeURLRule(unsafe_url_config))
+        if ip_address_config is not None:
+            rules.append(IPAddressRule(ip_address_config))
         if payment_card_config is not None:
             rules.append(PaymentCardRule(payment_card_config))
         if private_key_config is not None:
@@ -297,6 +303,7 @@ class ProcessScannerPool:
         banned_substring_catalog: BannedSubstringCatalog | None = None,
         json_output_config: JSONOutputConfig | None = None,
         unsafe_url_config: UnsafeURLConfig | None = None,
+        ip_address_config: IPAddressConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
         jwt_token_config: JWTTokenConfig | None = None,
@@ -332,6 +339,12 @@ class ProcessScannerPool:
         ):
             raise TypeError(
                 "unsafe_url_config must be an UnsafeURLConfig or None"
+            )
+        if ip_address_config is not None and not isinstance(
+            ip_address_config, IPAddressConfig
+        ):
+            raise TypeError(
+                "ip_address_config must be an IPAddressConfig or None"
             )
         if payment_card_config is not None and not isinstance(
             payment_card_config, PaymentCardConfig
@@ -418,6 +431,11 @@ class ProcessScannerPool:
                         else ()
                     ),
                     *(
+                        ("pii.ip_address",)
+                        if ip_address_config is not None
+                        else ()
+                    ),
+                    *(
                         ("pii.payment_card",)
                         if resolved_payment_card_config is not None
                         else ()
@@ -442,6 +460,7 @@ class ProcessScannerPool:
                     "unicode.invisible_characters",
                     "unicode.tag_smuggling",
                     "url.unsafe",
+                    "pii.ip_address",
                     "pii.payment_card",
                     "secrets.private_key",
                     "secrets.jwt_token",
@@ -455,6 +474,7 @@ class ProcessScannerPool:
         self._banned_substring_catalog = banned_substring_catalog
         self._json_output_config = json_output_config
         self._unsafe_url_config = unsafe_url_config
+        self._ip_address_config = ip_address_config
         self._payment_card_config = resolved_payment_card_config
         self._private_key_config = resolved_private_key_config
         self._jwt_token_config = resolved_jwt_token_config
@@ -504,6 +524,10 @@ class ProcessScannerPool:
         return self._unsafe_url_config
 
     @property
+    def ip_address_config(self) -> IPAddressConfig | None:
+        return self._ip_address_config
+
+    @property
     def payment_card_config(self) -> PaymentCardConfig | None:
         return self._payment_card_config
 
@@ -537,6 +561,7 @@ class ProcessScannerPool:
                         self._banned_substring_catalog,
                         self._json_output_config,
                         self._unsafe_url_config,
+                        self._ip_address_config,
                         self._payment_card_config,
                         self._private_key_config,
                         self._jwt_token_config,

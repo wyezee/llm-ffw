@@ -19,6 +19,8 @@ from llm_ffw import (
     AsyncLLMFirewallManager,
     Firewall,
     FirewallStream,
+    IPAddressConfig,
+    IPAddressRule,
     LLMFirewall,
     LLMFirewallManager,
     PaymentCardRule,
@@ -46,6 +48,7 @@ facade_parameters = signature(LLMFirewall).parameters
 assert "additional_secret_catalog" in facade_parameters
 assert "replacement_secret_catalog" in facade_parameters
 assert "secret_catalog" not in facade_parameters
+assert "ip_address_config" in facade_parameters
 capabilities = LLMFirewall().capabilities()
 assert capabilities.rule_count == 6
 assert tuple(rule.rule_id for rule in capabilities.rules) == (
@@ -72,6 +75,13 @@ assert any(
     for rule in url_firewall.capabilities().rules
 )
 url_firewall.close()
+ip_firewall = LLMFirewall(ip_address_config=IPAddressConfig())
+assert ip_firewall.capabilities().ip_address.max_candidates == 128
+assert any(
+    rule.rule_id == IPAddressRule.RULE_ID
+    for rule in ip_firewall.capabilities().rules
+)
+ip_firewall.close()
 synthetic = "sk-" + "A" * 20
 result = Firewall().process(synthetic, scope=ScanScope.INPUT)
 assert result.decision is Action.REDACT

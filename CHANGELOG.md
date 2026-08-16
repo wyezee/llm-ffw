@@ -4,6 +4,12 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Added
+
+- Opt-in bounded `IPAddressRule` for canonical IPv4 and IPv6 privacy
+  redaction, with input-only defaults, family/scope controls, safe metadata,
+  policy integration, public capabilities, and an 8 MB production envelope.
+
 ## 0.4.0 - 2026-08-16
 
 ### Added

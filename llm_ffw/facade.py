@@ -10,6 +10,7 @@ from .capabilities import (
     BannedSubstringCatalogCapability,
     FirewallCapabilities,
     JSONOutputCapability,
+    IPAddressCapability,
     RuleCapability,
     SecretCatalogCapability,
     UnsafeURLCapability,
@@ -22,6 +23,7 @@ from .config import ScannerConfig
 from .findings import Action, Finding
 from .inspection import ScanScope
 from .json_output import JSONOutputConfig
+from .ip_address import IPAddressConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
 from .private_key import PrivateKeyConfig
@@ -39,6 +41,7 @@ from .rules.banned_substrings import BannedSubstringsRule
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.json_output import JSONOutputRule
+from .rules.ip_address import IPAddressRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
 from .rules.private_key import PrivateKeyRule
@@ -119,6 +122,7 @@ class LLMFirewall:
         banned_substring_catalog: BannedSubstringCatalog | None = None,
         json_output_config: JSONOutputConfig | None = None,
         unsafe_url_config: UnsafeURLConfig | None = None,
+        ip_address_config: IPAddressConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
         jwt_token_config: JWTTokenConfig | None = None,
@@ -142,6 +146,7 @@ class LLMFirewall:
             banned_substring_catalog=banned_substring_catalog,
             json_output_config=json_output_config,
             unsafe_url_config=unsafe_url_config,
+            ip_address_config=ip_address_config,
             payment_card_config=payment_card_config,
             private_key_config=private_key_config,
             jwt_token_config=jwt_token_config,
@@ -194,6 +199,14 @@ class LLMFirewall:
                     rule_id=UnsafeURLRule.RULE_ID,
                     purpose=UnsafeURLRule.PURPOSE,
                     scopes=tuple(self._pool.unsafe_url_config.scopes),
+                )
+            )
+        if self._pool.ip_address_config is not None:
+            rule_capabilities.append(
+                RuleCapability(
+                    rule_id=IPAddressRule.RULE_ID,
+                    purpose=IPAddressRule.PURPOSE,
+                    scopes=tuple(self._pool.ip_address_config.scopes),
                 )
             )
         if self._pool.payment_card_config is not None:
@@ -271,6 +284,17 @@ class LLMFirewall:
                     max_url_chars=self._pool.unsafe_url_config.max_url_chars,
                 )
                 if self._pool.unsafe_url_config is not None
+                else None
+            ),
+            ip_address=(
+                IPAddressCapability(
+                    max_candidates=(
+                        self._pool.ip_address_config.max_candidates
+                    ),
+                    include_ipv4=self._pool.ip_address_config.include_ipv4,
+                    include_ipv6=self._pool.ip_address_config.include_ipv6,
+                )
+                if self._pool.ip_address_config is not None
                 else None
             ),
             payment_card=(

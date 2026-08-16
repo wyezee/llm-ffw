@@ -5,6 +5,7 @@ from .banned_substrings import BannedSubstringsRule
 from .invisible_characters import InvisibleCharactersRule
 from .unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .json_output import JSONOutputRule
+from .ip_address import IPAddressRule
 from .payment_card import PaymentCardRule
 from .private_key import PrivateKeyRule
 from .jwt_token import JWTTokenRule
@@ -16,6 +17,7 @@ __all__ = [
     "InvisibleCharactersRule",
     "UnicodeTagSmugglingRule",
     "JSONOutputRule",
+    "IPAddressRule",
     "PaymentCardRule",
     "PrivateKeyRule",
     "JWTTokenRule",

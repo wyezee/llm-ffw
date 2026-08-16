@@ -3,6 +3,7 @@ import unittest
 
 from llm_ffw import (
     FirewallCapabilities,
+    IPAddressCapability,
     RuleCapability,
     ScanScope,
     SecretCatalogCapability,
@@ -63,6 +64,20 @@ class CapabilityValueTests(unittest.TestCase):
                 policy_id="balanced",
                 policy_version="1",
             )
+
+    def test_ip_address_capability_is_bounded_and_typed(self) -> None:
+        capability = IPAddressCapability(
+            max_candidates=128,
+            include_ipv4=True,
+            include_ipv6=False,
+        )
+        self.assertEqual(capability.max_candidates, 128)
+        with self.assertRaises(ValueError):
+            IPAddressCapability(0, True, True)
+        with self.assertRaises(TypeError):
+            IPAddressCapability(1, 1, True)  # type: ignore[arg-type]
+        with self.assertRaises(ValueError):
+            IPAddressCapability(1, False, False)
 
 
 if __name__ == "__main__":

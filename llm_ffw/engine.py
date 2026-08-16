@@ -9,6 +9,7 @@ from .redaction import sanitize_findings
 from .rules.base import Rule, RuleMatch
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.invisible_characters import InvisibleCharactersRule
+from .rules.ip_address import IPAddressRule
 from .rules.json_output import JSONOutputRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.payment_card import PaymentCardRule
@@ -95,6 +96,7 @@ class Scanner:
         staged_safe_types = (
             BannedSubstringsRule,
             InvisibleCharactersRule,
+            IPAddressRule,
             JSONOutputRule,
             JWTTokenRule,
             PaymentCardRule,

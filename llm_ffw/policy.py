@@ -476,6 +476,7 @@ def _builtin_policy(
     unicode_tag_action: Action | None,
     json_output_action: Action,
     unsafe_url_action: Action,
+    ip_address_action: Action,
     payment_card_action: Action,
     private_key_action: Action,
     jwt_token_action: Action,
@@ -504,7 +505,7 @@ def _builtin_policy(
     )
     return FirewallPolicy(
         policy_id=policy_id,
-        version="1.7.0",
+        version="1.8.0",
         overrides=(
             PolicyOverride("secrets.detected", ScanScope.INPUT, input_action),
             PolicyOverride("secrets.detected", ScanScope.OUTPUT, output_action),
@@ -524,6 +525,16 @@ def _builtin_policy(
                 "url.unsafe",
                 ScanScope.OUTPUT,
                 unsafe_url_action,
+            ),
+            PolicyOverride(
+                "pii.ip_address",
+                ScanScope.INPUT,
+                ip_address_action,
+            ),
+            PolicyOverride(
+                "pii.ip_address",
+                ScanScope.OUTPUT,
+                ip_address_action,
             ),
             PolicyOverride(
                 "pii.payment_card",
@@ -567,6 +578,7 @@ BALANCED_POLICY = _builtin_policy(
     unicode_tag_action=None,
     json_output_action=Action.BLOCK,
     unsafe_url_action=Action.REDACT,
+    ip_address_action=Action.REDACT,
     payment_card_action=Action.REDACT,
     private_key_action=Action.REDACT,
     jwt_token_action=Action.REDACT,
@@ -579,6 +591,7 @@ STRICT_POLICY = _builtin_policy(
     unicode_tag_action=Action.BLOCK,
     json_output_action=Action.BLOCK,
     unsafe_url_action=Action.BLOCK,
+    ip_address_action=Action.BLOCK,
     payment_card_action=Action.BLOCK,
     private_key_action=Action.BLOCK,
     jwt_token_action=Action.BLOCK,
@@ -591,6 +604,7 @@ AUDIT_POLICY = _builtin_policy(
     unicode_tag_action=Action.REVIEW,
     json_output_action=Action.REVIEW,
     unsafe_url_action=Action.REVIEW,
+    ip_address_action=Action.REVIEW,
     payment_card_action=Action.REVIEW,
     private_key_action=Action.REVIEW,
     jwt_token_action=Action.REVIEW,
@@ -620,6 +634,7 @@ class Firewall:
                     "unicode.tag_smuggling",
                     "output.json.validity",
                     "url.unsafe",
+                    "pii.ip_address",
                     "pii.payment_card",
                     "secrets.private_key",
                     "secrets.jwt_token",

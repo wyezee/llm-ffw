@@ -9,6 +9,7 @@ from .banned_substring_catalog import BannedSubstringCatalog
 from .config import ScannerConfig
 from .facade import FirewallUnavailableError, LLMFirewall
 from .json_output import JSONOutputConfig
+from .ip_address import IPAddressConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
 from .private_key import PrivateKeyConfig
@@ -62,6 +63,7 @@ class LLMFirewallManager:
         banned_substring_catalog: BannedSubstringCatalog | None = None,
         json_output_config: JSONOutputConfig | None = None,
         unsafe_url_config: UnsafeURLConfig | None = None,
+        ip_address_config: IPAddressConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
         jwt_token_config: JWTTokenConfig | None = None,
@@ -75,6 +77,7 @@ class LLMFirewallManager:
         self._banned_substring_catalog = banned_substring_catalog
         self._json_output_config = json_output_config
         self._unsafe_url_config = unsafe_url_config
+        self._ip_address_config = ip_address_config
         self._payment_card_config = payment_card_config
         self._private_key_config = private_key_config
         self._jwt_token_config = jwt_token_config
@@ -103,6 +106,7 @@ class LLMFirewallManager:
             banned_substring_catalog=self._banned_substring_catalog,
             json_output_config=self._json_output_config,
             unsafe_url_config=self._unsafe_url_config,
+            ip_address_config=self._ip_address_config,
             payment_card_config=self._payment_card_config,
             private_key_config=self._private_key_config,
             jwt_token_config=self._jwt_token_config,

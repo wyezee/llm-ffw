@@ -299,6 +299,7 @@ rebuilding it per request.
 | `banned_substring_catalog` | Enable a deployment-owned immutable literal catalog |
 | `json_output_config` | Enable bounded output-only JSON validation |
 | `unsafe_url_config` | Enable bounded input/output URL inspection |
+| `ip_address_config` | Enable bounded canonical IP-address inspection |
 | `payment_card_config` | Customize enabled payment-card limits and scopes |
 | `private_key_config` | Customize enabled private-key limits and scopes |
 | `jwt_token_config` | Customize enabled JWT limits and scopes |
@@ -306,10 +307,11 @@ rebuilding it per request.
 | `request_timeout_seconds` | Per-request facade deadline; defaults to 5 seconds |
 
 The two secret-catalog parameters are mutually exclusive. Passing `None` for
-the opt-in banned-substring, JSON, and unsafe-URL configurations leaves those
-rules disabled. Payment-card, private-key, JWT, invisible-character, and Unicode
-tag rules are enabled by `ScannerConfig` defaults; their dedicated config
-objects customize bounds and scopes rather than enabling them.
+the opt-in banned-substring, JSON, unsafe-URL, and IP-address configurations
+leaves those rules disabled. Payment-card, private-key, JWT,
+invisible-character, and Unicode tag rules are enabled by `ScannerConfig`
+defaults; their dedicated config objects customize bounds and scopes rather
+than enabling them.
 
 `ProcessScannerPoolConfig` controls `max_workers`, `max_in_flight`,
 `max_tasks_per_child`, and `admission_timeout_seconds`. Size these from measured
@@ -376,6 +378,7 @@ Strict and audit policies can change the effective action.
 | `content.banned_substrings` | Opt-in | Catalog-defined | Pattern action; redact by default | `BannedSubstringCatalog` |
 | `output.json.validity` | Opt-in | Output | Block | `JSONOutputConfig` |
 | `url.unsafe` | Opt-in | Input/output by default | Redact | `UnsafeURLConfig` |
+| `pii.ip_address` | Opt-in | Input by default | Redact | `IPAddressConfig` |
 
 ### Default invisible-character canonicalization
 
@@ -477,6 +480,28 @@ non-public IP targets, exact documented cloud metadata hostnames, and ambiguous
 authorities under balanced policy. It checks input and output by default;
 deployments can restrict its `scopes`. It performs no DNS, HTTP, reputation,
 model, or other network call.
+
+### Opt-in IP-address inspection
+
+Applications that treat IP addresses as personal or infrastructure-sensitive
+data can enable deterministic inspection:
+
+```python
+from llm_ffw import IPAddressConfig, LLMFirewall, ScanScope
+
+firewall = LLMFirewall(
+    ip_address_config=IPAddressConfig(
+        scopes=(ScanScope.INPUT, ScanScope.OUTPUT),
+    )
+)
+```
+
+`IPAddressRule` recognizes standard IPv4 and IPv6 text using bounded candidate
+discovery followed by Python's `ipaddress` parser. It is input-only unless
+configured otherwise, redacts under balanced policy, and can independently
+disable either address family. It intentionally does not normalize obfuscated
+addresses or claim complete PII detection; the high-precision default targets
+accidental disclosure with predictable false-positive and performance bounds.
 
 ### Default payment-card inspection
 

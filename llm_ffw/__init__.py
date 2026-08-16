@@ -4,6 +4,7 @@ from .capabilities import (
     BannedSubstringCatalogCapability,
     FirewallCapabilities,
     JSONOutputCapability,
+    IPAddressCapability,
     RuleCapability,
     SecretCatalogCapability,
     UnsafeURLCapability,
@@ -32,6 +33,7 @@ from .inspection import (
     ScanScope,
 )
 from .json_output import JSONOutputConfig
+from .ip_address import IPAddressConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
 from .private_key import PrivateKeyConfig
@@ -76,6 +78,7 @@ from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.json_output import JSONOutputRule
+from .rules.ip_address import IPAddressRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
 from .rules.private_key import PrivateKeyRule
@@ -109,6 +112,9 @@ __all__ = [
     "JSONOutputConfig",
     "JSONOutputCapability",
     "JSONOutputRule",
+    "IPAddressCapability",
+    "IPAddressConfig",
+    "IPAddressRule",
     "LLMFirewall",
     "LLMFirewallManager",
     "LiteralMatchMode",
