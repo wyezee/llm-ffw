@@ -1,4 +1,4 @@
-"""Contextual detection of removable invisible Unicode characters."""
+"""Bounded detection of invisible Unicode tag-character payloads."""
 
 from ..findings import Action, Severity, Span
 from ..inspection import Inspection, InspectionFeature, ScanScope
@@ -8,11 +8,11 @@ from .base import Rule, RuleMatch
 _MAX_REMOVAL_RUNS = 64
 
 
-class InvisibleCharactersRule(Rule):
-    """Find U+200B runs used inside ASCII token-shaped text."""
+class UnicodeTagSmugglingRule(Rule):
+    """Remove non-RGI Unicode tag runs from model input."""
 
-    RULE_ID = "unicode.invisible_characters"
-    PURPOSE = "Detect removable invisible characters embedded in ASCII tokens."
+    RULE_ID = "unicode.tag_smuggling"
+    PURPOSE = "Detect invisible Unicode tag runs outside pinned RGI emoji flags."
     SCOPES = frozenset((ScanScope.INPUT,))
 
     @property
@@ -35,40 +35,41 @@ class InvisibleCharactersRule(Rule):
         if not isinstance(inspection, Inspection):
             raise TypeError("inspection must be an Inspection")
         candidates = inspection.unicode_security
-        if candidates.zero_width_space_runs_overflowed:
-            run = candidates.zero_width_space_runs[-1]
+        if candidates.tag_runs_overflowed:
+            run = candidates.tag_runs[-1]
             return (
                 RuleMatch(
                     span=Span(run.start, run.end),
                     severity=Severity.HIGH,
                     action=Action.BLOCK,
-                    message="Invisible-character removal limit exceeded.",
+                    message="Unicode tag removal limit exceeded.",
                     metadata={
-                        "character_type": "zero_width_space",
-                        "detector": "contextual_ascii_token",
+                        "character_type": "unicode_tag",
+                        "detector": "bounded_tag_run",
                         "limit": str(_MAX_REMOVAL_RUNS),
                         "span_basis": "characters",
                     },
                 ),
             )
+
         matches: list[RuleMatch] = []
-        for run in candidates.zero_width_space_runs:
-            start, end = run.start, run.end
+        for run in candidates.tag_runs:
             matches.append(
                 RuleMatch(
-                    span=Span(start, end),
+                    span=Span(run.start, run.end),
                     severity=Severity.HIGH,
                     action=Action.REMOVE,
-                    message="Invisible character embedded in an ASCII token.",
-                    redacted_preview="[REMOVED:invisible_character]",
+                    message="Invisible Unicode tag sequence detected.",
+                    redacted_preview="[REMOVED:unicode_tag_sequence]",
                     metadata={
-                        "character_type": "zero_width_space",
-                        "detector": "contextual_ascii_token",
+                        "character_type": "unicode_tag",
+                        "detector": "bounded_tag_run",
                         "span_basis": "characters",
+                        "unicode_version": "17.0",
                     },
                 )
             )
         return tuple(matches)
 
 
-__all__ = ["InvisibleCharactersRule"]
+__all__ = ["UnicodeTagSmugglingRule"]

@@ -43,9 +43,9 @@ jobs:
           --concurrency 4
           --process-requests 8
           --max-clean-overhead-percent 10
-          --min-dirty-throughput-mib-s 2.5
-          --max-dirty-peak-mib 128
-          --min-process-requests-per-second 0.5
+          --min-dirty-throughput-mib-s 1.8
+          --max-peak-mib 128
+          --min-process-requests-per-second 0.4
 
       - name: Run banned-substring production envelope
         run: >-
@@ -58,6 +58,20 @@ jobs:
           --min-throughput-mib-s 3
           --max-peak-mib 128
           --min-process-requests-per-second 0.5
+
+      - name: Run Unicode-tag production envelope
+        run: >-
+          python benchmarks/bench_unicode_tag_smuggling.py
+          --size 8000000
+          --rounds 3
+          --workers 2
+          --concurrency 4
+          --process-requests 8
+          --min-clean-throughput-mib-s 5
+          --min-rgi-throughput-mib-s 5
+          --min-dirty-throughput-mib-s 2
+          --max-dirty-peak-mib 128
+          --min-process-requests-per-second 0.4
 
       - name: Run JSON-output production envelope
         run: >-

@@ -25,6 +25,7 @@ from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult
 from .rules.secrets import SecretsRule
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.invisible_characters import InvisibleCharactersRule
+from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.json_output import JSONOutputRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
@@ -147,6 +148,8 @@ def _initialize_worker(
         rules = [SecretsRule(secret_catalog or BUILTIN_SECRET_CATALOG)]
         if scanner_config.enable_invisible_characters:
             rules.append(InvisibleCharactersRule())
+        if scanner_config.enable_unicode_tag_smuggling:
+            rules.append(UnicodeTagSmugglingRule())
         if banned_substring_catalog is not None:
             rules.append(BannedSubstringsRule(banned_substring_catalog))
         if json_output_config is not None:
@@ -334,6 +337,11 @@ class ProcessScannerPool:
                         else ()
                     ),
                     *(
+                        ("unicode.tag_smuggling",)
+                        if resolved_scanner_config.enable_unicode_tag_smuggling
+                        else ()
+                    ),
+                    *(
                         ("content.banned_substrings",)
                         if banned_substring_catalog is not None
                         else ()
@@ -371,6 +379,7 @@ class ProcessScannerPool:
                     "output.json.validity",
                     "secrets.detected",
                     "unicode.invisible_characters",
+                    "unicode.tag_smuggling",
                     "url.unsafe",
                     "pii.payment_card",
                     "secrets.private_key",

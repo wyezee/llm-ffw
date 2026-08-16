@@ -13,6 +13,7 @@ class ScannerTests(unittest.TestCase):
     def test_default_limit_supports_large_contexts(self) -> None:
         self.assertEqual(ScannerConfig().max_input_chars, 8_000_000)
         self.assertTrue(ScannerConfig().enable_invisible_characters)
+        self.assertTrue(ScannerConfig().enable_unicode_tag_smuggling)
         self.assertTrue(ScannerConfig().enable_payment_cards)
         self.assertTrue(ScannerConfig().enable_private_keys)
         self.assertTrue(ScannerConfig().enable_jwt_tokens)
@@ -28,6 +29,7 @@ class ScannerTests(unittest.TestCase):
                 "secrets.jwt_token",
                 "secrets.private_key",
                 "unicode.invisible_characters",
+                "unicode.tag_smuggling",
             ),
         )
         self.assertEqual(
@@ -43,6 +45,7 @@ class ScannerTests(unittest.TestCase):
         scanner = Scanner(
             config=ScannerConfig(
                 enable_invisible_characters=False,
+                enable_unicode_tag_smuggling=False,
                 enable_payment_cards=False,
                 enable_private_keys=False,
                 enable_jwt_tokens=False,
@@ -129,6 +132,7 @@ class ScannerTests(unittest.TestCase):
     def test_rejects_non_boolean_rule_activation_configuration(self) -> None:
         for field_name in (
             "enable_invisible_characters",
+            "enable_unicode_tag_smuggling",
             "enable_payment_cards",
             "enable_private_keys",
             "enable_jwt_tokens",

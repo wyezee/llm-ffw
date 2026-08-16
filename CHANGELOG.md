@@ -6,6 +6,11 @@ All notable changes are recorded here before a tagged release.
 
 ### Added
 
+- Default input-only `UnicodeTagSmugglingRule` with bounded removal and rescan,
+  Unicode Emoji 17.0 RGI subdivision-flag preservation, disclosure-safe
+  findings, independent opt-out, and 8 MB adversarial/process gates. Built-in
+  policy profiles advance to `1.7.0`.
+
 - Default bounded `JWTTokenRule` detection and redaction for compact JWTs with
   canonical Base64URL, unique-member JSON, algorithm, and JWT-type/registered-
   claim validation. Built-in policy profiles advance to `1.6.0`.

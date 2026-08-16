@@ -3,6 +3,7 @@
 from .base import Rule, RuleMatch
 from .banned_substrings import BannedSubstringsRule
 from .invisible_characters import InvisibleCharactersRule
+from .unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .json_output import JSONOutputRule
 from .payment_card import PaymentCardRule
 from .private_key import PrivateKeyRule
@@ -13,6 +14,7 @@ from .unsafe_url import UnsafeURLRule
 __all__ = [
     "BannedSubstringsRule",
     "InvisibleCharactersRule",
+    "UnicodeTagSmugglingRule",
     "JSONOutputRule",
     "PaymentCardRule",
     "PrivateKeyRule",

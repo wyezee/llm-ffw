@@ -59,6 +59,7 @@ from .secret_catalog import (
     SignatureStatus,
 )
 from .rules.invisible_characters import InvisibleCharactersRule
+from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.json_output import JSONOutputRule
 from .rules.unsafe_url import UnsafeURLRule
@@ -88,6 +89,7 @@ __all__ = [
     "InspectionFeature",
     "InspectionFeatureUnavailableError",
     "InvisibleCharactersRule",
+    "UnicodeTagSmugglingRule",
     "JSONOutputConfig",
     "JSONOutputCapability",
     "JSONOutputRule",

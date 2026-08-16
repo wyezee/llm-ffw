@@ -84,6 +84,8 @@ class InspectionTests(unittest.TestCase):
             _ = inspection.is_ascii
         with self.assertRaises(InspectionFeatureUnavailableError):
             _ = inspection.prompt_text
+        with self.assertRaises(InspectionFeatureUnavailableError):
+            _ = inspection.unicode_security
 
     def test_identity_normalization_does_not_copy_large_ascii_text(self) -> None:
         text = "x" * 8_000_000

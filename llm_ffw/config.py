@@ -10,6 +10,7 @@ class ScannerConfig:
     max_input_chars: int = 8_000_000
     redaction_text: str = "[REDACTED]"
     enable_invisible_characters: bool = True
+    enable_unicode_tag_smuggling: bool = True
     enable_payment_cards: bool = True
     enable_private_keys: bool = True
     enable_jwt_tokens: bool = True
@@ -27,6 +28,8 @@ class ScannerConfig:
             raise ValueError("redaction_text must not be empty")
         if not isinstance(self.enable_invisible_characters, bool):
             raise TypeError("enable_invisible_characters must be a boolean")
+        if not isinstance(self.enable_unicode_tag_smuggling, bool):
+            raise TypeError("enable_unicode_tag_smuggling must be a boolean")
         if not isinstance(self.enable_payment_cards, bool):
             raise TypeError("enable_payment_cards must be a boolean")
         if not isinstance(self.enable_private_keys, bool):

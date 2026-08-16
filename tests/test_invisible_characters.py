@@ -116,7 +116,7 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
         ).process(text)
 
         self.assertEqual(balanced.decision, Action.REMOVE)
-        self.assertEqual(balanced.policy_version, "1.6.0")
+        self.assertEqual(balanced.policy_version, "1.7.0")
         self.assertEqual(balanced.processed_text, "helloworld")
         self.assertEqual(strict.decision, Action.BLOCK)
         self.assertIsNone(strict.processed_text)
@@ -251,7 +251,7 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
         )
 
         capabilities = firewall.capabilities()
-        self.assertEqual(capabilities.rule_count, 5)
+        self.assertEqual(capabilities.rule_count, 6)
         self.assertEqual(
             tuple(rule.rule_id for rule in capabilities.rules),
             (
@@ -260,6 +260,7 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
                 "secrets.jwt_token",
                 "secrets.private_key",
                 "unicode.invisible_characters",
+                "unicode.tag_smuggling",
             ),
         )
         with firewall:

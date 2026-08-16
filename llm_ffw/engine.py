@@ -8,6 +8,7 @@ from .inspection import InspectionFeature, ScanScope, build_inspection
 from .redaction import sanitize_findings
 from .rules.base import Rule, RuleMatch
 from .rules.invisible_characters import InvisibleCharactersRule
+from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.payment_card import PaymentCardRule
 from .rules.private_key import PrivateKeyRule
 from .rules.jwt_token import JWTTokenRule
@@ -30,6 +31,8 @@ class Scanner:
             defaults: list[Rule] = [SecretsRule()]
             if self._config.enable_invisible_characters:
                 defaults.append(InvisibleCharactersRule())
+            if self._config.enable_unicode_tag_smuggling:
+                defaults.append(UnicodeTagSmugglingRule())
             if self._config.enable_payment_cards:
                 defaults.append(PaymentCardRule())
             if self._config.enable_private_keys:

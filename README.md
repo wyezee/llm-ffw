@@ -6,10 +6,11 @@ only the Python standard library: no model judge, network calls, probabilistic
 classification, or third-party packages.
 
 The default scanner ships a secure baseline: `SecretsRule`, input-only
-`InvisibleCharactersRule`, `PaymentCardRule`, `PrivateKeyRule`, and
-`JWTTokenRule`. It detects constrained credential formats, armored private-key
-blocks, and structurally credible compact JWTs, canonicalizes contextual U+200B
-token obfuscation, and redacts Luhn-valid payment-card candidates. Findings
+`InvisibleCharactersRule`, input-only `UnicodeTagSmugglingRule`,
+`PaymentCardRule`, `PrivateKeyRule`, and `JWTTokenRule`. It detects constrained
+credential formats, armored private-key blocks, and structurally credible
+compact JWTs; canonicalizes contextual U+200B token obfuscation and non-RGI
+Unicode tag runs; and redacts Luhn-valid payment-card candidates. Findings
 retain original-text spans and safe category metadata rather than matched
 values.
 
@@ -98,6 +99,16 @@ Balanced and strict policies enforce that block; audit or a custom policy may
 override it. Other format, joining, bidi, private-use, and unassigned
 characters are not removed. See
 [`docs/invisible-characters.md`](docs/invisible-characters.md).
+
+### Default Unicode tag canonicalization
+
+`UnicodeTagSmugglingRule` removes invisible tag-character runs from input and
+rescans the cleaned text. It preserves the three RGI subdivision-flag tag
+sequences pinned by Unicode Emoji 17.0 and treats malformed, extended, or other
+tag runs as findings. Applications can independently opt out with
+`ScannerConfig(enable_unicode_tag_smuggling=False)`. More than 64 relevant runs
+fails closed. See
+[`docs/unicode-tag-smuggling.md`](docs/unicode-tag-smuggling.md).
 
 ## Deployment-defined banned substrings
 

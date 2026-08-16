@@ -428,6 +428,7 @@ def _builtin_policy(
     input_action: Action,
     output_action: Action,
     invisible_action: Action | None,
+    unicode_tag_action: Action | None,
     json_output_action: Action,
     unsafe_url_action: Action,
     payment_card_action: Action,
@@ -445,13 +446,25 @@ def _builtin_policy(
         if invisible_action is not None
         else ()
     )
+    unicode_tag_overrides = (
+        (
+            PolicyOverride(
+                "unicode.tag_smuggling",
+                ScanScope.INPUT,
+                unicode_tag_action,
+            ),
+        )
+        if unicode_tag_action is not None
+        else ()
+    )
     return FirewallPolicy(
         policy_id=policy_id,
-        version="1.6.0",
+        version="1.7.0",
         overrides=(
             PolicyOverride("secrets.detected", ScanScope.INPUT, input_action),
             PolicyOverride("secrets.detected", ScanScope.OUTPUT, output_action),
             *invisible_overrides,
+            *unicode_tag_overrides,
             PolicyOverride(
                 "output.json.validity",
                 ScanScope.OUTPUT,
@@ -506,6 +519,7 @@ BALANCED_POLICY = _builtin_policy(
     input_action=Action.REDACT,
     output_action=Action.REDACT,
     invisible_action=None,
+    unicode_tag_action=None,
     json_output_action=Action.BLOCK,
     unsafe_url_action=Action.REDACT,
     payment_card_action=Action.REDACT,
@@ -517,6 +531,7 @@ STRICT_POLICY = _builtin_policy(
     input_action=Action.BLOCK,
     output_action=Action.REDACT,
     invisible_action=Action.BLOCK,
+    unicode_tag_action=Action.BLOCK,
     json_output_action=Action.BLOCK,
     unsafe_url_action=Action.BLOCK,
     payment_card_action=Action.BLOCK,
@@ -528,6 +543,7 @@ AUDIT_POLICY = _builtin_policy(
     input_action=Action.REVIEW,
     output_action=Action.REVIEW,
     invisible_action=Action.REVIEW,
+    unicode_tag_action=Action.REVIEW,
     json_output_action=Action.REVIEW,
     unsafe_url_action=Action.REVIEW,
     payment_card_action=Action.REVIEW,
@@ -556,6 +572,7 @@ class Firewall:
                 (
                     "secrets.detected",
                     "unicode.invisible_characters",
+                    "unicode.tag_smuggling",
                     "output.json.validity",
                     "url.unsafe",
                     "pii.payment_card",

@@ -34,6 +34,7 @@ from .process_pool import (
 from .rules.secrets import SecretsRule
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.invisible_characters import InvisibleCharactersRule
+from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.json_output import JSONOutputRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
@@ -182,6 +183,14 @@ class LLMFirewall:
                     rule_id=InvisibleCharactersRule.RULE_ID,
                     purpose=InvisibleCharactersRule.PURPOSE,
                     scopes=tuple(InvisibleCharactersRule.SCOPES),
+                )
+            )
+        if self._pool.scanner_config.enable_unicode_tag_smuggling:
+            rule_capabilities.append(
+                RuleCapability(
+                    rule_id=UnicodeTagSmugglingRule.RULE_ID,
+                    purpose=UnicodeTagSmugglingRule.PURPOSE,
+                    scopes=tuple(UnicodeTagSmugglingRule.SCOPES),
                 )
             )
         literal_catalog = self._pool.banned_substring_catalog
