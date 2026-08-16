@@ -4,6 +4,8 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.2.0rc1 - 2026-08-16
+
 ### Added
 
 - Default input-only `UnicodeTagSmugglingRule` with bounded removal and rescan,
@@ -30,8 +32,8 @@ All notable changes are recorded here before a tagged release.
 
 - Opt-in input/output `UnsafeURLRule` with configurable scopes and bounded
   structural parsing for dangerous schemes, embedded authority credentials,
-  local targets, and ambiguous authorities; no DNS, HTTP, model, or reputation
-  calls.
+  local targets, exact documented Google and Tencent cloud metadata hostnames,
+  and ambiguous authorities; no DNS, HTTP, model, or reputation calls.
 - Built-in policy profiles `1.3.0` redact unsafe URLs under balanced policy,
   block them under strict policy, and report them under audit policy.
 - Cross-platform 8 MB unsafe-URL clean, adversarial, redaction, memory, and
@@ -52,6 +54,12 @@ All notable changes are recorded here before a tagged release.
   benchmark with Windows/Linux release tripwires.
 - Built-in policy profiles `1.1.0` with balanced remove, strict block, and
   audit review handling for the rule.
+
+### Changed
+
+- Shared Unicode canonicalization now builds replacement text and original-span
+  mappings lazily, preserving the clean-input fast path while keeping bounded
+  remove-and-rescan behavior.
 
 ## 0.1.0 - 2026-08-15
 

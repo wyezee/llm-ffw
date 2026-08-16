@@ -112,6 +112,32 @@ jobs:
           --max-peak-mib 128
           --min-process-requests-per-second 0.5
 
+      - name: Run private-key production envelope
+        run: >-
+          python benchmarks/bench_private_keys.py
+          --size 8000000
+          --rounds 3
+          --workers 2
+          --concurrency 4
+          --process-requests 8
+          --min-throughput-mib-s 3
+          --min-key-throughput-mib-s 2.5
+          --max-peak-mib 128
+          --min-process-requests-per-second 0.5
+
+      - name: Run JWT production envelope
+        run: >-
+          python benchmarks/bench_jwt_tokens.py
+          --size 8000000
+          --rounds 3
+          --workers 2
+          --concurrency 4
+          --process-requests 8
+          --min-throughput-mib-s 3
+          --min-jwt-throughput-mib-s 2.5
+          --max-peak-mib 128
+          --min-process-requests-per-second 0.5
+
       - name: Run process soak and recycling gate
         run: python benchmarks/bench_soak.py --size 8000000 --workers 4 --concurrency 8 --requests 32 --max-tasks-per-child 4 --min-requests-per-second 1
 
