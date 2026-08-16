@@ -355,9 +355,10 @@ the owner decisions in the checklist are complete.
 
 ## Production process concurrency
 
-`ProcessScannerPool` is the supported multi-core execution boundary. It starts
-workers eagerly, uses a bounded in-flight queue, recycles workers, returns only
-safe `Finding` objects, detects broken workers, and shuts down deterministically.
+`ProcessScannerPool` is the supported multi-core execution boundary. It validates
+worker execution before accepting traffic, uses a bounded in-flight queue,
+recycles workers, returns only safe `Finding` objects, detects broken workers,
+and shuts down deterministically.
 
 ```python
 from llm_ffw import ProcessScannerPool, ProcessScannerPoolConfig, ScanScope

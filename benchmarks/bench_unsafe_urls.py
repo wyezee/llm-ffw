@@ -68,6 +68,11 @@ def benchmark(
             ),
             Action.REDACT,
         ),
+        (
+            "overlapping_schemes",
+            _sized_suffix(size, "", "http://"),
+            Action.REDACT,
+        ),
     )
     durations: dict[str, list[float]] = {
         name: [] for name, _, _ in workloads
@@ -167,6 +172,7 @@ def main() -> None:
     if min(
         result["unsafe_at_end_mib_per_second"],
         result["metadata_host_at_end_mib_per_second"],
+        result["overlapping_schemes_mib_per_second"],
     ) < args.min_unsafe_throughput_mib_s:
         raise SystemExit("unsafe URL redaction throughput gate failed")
     if result["unsafe_peak_mib"] > args.max_peak_mib:

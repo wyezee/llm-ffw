@@ -84,3 +84,30 @@ class SecretsRuleTests(unittest.TestCase):
 
         self.assertEqual(findings, ())
         self.assertLess(elapsed, 2.0)
+
+    def test_dense_matches_fail_closed_at_bounded_limit(self) -> None:
+        token = "sk_test_" + "A" * 10
+        text = " ".join((token,) * (SecretsRule.MAX_CANDIDATES + 1))
+
+        findings = self.scanner.scan(text)
+
+        self.assertEqual(len(findings), SecretsRule.MAX_CANDIDATES + 1)
+        overflow = findings[-1]
+        self.assertIs(overflow.action, Action.BLOCK)
+        self.assertIs(overflow.severity, Severity.HIGH)
+        self.assertEqual(
+            overflow.metadata["reason"],
+            "candidate_limit_exceeded",
+        )
+        self.assertEqual(overflow.span.end, len(text))
+
+    def test_dense_long_input_remains_bounded_and_fast(self) -> None:
+        token = "sk_test_" + "A" * 10
+        text = (token + " ") * 400_000
+
+        started = time.perf_counter()
+        findings = self.scanner.scan(text)
+        elapsed = time.perf_counter() - started
+
+        self.assertEqual(len(findings), SecretsRule.MAX_CANDIDATES + 1)
+        self.assertLess(elapsed, 2.0)

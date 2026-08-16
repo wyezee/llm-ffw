@@ -516,7 +516,7 @@ class ProcessScannerPool:
         return self._jwt_token_config
 
     def start(self) -> "ProcessScannerPool":
-        """Start workers eagerly and fail before accepting traffic if startup fails."""
+        """Start workers and validate process execution before accepting traffic."""
 
         executor: ProcessPoolExecutor | None = None
         with self._lifecycle_lock:
@@ -564,6 +564,9 @@ class ProcessScannerPool:
                     self._state = ProcessPoolState.BROKEN
                 if executor is not None:
                     executor.shutdown(wait=True, cancel_futures=True)
+                with self._state_lock:
+                    if self._executor is executor:
+                        self._executor = None
                 raise
         return self
 
@@ -710,6 +713,7 @@ class ProcessScannerPool:
             return future.result(timeout=validated_timeout)
         except TimeoutError:
             future.cancel()
+            self._break_timed_out_generation()
             raise
 
     def _scan_for_policy(
@@ -732,7 +736,30 @@ class ProcessScannerPool:
             return future.result(timeout=timeout)
         except TimeoutError:
             future.cancel()
+            self._break_timed_out_generation()
             raise
+
+    def _break_timed_out_generation(self) -> None:
+        """Stop all work in a generation that missed its request deadline."""
+
+        executor: ProcessPoolExecutor | None = None
+        with self._lifecycle_lock:
+            with self._state_lock:
+                if self._state is not ProcessPoolState.RUNNING:
+                    return
+                executor = self._executor
+                self._executor = None
+                self._state = ProcessPoolState.BROKEN
+            if executor is not None:
+                # Python 3.14 force-shutdown is non-blocking: it cancels queued
+                # work and signals every live worker. Completion callbacks then
+                # release their admission slots.
+                try:
+                    executor.terminate_workers()
+                except BaseException:
+                    # The pool is already quarantined as BROKEN. Preserve the
+                    # request's TimeoutError rather than exposing cleanup detail.
+                    pass
 
     def process(
         self,

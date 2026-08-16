@@ -3,6 +3,7 @@
 from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass, field
 import math
+from threading import Lock
 from typing import cast
 
 from .capabilities import (
@@ -92,11 +93,11 @@ class SanitizationResult:
         object.__setattr__(self, "findings", validated.findings)
 
 
-def _validate_request_timeout(value: object) -> float | None:
+def _validate_request_timeout(value: object) -> float:
     if value is None:
-        return None
+        raise TypeError("request_timeout_seconds must be numeric")
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise TypeError("request_timeout_seconds must be numeric or None")
+        raise TypeError("request_timeout_seconds must be numeric")
     if value < 0 or not math.isfinite(value):
         raise ValueError(
             "request_timeout_seconds must be finite and not negative"
@@ -171,11 +172,12 @@ class LLMFirewall:
         private_key_config: PrivateKeyConfig | None = None,
         jwt_token_config: JWTTokenConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
-        request_timeout_seconds: float | None = 5.0,
+        request_timeout_seconds: float = 5.0,
     ) -> None:
         self._request_timeout_seconds = _validate_request_timeout(
             request_timeout_seconds
         )
+        self._lifecycle_lock = Lock()
         catalog = _resolve_secret_catalog(
             additional_secret_catalog,
             replacement_secret_catalog,
@@ -369,13 +371,14 @@ class LLMFirewall:
     def start(self) -> "LLMFirewall":
         """Start workers once during application startup."""
 
-        if self._pool.state is ProcessPoolState.RUNNING:
-            return self
         failure: FirewallUnavailableError | None = None
-        try:
-            self._pool.start()
-        except Exception as exc:
-            failure = self._unavailable_error(exc)
+        with self._lifecycle_lock:
+            if self._pool.state is ProcessPoolState.RUNNING:
+                return self
+            try:
+                self._pool.start()
+            except Exception as exc:
+                failure = self._unavailable_error(exc)
         if failure is not None:
             raise failure
         return self
@@ -384,10 +387,11 @@ class LLMFirewall:
         """Stop admission and close workers during graceful shutdown."""
 
         failure: FirewallUnavailableError | None = None
-        try:
-            self._pool.shutdown(cancel_pending=True)
-        except Exception as exc:
-            failure = self._unavailable_error(exc)
+        with self._lifecycle_lock:
+            try:
+                self._pool.shutdown(cancel_pending=True)
+            except Exception as exc:
+                failure = self._unavailable_error(exc)
         if failure is not None:
             raise failure
 
@@ -395,10 +399,11 @@ class LLMFirewall:
         """Terminate workers at the service's graceful-shutdown deadline."""
 
         failure: FirewallUnavailableError | None = None
-        try:
-            self._pool.terminate()
-        except Exception as exc:
-            failure = self._unavailable_error(exc)
+        with self._lifecycle_lock:
+            try:
+                self._pool.terminate()
+            except Exception as exc:
+                failure = self._unavailable_error(exc)
         if failure is not None:
             raise failure
 
@@ -406,10 +411,11 @@ class LLMFirewall:
         """Kill workers at the service's final hard-stop deadline."""
 
         failure: FirewallUnavailableError | None = None
-        try:
-            self._pool.kill()
-        except Exception as exc:
-            failure = self._unavailable_error(exc)
+        with self._lifecycle_lock:
+            try:
+                self._pool.kill()
+            except Exception as exc:
+                failure = self._unavailable_error(exc)
         if failure is not None:
             raise failure
 
@@ -510,6 +516,11 @@ class LLMFirewall:
                 f"{field_name} exceeds max_input_chars="
                 f"{self._pool.scanner_config.max_input_chars}"
             )
+
+    def _secret_catalog_snapshot(self) -> SecretCatalog:
+        """Return the immutable catalog pinned to this generation."""
+
+        return self._pool.secret_catalog
 
     @staticmethod
     def _unavailable_error(exc: Exception) -> FirewallUnavailableError:

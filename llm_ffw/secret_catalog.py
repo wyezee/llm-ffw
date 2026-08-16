@@ -90,6 +90,13 @@ class SecretSignature:
 
         _validate_character_set(self.suffix_chars, "suffix_chars")
         _validate_character_set(self.boundary_chars, "boundary_chars")
+        if any(
+            character not in self.boundary_chars
+            for character in self.suffix_chars
+        ):
+            raise ValueError(
+                "boundary_chars must contain every suffix character"
+            )
         for prefix in prefixes:
             if any(character not in self.boundary_chars for character in prefix):
                 raise ValueError("boundary_chars must contain every prefix character")

@@ -75,14 +75,21 @@ def _find_candidates(
     config: UnsafeURLConfig,
 ) -> tuple[tuple[_URLCandidate, ...], Span | None]:
     candidates: list[_URLCandidate] = []
+    covered_until = 0
     for match in _URL_START.finditer(text):
-        end = _candidate_end(text, match.start())
-        if end <= match.end():
+        # A scheme-like substring inside an undelimited URL candidate is part of
+        # that candidate, not a second URL. Skipping it also prevents repeated
+        # scans over the same long tail.
+        if match.start() < covered_until:
             continue
         if len(candidates) >= config.max_candidates:
             # Policy may safely transform a BLOCK recommendation into REDACT.
             # Cover the uninspected remainder so no candidate can survive it.
             return tuple(candidates), Span(match.start(), len(text))
+        end = _candidate_end(text, match.start())
+        covered_until = max(covered_until, end)
+        if end <= match.end():
+            continue
         candidates.append(
             _URLCandidate(
                 start=match.start(),

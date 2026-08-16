@@ -66,7 +66,7 @@ class LLMFirewallManager:
         private_key_config: PrivateKeyConfig | None = None,
         jwt_token_config: JWTTokenConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
-        request_timeout_seconds: float | None = 5.0,
+        request_timeout_seconds: float = 5.0,
     ) -> None:
         self._scanner_config = scanner_config
         self._pool_config = pool_config
@@ -179,11 +179,24 @@ class LLMFirewallManager:
                 replacement_secret_catalog=None,
             )
 
+    def restart(self) -> FirewallCapabilities:
+        """Replace the active generation with identical catalog configuration."""
+
+        with self._reload_lock:
+            with self._condition:
+                catalog = self._active.firewall._secret_catalog_snapshot()
+            return self._reload_locked(
+                additional_secret_catalog=None,
+                replacement_secret_catalog=catalog,
+                allow_unchanged=True,
+            )
+
     def _reload_locked(
         self,
         *,
         additional_secret_catalog: SecretCatalog | None,
         replacement_secret_catalog: SecretCatalog | None,
+        allow_unchanged: bool = False,
     ) -> FirewallCapabilities:
         with self._condition:
             if self._state is not FirewallManagerState.RUNNING:
@@ -203,7 +216,8 @@ class LLMFirewallManager:
             )
             active_catalog = self._active.firewall.capabilities().secret_catalog
             if (
-                requested.catalog_id == active_catalog.catalog_id
+                not allow_unchanged
+                and requested.catalog_id == active_catalog.catalog_id
                 and requested.version == active_catalog.version
             ):
                 raise FirewallReloadError(
@@ -243,10 +257,10 @@ class LLMFirewallManager:
         self,
         candidate: LLMFirewall,
     ) -> FirewallCapabilities:
-        closing = False
+        interrupted_state: FirewallManagerState | None = None
         with self._condition:
             if self._state is not FirewallManagerState.RELOADING:
-                closing = True
+                interrupted_state = self._state
             else:
                 previous = self._active
                 current = _Generation(candidate)
@@ -259,11 +273,15 @@ class LLMFirewallManager:
                     and self._state is FirewallManagerState.RUNNING
                 ):
                     self._condition.wait()
-        if closing:
+        if interrupted_state is not None:
             self._discard_candidate(candidate)
             raise FirewallReloadError(
                 activated=False,
-                cause_type="FirewallManagerClosingError",
+                cause_type=(
+                    "FirewallManagerBrokenError"
+                    if interrupted_state is FirewallManagerState.BROKEN
+                    else "FirewallManagerClosingError"
+                ),
             )
         cleanup_error: FirewallUnavailableError | None = None
         with self._condition:
@@ -328,6 +346,7 @@ class LLMFirewallManager:
             generation.in_flight -= 1
             if generation.in_flight < 0:
                 self._state = FirewallManagerState.BROKEN
+                self._condition.notify_all()
                 raise RuntimeError("firewall generation lease underflow")
             self._condition.notify_all()
 

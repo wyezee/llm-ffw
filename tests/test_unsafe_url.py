@@ -1,3 +1,4 @@
+import time
 import unittest
 
 from llm_ffw import (
@@ -245,6 +246,17 @@ class UnsafeURLRuleTests(unittest.TestCase):
             _scanner().scan("a" * 8_000_000, scope=ScanScope.OUTPUT),
             (),
         )
+
+    def test_overlapping_scheme_markers_scan_one_candidate_linearly(self) -> None:
+        text = "http://" * 129 + "a" * 1_000_000
+
+        started = time.perf_counter()
+        findings = _scanner().scan(text, scope=ScanScope.OUTPUT)
+        elapsed = time.perf_counter() - started
+
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].metadata["reason"], "url_too_long")
+        self.assertLess(elapsed, 1.0)
 
     def test_builtin_policies_redact_block_and_review(self) -> None:
         text = "Open javascript:alert(1)"

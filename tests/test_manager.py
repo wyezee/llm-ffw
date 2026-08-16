@@ -1,3 +1,5 @@
+from concurrent.futures.process import BrokenProcessPool
+import os
 import string
 from threading import Event, Thread
 import time
@@ -18,6 +20,10 @@ from llm_ffw import (
     SecretCatalog,
     SecretSignature,
 )
+
+
+def _terminate_current_test_worker() -> None:
+    os._exit(23)
 
 
 def _pool_config() -> ProcessScannerPoolConfig:
@@ -130,10 +136,36 @@ class LLMFirewallManagerTests(unittest.TestCase):
                 "CatalogCoordinateUnchangedError",
             )
 
+            restarted = manager.restart()
+            self.assertEqual(restarted.secret_catalog.signature_count, 29)
+            self.assertEqual(manager.sanitize_input(custom), "[REDACTED]")
+
             restored = manager.reload_builtin_catalog()
             self.assertEqual(restored.secret_catalog.signature_count, 28)
             self.assertEqual(manager.sanitize_input(custom), custom)
             self.assertEqual(manager.sanitize_input(builtin), "[REDACTED]")
+        finally:
+            manager.close()
+
+    def test_restart_replaces_broken_generation_with_same_catalog(self) -> None:
+        manager = LLMFirewallManager(pool_config=_pool_config()).start()
+        previous = manager._active.firewall
+        executor = previous._pool._executor
+        self.assertIsNotNone(executor)
+        if executor is None:
+            self.fail("running firewall did not have an executor")
+        terminated = executor.submit(_terminate_current_test_worker)
+        try:
+            with self.assertRaises(BrokenProcessPool):
+                terminated.result(timeout=10)
+            with self.assertRaises(FirewallUnavailableError):
+                manager.sanitize_input("safe")
+
+            capabilities = manager.restart()
+
+            self.assertEqual(capabilities.secret_catalog.version, "3.0.0")
+            self.assertIsNot(manager._active.firewall, previous)
+            self.assertEqual(manager.sanitize_input("sk-" + "A" * 20), "[REDACTED]")
         finally:
             manager.close()
 

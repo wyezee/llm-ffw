@@ -122,6 +122,9 @@ class ProcessScannerPoolTests(unittest.TestCase):
 
             with self.assertRaises(TimeoutError):
                 pool.scan(slow_text, timeout=0)
+            self.assertEqual(pool.state, ProcessPoolState.BROKEN)
+            with self.assertRaises(ProcessPoolNotRunningError):
+                pool.submit("safe")
             with self.assertRaisesRegex(ValueError, "max_input_chars"):
                 pool.submit(slow_text + "x")
 

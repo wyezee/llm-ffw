@@ -4,6 +4,16 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Changed
+
+- Unsafe URL candidate discovery is linear for overlapping scheme markers, and
+  secret findings now fail closed after a bounded 128 candidates.
+- Custom secret signatures require suffix characters to be boundary characters,
+  preventing deployment catalogs from introducing repeated suffix rescans.
+- A request timeout quarantines and terminates its complete worker generation;
+  `LLMFirewallManager.restart()` can replace broken generations with identical
+  catalog configuration. High-level facades now require a finite timeout.
+
 ## 0.2.0rc2 - 2026-08-16
 
 ### Added

@@ -196,6 +196,17 @@ class SecretCatalogTests(unittest.TestCase):
                 boundary_chars=_WORD,
                 source="internal://security/token-format\nforged",
             ),
+            lambda: SecretSignature(
+                signature_id="example.token",
+                provider="example",
+                secret_type="example_token",
+                prefixes=("ex_",),
+                suffix_chars=_ALNUM + "-",
+                min_suffix_chars=8,
+                max_suffix_chars=None,
+                boundary_chars=_WORD,
+                source="internal://security/token-format",
+            ),
             lambda: SecretCatalog(
                 "acme.catalog",
                 "1",

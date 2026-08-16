@@ -2,7 +2,7 @@
 
 import re
 
-from ..findings import Action, Span
+from ..findings import Action, Severity, Span
 from ..inspection import Inspection, ScanScope
 from ..secret_catalog import BUILTIN_SECRET_CATALOG, SecretCatalog, SecretSignature
 from .base import Rule, RuleMatch
@@ -14,6 +14,7 @@ class SecretsRule(Rule):
     RULE_ID = "secrets.detected"
     PURPOSE = "Detect explicitly formatted credentials with well-known prefixes."
     SCOPES = frozenset((ScanScope.INPUT, ScanScope.OUTPUT))
+    MAX_CANDIDATES = 128
 
     def __init__(self, catalog: SecretCatalog | None = None) -> None:
         if catalog is not None and not isinstance(catalog, SecretCatalog):
@@ -97,6 +98,25 @@ class SecretsRule(Rule):
                 )
             ):
                 continue
+
+            if len(matches) >= self.MAX_CANDIDATES:
+                matches.append(
+                    RuleMatch(
+                        span=Span(position, len(text)),
+                        severity=Severity.HIGH,
+                        action=Action.BLOCK,
+                        message="Secret inspection limit exceeded.",
+                        metadata={
+                            "reason": "candidate_limit_exceeded",
+                            "limit": str(self.MAX_CANDIDATES),
+                            "catalog_id": self._catalog.catalog_id,
+                            "catalog_version": self._catalog.version,
+                            "detector": "well_known_prefix",
+                            "span_basis": "characters",
+                        },
+                    )
+                )
+                break
 
             matches.append(
                 RuleMatch(
