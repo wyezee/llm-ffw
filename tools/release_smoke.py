@@ -9,7 +9,7 @@ import venv
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "0.2.0rc1"
+EXPECTED_VERSION = "0.2.0rc2"
 SMOKE_CODE = """
 from importlib.metadata import files, metadata, version
 from inspect import signature
@@ -19,10 +19,11 @@ from llm_ffw import (
     LLMFirewall,
     LLMFirewallManager,
     ScanScope,
+    SanitizationResult,
     UnsafeURLConfig,
 )
 
-assert version("llm-ffw") == "0.2.0rc1"
+assert version("llm-ffw") == "0.2.0rc2"
 assert metadata("llm-ffw").get_all("Requires-Dist") is None
 assert metadata("llm-ffw")["License-Expression"] == "Apache-2.0"
 assert "Development Status :: 4 - Beta" in metadata("llm-ffw").get_all(
@@ -30,6 +31,7 @@ assert "Development Status :: 4 - Beta" in metadata("llm-ffw").get_all(
 )
 assert any(str(path).endswith("licenses/LICENSE") for path in files("llm-ffw"))
 assert LLMFirewall.__module__ == "llm_ffw.facade"
+assert SanitizationResult.__module__ == "llm_ffw.facade"
 facade_parameters = signature(LLMFirewall).parameters
 assert "additional_secret_catalog" in facade_parameters
 assert "replacement_secret_catalog" in facade_parameters

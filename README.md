@@ -22,10 +22,14 @@ detected secrets in both directions while preserving flow:
 ```python
 from llm_ffw import LLMFirewall
 
-with LLMFirewall() as firewall:
-    safe_prompt = firewall.sanitize_input(prompt)
-    model_output = call_model(safe_prompt)
-    safe_output = firewall.sanitize_output(model_output)
+def main() -> None:
+    with LLMFirewall() as firewall:
+        safe_prompt = firewall.sanitize_input(prompt)
+        model_output = call_model(safe_prompt)
+        safe_output = firewall.sanitize_output(model_output)
+
+if __name__ == "__main__":
+    main()
 ```
 
 Create one facade during application startup and reuse it for every request.
@@ -39,6 +43,24 @@ because the facade uses worker processes.
 worker failures without retaining the submitted text or an internal exception
 chain. Hosts should reject rather than forward content when inspection is
 unavailable.
+
+Applications that need safe audit metadata can request a structured result
+without dropping to the process-pool API:
+
+```python
+result = firewall.sanitize_input_result(prompt)
+safe_prompt = result.text
+for finding in result.findings:
+    record_metric(finding.rule_id, finding.action.value)
+```
+
+`sanitize_output_result()` provides the same contract for model output. These
+methods still raise `ContentBlockedError` and `FirewallUnavailableError`, so a
+returned result is always forwardable under the selected policy. It retains
+only policy-processed text rather than a second pre-inspection copy; an explicit
+audit policy can intentionally leave that text unchanged. Its representation
+always omits the text as an additional safeguard. Do not log `result.text` or
+recover matched content by slicing the original request with finding spans.
 
 `Firewall`, `ProcessScannerPool`, and `Scanner` remain lower-level APIs for
 custom policy results, process orchestration, and detection-only evaluation.

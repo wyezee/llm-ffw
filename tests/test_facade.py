@@ -1,7 +1,10 @@
 import unittest
 import string
+from dataclasses import FrozenInstanceError
 
 from llm_ffw import (
+    Action,
+    AUDIT_POLICY,
     BUILTIN_SECRET_CATALOG,
     STRICT_POLICY,
     ContentBlockedError,
@@ -10,6 +13,8 @@ from llm_ffw import (
     ProcessPoolState,
     ProcessScannerPoolConfig,
     ScannerConfig,
+    SanitizationResult,
+    ScanScope,
     SecretCatalog,
     SecretSignature,
 )
@@ -204,6 +209,61 @@ class LLMFirewallTests(unittest.TestCase):
 
         self.assertEqual(firewall.state, ProcessPoolState.CLOSED)
 
+    def test_structured_results_are_forwardable_and_disclosure_safe(self) -> None:
+        secret = "sk-" + "D" * 20
+        firewall = LLMFirewall(pool_config=_single_worker_config())
+
+        with firewall:
+            input_result = firewall.sanitize_input_result(
+                f"before {secret} after"
+            )
+            output_result = firewall.sanitize_output_result(
+                "ordinary output",
+                prompt_context="ordinary prompt",
+            )
+
+        self.assertIsInstance(input_result, SanitizationResult)
+        self.assertEqual(input_result.text, "before [REDACTED] after")
+        self.assertEqual(input_result.scope, ScanScope.INPUT)
+        self.assertIs(input_result.decision, Action.REDACT)
+        self.assertEqual(len(input_result.findings), 1)
+        self.assertEqual(input_result.findings[0].rule_id, "secrets.detected")
+        self.assertNotIn(secret, repr(input_result))
+        self.assertNotIn(input_result.text, repr(input_result))
+
+        self.assertEqual(output_result.text, "ordinary output")
+        self.assertEqual(output_result.scope, ScanScope.OUTPUT)
+        self.assertIs(output_result.decision, Action.ALLOW)
+        self.assertEqual(output_result.findings, ())
+        with self.assertRaises(FrozenInstanceError):
+            output_result.text = "changed"  # type: ignore[misc]
+
+    def test_structured_result_rejects_blocked_or_invalid_state(self) -> None:
+        fields = {
+            "text": "safe",
+            "policy_id": "test.policy",
+            "policy_version": "1.0.0",
+            "scope": ScanScope.INPUT,
+            "decision": Action.ALLOW,
+            "findings": (),
+        }
+        with self.assertRaises(ValueError):
+            SanitizationResult(**(fields | {"decision": Action.BLOCK}))
+
+    def test_audit_result_omits_unchanged_sensitive_text_from_repr(self) -> None:
+        secret = "sk-" + "R" * 20
+        firewall = LLMFirewall(
+            pool_config=_single_worker_config(),
+            policy=AUDIT_POLICY,
+        )
+
+        with firewall:
+            result = firewall.sanitize_input_result(secret)
+
+        self.assertEqual(result.text, secret)
+        self.assertIs(result.decision, Action.REVIEW)
+        self.assertNotIn(secret, repr(result))
+
     def test_secure_baseline_defaults_and_explicit_opt_outs_reach_workers(self) -> None:
         invisible = "hello\u200bworld"
         card = "Card 4242424242424242"
@@ -246,6 +306,8 @@ class LLMFirewallTests(unittest.TestCase):
 
         with firewall:
             with self.assertRaises(ContentBlockedError) as raised:
+                firewall.sanitize_input_result(value)
+            with self.assertRaises(ContentBlockedError):
                 firewall.sanitize_input(value)
             self.assertEqual(firewall.sanitize_input("safe"), "safe")
 

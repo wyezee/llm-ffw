@@ -1,7 +1,9 @@
 """High-level production facade for sanitized input and output text."""
 
 from concurrent.futures.process import BrokenProcessPool
+from dataclasses import dataclass, field
 import math
+from typing import cast
 
 from .capabilities import (
     BannedSubstringCatalogCapability,
@@ -16,7 +18,7 @@ from .capabilities import (
 )
 from .banned_substring_catalog import BannedSubstringCatalog
 from .config import ScannerConfig
-from .findings import Finding
+from .findings import Action, Finding
 from .inspection import ScanScope
 from .json_output import JSONOutputConfig
 from .unsafe_url import UnsafeURLConfig
@@ -65,6 +67,29 @@ class FirewallUnavailableError(RuntimeError):
     def __init__(self, cause_type: str) -> None:
         super().__init__("content inspection unavailable")
         self.cause_type = cause_type
+
+
+@dataclass(frozen=True, slots=True)
+class SanitizationResult:
+    """Forwardable sanitized text and disclosure-safe enforcement details."""
+
+    text: str = field(repr=False)
+    policy_id: str
+    policy_version: str
+    scope: ScanScope
+    decision: Action
+    findings: tuple[Finding, ...]
+
+    def __post_init__(self) -> None:
+        validated = FirewallResult(
+            policy_id=self.policy_id,
+            policy_version=self.policy_version,
+            scope=self.scope,
+            decision=self.decision,
+            processed_text=self.text,
+            findings=self.findings,
+        )
+        object.__setattr__(self, "findings", validated.findings)
 
 
 def _validate_request_timeout(value: object) -> float | None:
@@ -392,7 +417,15 @@ class LLMFirewall:
         """Return input text after applying the configured firewall policy."""
 
         self._validate_text(text, "text")
-        return self._sanitize(text, scope=ScanScope.INPUT)
+        result = self._forwardable_result(text, scope=ScanScope.INPUT)
+        return cast(str, result.processed_text)
+
+    def sanitize_input_result(self, text: str) -> SanitizationResult:
+        """Return sanitized input with safe findings and policy metadata."""
+
+        self._validate_text(text, "text")
+        result = self._forwardable_result(text, scope=ScanScope.INPUT)
+        return self._sanitization_result(result)
 
     def sanitize_output(
         self,
@@ -405,19 +438,38 @@ class LLMFirewall:
         self._validate_text(text, "text")
         if prompt_context is not None:
             self._validate_text(prompt_context, "prompt_context")
-        return self._sanitize(
+        result = self._forwardable_result(
             text,
             scope=ScanScope.OUTPUT,
             prompt_context=prompt_context,
         )
+        return cast(str, result.processed_text)
 
-    def _sanitize(
+    def sanitize_output_result(
+        self,
+        text: str,
+        *,
+        prompt_context: str | None = None,
+    ) -> SanitizationResult:
+        """Return sanitized output with safe findings and policy metadata."""
+
+        self._validate_text(text, "text")
+        if prompt_context is not None:
+            self._validate_text(prompt_context, "prompt_context")
+        result = self._forwardable_result(
+            text,
+            scope=ScanScope.OUTPUT,
+            prompt_context=prompt_context,
+        )
+        return self._sanitization_result(result)
+
+    def _forwardable_result(
         self,
         text: str,
         *,
         scope: ScanScope,
         prompt_context: str | None = None,
-    ) -> str:
+    ) -> FirewallResult:
         failure: FirewallUnavailableError | None = None
         result: FirewallResult | None = None
         try:
@@ -437,7 +489,18 @@ class LLMFirewall:
             raise ContentBlockedError(result)
         if result.processed_text is None:
             raise FirewallUnavailableError("InternalInspectionError")
-        return result.processed_text
+        return result
+
+    @staticmethod
+    def _sanitization_result(result: FirewallResult) -> SanitizationResult:
+        return SanitizationResult(
+            text=cast(str, result.processed_text),
+            policy_id=result.policy_id,
+            policy_version=result.policy_version,
+            scope=result.scope,
+            decision=result.decision,
+            findings=result.findings,
+        )
 
     def _validate_text(self, value: object, field_name: str) -> None:
         if not isinstance(value, str):
@@ -476,4 +539,5 @@ __all__ = [
     "ContentBlockedError",
     "FirewallUnavailableError",
     "LLMFirewall",
+    "SanitizationResult",
 ]

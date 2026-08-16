@@ -4,6 +4,19 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.2.0rc2 - 2026-08-16
+
+### Added
+
+- `LLMFirewall.sanitize_input_result()` and `sanitize_output_result()` return
+  forwardable sanitized text with disclosure-safe findings, effective policy
+  metadata, and decisions while preserving fail-closed exceptions.
+
+### Changed
+
+- The primary multiprocessing quickstart now includes the required standalone
+  entry-point guard.
+
 ## 0.2.0rc1 - 2026-08-16
 
 ### Added

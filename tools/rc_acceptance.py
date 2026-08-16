@@ -176,11 +176,13 @@ def _percentile(values: list[float], percentile: int) -> float:
 
 def _sanitize(firewall: LLMFirewall, scenario: AcceptanceScenario) -> str:
     if scenario.scope == "input":
-        return firewall.sanitize_input(scenario.text)
-    return firewall.sanitize_output(
-        scenario.text,
-        prompt_context="Synthetic RC consumer acceptance scenario.",
-    )
+        result = firewall.sanitize_input_result(scenario.text)
+    else:
+        result = firewall.sanitize_output_result(
+            scenario.text,
+            prompt_context="Synthetic RC consumer acceptance scenario.",
+        )
+    return result.text
 
 
 def _execute(

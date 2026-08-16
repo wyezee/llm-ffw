@@ -19,7 +19,12 @@ from .banned_substring_catalog import (
 from .config import ScannerConfig
 from .engine import Scanner
 from .findings import Action, Finding, Severity, Span
-from .facade import ContentBlockedError, FirewallUnavailableError, LLMFirewall
+from .facade import (
+    ContentBlockedError,
+    FirewallUnavailableError,
+    LLMFirewall,
+    SanitizationResult,
+)
 from .inspection import (
     Inspection,
     InspectionFeature,
@@ -115,6 +120,7 @@ __all__ = [
     "Scanner",
     "ScannerConfig",
     "ScanScope",
+    "SanitizationResult",
     "SecretCatalog",
     "SecretCatalogCapability",
     "SecretSignature",
@@ -127,4 +133,4 @@ __all__ = [
     "UnsafeURLRule",
 ]
 
-__version__ = "0.2.0rc1"
+__version__ = "0.2.0rc2"
