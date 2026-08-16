@@ -4,6 +4,8 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.5.0 - 2026-08-17
+
 ### Added
 
 - Opt-in bounded `EmailAddressRule` for conservative ASCII mailbox privacy
