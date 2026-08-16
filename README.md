@@ -5,11 +5,11 @@ scanning inputs entering and outputs leaving an LLM runtime. Its runtime uses
 only the Python standard library: no model judge, network calls, probabilistic
 classification, or third-party packages.
 
-The default scanner ships one rule. `SecretsRule` detects a narrow set of
-credentials in text from an immutable, versioned signature catalog and returns
-original-text spans plus safe redaction metadata. Future milestones may add
-structured and other payload types without changing the deterministic rule
-contract.
+The default scanner ships a secure baseline: `SecretsRule`, input-only
+`InvisibleCharactersRule`, and `PaymentCardRule`. It detects constrained
+credential formats, canonicalizes contextual U+200B token obfuscation, and
+redacts Luhn-valid payment-card candidates. Findings retain original-text spans
+and safe category metadata rather than matched values.
 
 ## Usage
 
@@ -76,18 +76,18 @@ headroom for a typical one-million-token text context. Token-to-character ratios
 vary by model, language, and content; callers should still set an explicit limit
 appropriate to their deployment and memory budget.
 
-### Opt-in invisible-character canonicalization
+### Default invisible-character canonicalization
 
-The opt-in `InvisibleCharactersRule` removes a U+200B zero-width-space
+`InvisibleCharactersRule` removes a U+200B zero-width-space
 run only when it is embedded between ASCII token characters, then rescans the
 cleaned input through every enabled rule. Clean ASCII requests retain a single
-scan. The rule is input-only and disabled by default:
+scan. The rule is input-only and enabled by default. Applications can opt out:
 
 ```python
 from llm_ffw import LLMFirewall, ScannerConfig
 
 firewall = LLMFirewall(
-    scanner_config=ScannerConfig(enable_invisible_characters=True),
+    scanner_config=ScannerConfig(enable_invisible_characters=False),
 )
 ```
 
@@ -137,10 +137,10 @@ checks input and output by default; deployments can restrict its `scopes`.
 It performs no DNS, HTTP, reputation, model, or other network call. See
 [`docs/unsafe-urls.md`](docs/unsafe-urls.md).
 
-## Opt-in payment-card inspection
+## Default payment-card inspection
 
-Applications that may handle payment-card data can enable bounded Luhn-based
-inspection in both directions:
+Bounded Luhn-based payment-card inspection is enabled in both directions by
+default. Applications can customize its limits and scopes:
 
 ```python
 from llm_ffw import LLMFirewall, PaymentCardConfig
@@ -150,7 +150,8 @@ firewall = LLMFirewall(payment_card_config=PaymentCardConfig())
 
 `PaymentCardRule` redacts structurally plausible 13–19 digit ASCII candidates
 under balanced policy. Luhn is a checksum, not proof that a card exists or is
-active, so this rule remains opt-in. See
+active. Applications that intentionally pass checksum-valid identifiers or test
+cards can opt out with `ScannerConfig(enable_payment_cards=False)`. See
 [`docs/payment-cards.md`](docs/payment-cards.md).
 
 ## Supported secret signatures

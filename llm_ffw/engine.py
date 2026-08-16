@@ -8,6 +8,7 @@ from .inspection import InspectionFeature, ScanScope, build_inspection
 from .redaction import sanitize_findings
 from .rules.base import Rule, RuleMatch
 from .rules.invisible_characters import InvisibleCharactersRule
+from .rules.payment_card import PaymentCardRule
 from .rules.secrets import SecretsRule
 
 
@@ -27,6 +28,8 @@ class Scanner:
             defaults: list[Rule] = [SecretsRule()]
             if self._config.enable_invisible_characters:
                 defaults.append(InvisibleCharactersRule())
+            if self._config.enable_payment_cards:
+                defaults.append(PaymentCardRule())
             selected_rules = tuple(defaults)
         else:
             selected_rules = tuple(rules)

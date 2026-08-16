@@ -9,7 +9,8 @@ class ScannerConfig:
 
     max_input_chars: int = 8_000_000
     redaction_text: str = "[REDACTED]"
-    enable_invisible_characters: bool = False
+    enable_invisible_characters: bool = True
+    enable_payment_cards: bool = True
 
     def __post_init__(self) -> None:
         if isinstance(self.max_input_chars, bool) or not isinstance(
@@ -24,3 +25,5 @@ class ScannerConfig:
             raise ValueError("redaction_text must not be empty")
         if not isinstance(self.enable_invisible_characters, bool):
             raise TypeError("enable_invisible_characters must be a boolean")
+        if not isinstance(self.enable_payment_cards, bool):
+            raise TypeError("enable_payment_cards must be a boolean")

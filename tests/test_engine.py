@@ -12,18 +12,40 @@ def _key(marker: str) -> str:
 class ScannerTests(unittest.TestCase):
     def test_default_limit_supports_large_contexts(self) -> None:
         self.assertEqual(ScannerConfig().max_input_chars, 8_000_000)
-        self.assertFalse(ScannerConfig().enable_invisible_characters)
+        self.assertTrue(ScannerConfig().enable_invisible_characters)
+        self.assertTrue(ScannerConfig().enable_payment_cards)
 
-    def test_default_scanner_has_only_secrets_rule(self) -> None:
+    def test_default_scanner_has_secure_baseline_rules(self) -> None:
         scanner = Scanner()
 
         self.assertEqual(
             tuple(rule.rule_id for rule in scanner.rules),
-            ("secrets.detected",),
+            (
+                "pii.payment_card",
+                "secrets.detected",
+                "unicode.invisible_characters",
+            ),
         )
         self.assertEqual(
-            scanner.rules[0].scopes,
+            next(
+                rule.scopes
+                for rule in scanner.rules
+                if rule.rule_id == "secrets.detected"
+            ),
             frozenset((ScanScope.INPUT, ScanScope.OUTPUT)),
+        )
+
+    def test_secure_baseline_rules_can_be_explicitly_disabled(self) -> None:
+        scanner = Scanner(
+            config=ScannerConfig(
+                enable_invisible_characters=False,
+                enable_payment_cards=False,
+            )
+        )
+
+        self.assertEqual(
+            tuple(rule.rule_id for rule in scanner.rules),
+            ("secrets.detected",),
         )
 
     def test_secrets_rule_scans_input_and_output(self) -> None:
@@ -98,8 +120,10 @@ class ScannerTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             Scanner().scan(None)  # type: ignore[arg-type]
 
-    def test_rejects_non_boolean_invisible_character_configuration(self) -> None:
-        with self.assertRaises(TypeError):
-            ScannerConfig(  # type: ignore[arg-type]
-                enable_invisible_characters=1,
-            )
+    def test_rejects_non_boolean_rule_activation_configuration(self) -> None:
+        for field_name in (
+            "enable_invisible_characters",
+            "enable_payment_cards",
+        ):
+            with self.subTest(field_name=field_name), self.assertRaises(TypeError):
+                ScannerConfig(**{field_name: 1})  # type: ignore[arg-type]

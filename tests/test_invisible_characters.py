@@ -238,11 +238,10 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
         self.assertTrue(result.blocked)
         self.assertIsNone(result.processed_text)
 
-    def test_process_facade_opt_in_survives_worker_recycling(self) -> None:
+    def test_process_facade_default_survives_worker_recycling(self) -> None:
         secret = "sk-" + "B" * 20
         obfuscated = secret[:3] + _ZWSP + secret[3:]
         firewall = LLMFirewall(
-            scanner_config=ScannerConfig(enable_invisible_characters=True),
             pool_config=ProcessScannerPoolConfig(
                 max_workers=1,
                 max_in_flight=1,
@@ -252,10 +251,14 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
         )
 
         capabilities = firewall.capabilities()
-        self.assertEqual(capabilities.rule_count, 2)
+        self.assertEqual(capabilities.rule_count, 3)
         self.assertEqual(
             tuple(rule.rule_id for rule in capabilities.rules),
-            ("secrets.detected", "unicode.invisible_characters"),
+            (
+                "pii.payment_card",
+                "secrets.detected",
+                "unicode.invisible_characters",
+            ),
         )
         with firewall:
             self.assertEqual(firewall.sanitize_input(obfuscated), "[REDACTED]")
@@ -268,7 +271,7 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
                 "hello" + _ZWSP + "world",
             )
 
-    def test_opt_in_rule_is_kept_with_replacement_secret_catalog(self) -> None:
+    def test_default_rule_is_kept_with_replacement_secret_catalog(self) -> None:
         signature = SecretSignature(
             signature_id="acme.token",
             provider="acme",

@@ -6,7 +6,7 @@ All notable changes are recorded here before a tagged release.
 
 ### Added
 
-- Opt-in input/output `PaymentCardRule` with bounded ASCII candidate matching,
+- Input/output `PaymentCardRule` with bounded ASCII candidate matching,
   Luhn validation, configurable scopes, safe full-span redaction, and no
   issuer, network, or model lookup.
 - Built-in policy profiles `1.4.0` redact payment-card findings under balanced
@@ -32,12 +32,12 @@ All notable changes are recorded here before a tagged release.
   prefix-factored matching, bounded findings, process propagation, and safe
   capability summaries.
 
-- Opt-in `InvisibleCharactersRule` with contextual U+200B removal, bounded
+- `InvisibleCharactersRule` with contextual U+200B removal, bounded
   findings, compact original-span mapping, and one remove-then-rescan pass.
 - Explicit `REMOVE` policy action and focused clean/dirty/process performance
   benchmark with Windows/Linux release tripwires.
 - Built-in policy profiles `1.1.0` with balanced remove, strict block, and
-  audit review handling for the opt-in rule.
+  audit review handling for the rule.
 
 ## 0.1.0 - 2026-08-15
 
@@ -66,6 +66,9 @@ All notable changes are recorded here before a tagged release.
 
 ### Changed
 
+- The secure default baseline now enables `SecretsRule`, input-only
+  `InvisibleCharactersRule`, and `PaymentCardRule`; explicit scanner flags can
+  disable either non-secret rule.
 - The default input limit is 8,000,000 characters.
 - Python 3.14.7 or newer is required.
 - Balanced policy redacts secret findings in both directions by default.

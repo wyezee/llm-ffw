@@ -52,12 +52,20 @@ class LLMFirewallTests(unittest.TestCase):
         capabilities = firewall.capabilities()
 
         self.assertIs(capabilities, firewall.capabilities())
-        self.assertEqual(capabilities.rule_count, 1)
-        self.assertEqual(capabilities.rules[0].rule_id, "secrets.detected")
+        self.assertEqual(capabilities.rule_count, 3)
         self.assertEqual(
-            tuple(scope.value for scope in capabilities.rules[0].scopes),
-            ("input", "output"),
+            tuple(rule.rule_id for rule in capabilities.rules),
+            (
+                "pii.payment_card",
+                "secrets.detected",
+                "unicode.invisible_characters",
+            ),
         )
+        secrets = next(
+            rule for rule in capabilities.rules if rule.rule_id == "secrets.detected"
+        )
+        self.assertEqual(tuple(scope.value for scope in secrets.scopes), ("input", "output"))
+        self.assertEqual(capabilities.payment_card.max_candidates, 128)
         self.assertEqual(
             capabilities.secret_catalog.catalog_id,
             "llm_ffw.builtin.secrets",
@@ -190,6 +198,25 @@ class LLMFirewallTests(unittest.TestCase):
             )
 
         self.assertEqual(firewall.state, ProcessPoolState.CLOSED)
+
+    def test_secure_baseline_defaults_and_explicit_opt_outs_reach_workers(self) -> None:
+        invisible = "hello\u200bworld"
+        card = "Card 4242424242424242"
+        default = LLMFirewall(pool_config=_single_worker_config())
+        opted_out = LLMFirewall(
+            scanner_config=ScannerConfig(
+                enable_invisible_characters=False,
+                enable_payment_cards=False,
+            ),
+            pool_config=_single_worker_config(),
+        )
+
+        with default:
+            self.assertEqual(default.sanitize_input(invisible), "helloworld")
+            self.assertEqual(default.sanitize_output(card), "Card [REDACTED]")
+        with opted_out:
+            self.assertEqual(opted_out.sanitize_input(invisible), invisible)
+            self.assertEqual(opted_out.sanitize_output(card), card)
 
     def test_explicit_lifecycle_is_idempotent_while_running(self) -> None:
         firewall = LLMFirewall(pool_config=_single_worker_config())

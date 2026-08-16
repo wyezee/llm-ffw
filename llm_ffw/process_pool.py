@@ -264,6 +264,18 @@ class ProcessScannerPool:
         if not isinstance(policy, FirewallPolicy):
             raise TypeError("policy must be a FirewallPolicy")
         resolved_scanner_config = scanner_config or ScannerConfig()
+        if (
+            not resolved_scanner_config.enable_payment_cards
+            and payment_card_config is not None
+        ):
+            raise ValueError(
+                "payment_card_config requires enable_payment_cards=True"
+            )
+        resolved_payment_card_config = (
+            (payment_card_config or PaymentCardConfig())
+            if resolved_scanner_config.enable_payment_cards
+            else None
+        )
         policy.validate_rule_ids(
             frozenset(
                 (
@@ -290,7 +302,7 @@ class ProcessScannerPool:
                     ),
                     *(
                         ("pii.payment_card",)
-                        if payment_card_config is not None
+                        if resolved_payment_card_config is not None
                         else ()
                     ),
                 )
@@ -313,7 +325,7 @@ class ProcessScannerPool:
         self._banned_substring_catalog = banned_substring_catalog
         self._json_output_config = json_output_config
         self._unsafe_url_config = unsafe_url_config
-        self._payment_card_config = payment_card_config
+        self._payment_card_config = resolved_payment_card_config
         self._json_output_rule = (
             JSONOutputRule(json_output_config)
             if json_output_config is not None

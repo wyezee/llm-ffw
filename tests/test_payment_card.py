@@ -13,6 +13,7 @@ from llm_ffw import (
     ProcessScannerPoolConfig,
     ScanScope,
     Scanner,
+    ScannerConfig,
 )
 
 
@@ -165,9 +166,13 @@ class PaymentCardRuleTests(unittest.TestCase):
 
 
 class PaymentCardFacadeTests(unittest.TestCase):
-    def test_is_opt_in_and_advertises_bounded_configuration(self) -> None:
-        disabled = LLMFirewall(pool_config=_single_worker_config())
-        enabled = LLMFirewall(
+    def test_is_default_opt_out_and_advertises_bounded_configuration(self) -> None:
+        enabled = LLMFirewall(pool_config=_single_worker_config())
+        disabled = LLMFirewall(
+            scanner_config=ScannerConfig(enable_payment_cards=False),
+            pool_config=_single_worker_config(),
+        )
+        customized = LLMFirewall(
             pool_config=_single_worker_config(),
             payment_card_config=PaymentCardConfig(max_candidates=32),
         )
@@ -180,7 +185,11 @@ class PaymentCardFacadeTests(unittest.TestCase):
                 "pii.payment_card",
                 tuple(rule.rule_id for rule in enabled.capabilities().rules),
             )
-            self.assertEqual(enabled.capabilities().payment_card.max_candidates, 32)
+            self.assertEqual(enabled.capabilities().payment_card.max_candidates, 128)
+            self.assertEqual(
+                customized.capabilities().payment_card.max_candidates,
+                32,
+            )
             card_capability = next(
                 rule
                 for rule in enabled.capabilities().rules
@@ -193,6 +202,14 @@ class PaymentCardFacadeTests(unittest.TestCase):
         finally:
             disabled.close()
             enabled.close()
+            customized.close()
+
+    def test_rejects_payment_config_when_rule_is_disabled(self) -> None:
+        with self.assertRaisesRegex(ValueError, "enable_payment_cards"):
+            LLMFirewall(
+                scanner_config=ScannerConfig(enable_payment_cards=False),
+                payment_card_config=PaymentCardConfig(),
+            )
 
     def test_worker_redacts_and_strict_policy_blocks(self) -> None:
         balanced = LLMFirewall(
