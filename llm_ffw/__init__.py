@@ -64,6 +64,7 @@ from .secret_catalog import (
     SecretSignature,
     SignatureStatus,
 )
+from .secret_stream import SecretStream, SecretStreamState
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.banned_substrings import BannedSubstringsRule
@@ -127,6 +128,8 @@ __all__ = [
     "SecretCatalog",
     "SecretCatalogCapability",
     "SecretSignature",
+    "SecretStream",
+    "SecretStreamState",
     "Severity",
     "SignatureStatus",
     "Span",

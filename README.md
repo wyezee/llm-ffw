@@ -57,6 +57,7 @@ Choose the highest-level API that fits the integration:
 | `AsyncLLMFirewall` | The same production contract for asyncio applications |
 | `LLMFirewallManager` | The same facade with zero-downtime secret-catalog reloads |
 | `AsyncLLMFirewallManager` | Asyncio sanitization plus asynchronous catalog lifecycle |
+| `SecretStream` | Incremental redaction when only catalog-shaped secrets are required |
 | `Firewall` | Same-process scanning plus policy application |
 | `Scanner` | Same-process detection when the host applies findings itself |
 | `ProcessScannerPool` | Advanced process orchestration and explicit overload control |
@@ -82,6 +83,62 @@ Call `start()` and `close()` from a long-lived application's lifecycle hooks;
 the context-manager form is convenient for scripts and batch jobs. Standalone
 programs must protect their entry point with `if __name__ == "__main__":`
 because the facade uses worker processes.
+
+### Incremental secret redaction
+
+Use `SecretStream` when text must be forwarded incrementally and the required
+protection is specifically the versioned secret-signature catalog:
+
+```python
+from llm_ffw import SecretStream
+
+stream = SecretStream()
+try:
+    for chunk in incoming_chunks:
+        safe_chunk = stream.feed(chunk)
+        if safe_chunk:
+            forward(safe_chunk)
+    final_chunk = stream.finish()
+    if final_chunk:
+        forward(final_chunk)
+except BaseException:
+    stream.cancel()
+    raise
+
+for finding in stream.findings:
+    record_metric(finding.rule_id, finding.action.value)
+```
+
+`feed()` accepts one non-empty string and returns text that is safe to forward
+immediately. `finish()` resolves any prefix or credential ending at end of
+stream and must be called after the final chunk. Findings contain spans into
+the original concatenated input and safe metadata, never the matched value.
+The stream defaults to the built-in catalog, an 8,000,000-character cumulative
+limit, and `[REDACTED]`; these can be configured at construction time.
+
+This is intentionally a secrets-only API. It does not run or claim coverage
+from invisible-character, Unicode-tag, payment-card, private-key, JWT, URL,
+banned-substring, or JSON rules. Those rules can require transformations or
+whole-document decisions that cannot safely be represented as early streaming
+output. Use `LLMFirewall` or `AsyncLLMFirewall` when the complete configured
+rule set is required.
+
+Only redacting secret catalogs are accepted because emitted text cannot be
+recalled after a later block decision. Deployment-specific signatures use the
+same explicit configuration contract as the main facade:
+
+```python
+stream = SecretStream(additional_secret_catalog=application_secrets)
+```
+
+`additional_secret_catalog` extends the built-ins;
+`replacement_secret_catalog` explicitly replaces them. They are mutually
+exclusive. Unbounded custom signatures are accepted only when their suffix and
+boundary character sets are identical and no required suffix ending is used;
+otherwise the stream rejects the catalog during construction rather than
+buffering attacker-sized candidate text. Bounded signatures are limited to
+65,536 suffix characters for the same reason. A stream is stateful, belongs to
+one request, and must not be shared between concurrent callers.
 
 ### Async usage
 

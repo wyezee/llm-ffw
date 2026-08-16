@@ -46,6 +46,7 @@ from .rules.jwt_token import JWTTokenRule
 from .secret_catalog import (
     BUILTIN_SECRET_CATALOG,
     SecretCatalog,
+    _resolve_secret_catalog,
 )
 
 
@@ -103,56 +104,6 @@ def _validate_request_timeout(value: object) -> float:
             "request_timeout_seconds must be finite and not negative"
         )
     return float(value)
-
-
-def _resolve_secret_catalog(
-    additional_secret_catalog: SecretCatalog | None,
-    replacement_secret_catalog: SecretCatalog | None,
-) -> SecretCatalog:
-    for value, field_name in (
-        (additional_secret_catalog, "additional_secret_catalog"),
-        (replacement_secret_catalog, "replacement_secret_catalog"),
-    ):
-        if value is not None and not isinstance(value, SecretCatalog):
-            raise TypeError(f"{field_name} must be a SecretCatalog or None")
-    if (
-        additional_secret_catalog is not None
-        and replacement_secret_catalog is not None
-    ):
-        raise ValueError(
-            "additional_secret_catalog and replacement_secret_catalog "
-            "are mutually exclusive"
-        )
-    if replacement_secret_catalog is not None:
-        return replacement_secret_catalog
-    if additional_secret_catalog is None:
-        return BUILTIN_SECRET_CATALOG
-    builtin_prefixes = tuple(
-        prefix
-        for signature in BUILTIN_SECRET_CATALOG.signatures
-        for prefix in signature.prefixes
-    )
-    additional_prefixes = tuple(
-        prefix
-        for signature in additional_secret_catalog.signatures
-        for prefix in signature.prefixes
-    )
-    if any(
-        builtin.startswith(additional) or additional.startswith(builtin)
-        for builtin in builtin_prefixes
-        for additional in additional_prefixes
-    ):
-        raise ValueError(
-            "additional secret prefixes must not overlap built-in prefixes"
-        )
-    return SecretCatalog(
-        catalog_id=additional_secret_catalog.catalog_id,
-        version=additional_secret_catalog.version,
-        signatures=(
-            BUILTIN_SECRET_CATALOG.signatures
-            + additional_secret_catalog.signatures
-        ),
-    )
 
 
 class LLMFirewall:
