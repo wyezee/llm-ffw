@@ -3,11 +3,17 @@ name: Publish to PyPI
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to publish
+        required: true
+        type: string
 
 permissions: {}
 
 concurrency:
-  group: pypi-publish-${{ github.event.release.tag_name }}
+  group: pypi-publish-${{ github.event.release.tag_name || inputs.release_tag }}
   cancel-in-progress: false
 
 jobs:
@@ -22,7 +28,7 @@ jobs:
       - name: Check out released source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event.release.tag_name || inputs.release_tag }}
           persist-credentials: false
 
       - name: Install Python 3.14.7
@@ -33,7 +39,7 @@ jobs:
 
       - name: Verify release tag matches package version
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
         run: >-
           python -c "import os, pathlib, tomllib;
           version = tomllib.loads(pathlib.Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version'];
