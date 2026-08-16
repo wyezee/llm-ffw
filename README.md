@@ -43,8 +43,9 @@ runtime dependencies outside the Python standard library.
 python -m pip install llm-ffw
 ```
 
-Pin the version in production dependency files. To reproduce this README's API
-and benchmark results exactly, install `llm-ffw==0.2.0`.
+Pin the version in production dependency files. To use the complete synchronous
+and asynchronous API documented here, install `llm-ffw==0.3.0`. The performance
+table above remains explicitly attributed to release `0.2.0`.
 
 ## Usage
 

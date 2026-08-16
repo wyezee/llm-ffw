@@ -4,6 +4,18 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.3.0 - 2026-08-16
+
+### Added
+
+- `AsyncLLMFirewall` with async input/output sanitization, structured results,
+  bounded admission, cancellation-safe capacity accounting, and managed
+  process lifecycle without blocking the application event loop.
+- `AsyncLLMFirewallManager` with asynchronous sanitization, catalog reload,
+  built-in catalog refresh, restart, and generation shutdown.
+- Cross-platform 8 MB async responsiveness and throughput release gate plus
+  isolated-wheel export validation.
+
 ## 0.2.0 - 2026-08-16
 
 ### Changed
