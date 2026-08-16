@@ -119,8 +119,7 @@ firewall = LLMFirewall(
 More than 64 contextual runs produces one bounded `BLOCK` recommendation.
 Balanced and strict policies enforce that block; audit or a custom policy may
 override it. Other format, joining, bidi, private-use, and unassigned
-characters are not removed. See
-[`docs/invisible-characters.md`](docs/invisible-characters.md).
+characters are not removed.
 
 ### Default Unicode tag canonicalization
 
@@ -129,15 +128,13 @@ rescans the cleaned text. It preserves the three RGI subdivision-flag tag
 sequences pinned by Unicode Emoji 17.0 and treats malformed, extended, or other
 tag runs as findings. Applications can independently opt out with
 `ScannerConfig(enable_unicode_tag_smuggling=False)`. More than 64 relevant runs
-fails closed. See
-[`docs/unicode-tag-smuggling.md`](docs/unicode-tag-smuggling.md).
+fails closed.
 
 ## Deployment-defined banned substrings
 
 An optional immutable `BannedSubstringCatalog` provides constrained substring
 or ASCII-word matching for input and output. It defaults to redaction and never
-accepts caller regex. See
-[`docs/banned-substrings.md`](docs/banned-substrings.md).
+accepts caller regex.
 
 ## Opt-in JSON output validation
 
@@ -152,8 +149,7 @@ firewall = LLMFirewall(json_output_config=JSONOutputConfig())
 
 Malformed syntax, duplicate keys, non-standard non-finite constants, and
 configured resource-limit violations block by default. The rule does not
-extract JSON from Markdown or repair malformed output. See
-[`docs/json-output.md`](docs/json-output.md).
+extract JSON from Markdown or repair malformed output.
 
 ## Opt-in unsafe URL inspection
 
@@ -170,8 +166,7 @@ firewall = LLMFirewall(unsafe_url_config=UnsafeURLConfig())
 non-public IP targets, exact documented cloud metadata hostnames, and ambiguous
 authorities under balanced policy. It checks input and output by default;
 deployments can restrict its `scopes`. It performs no DNS, HTTP, reputation,
-model, or other network call. See
-[`docs/unsafe-urls.md`](docs/unsafe-urls.md).
+model, or other network call.
 
 ## Default payment-card inspection
 
@@ -187,8 +182,7 @@ firewall = LLMFirewall(payment_card_config=PaymentCardConfig())
 `PaymentCardRule` redacts structurally plausible 13–19 digit ASCII candidates
 under balanced policy. Luhn is a checksum, not proof that a card exists or is
 active. Applications that intentionally pass checksum-valid identifiers or test
-cards can opt out with `ScannerConfig(enable_payment_cards=False)`. See
-[`docs/payment-cards.md`](docs/payment-cards.md).
+cards can opt out with `ScannerConfig(enable_payment_cards=False)`.
 
 ## Supported secret signatures
 
@@ -196,29 +190,24 @@ Armored private-key inspection is independently enabled by default for input
 and output. Balanced policy redacts complete blocks and safely contains
 malformed or oversized blocks. Applications can customize bounded limits with
 `PrivateKeyConfig` or explicitly opt out with
-`ScannerConfig(enable_private_keys=False)`. See
-[`docs/private-keys.md`](docs/private-keys.md).
+`ScannerConfig(enable_private_keys=False)`.
 
 Compact JWT inspection is also enabled by default. It validates canonical
 Base64URL, unique-member JSON header/payload objects, algorithm/signature
 consistency, and JWT-specific type or registered-claim evidence before
 redaction. It does not verify signatures or trust claims. Applications can
 customize bounded limits with `JWTTokenConfig` or opt out with
-`ScannerConfig(enable_jwt_tokens=False)`. See
-[`docs/jwt-tokens.md`](docs/jwt-tokens.md).
+`ScannerConfig(enable_jwt_tokens=False)`.
 
 Built-in catalog `3.0.0` has 28 constrained signatures and 47 prefixes for
 OpenAI, GitHub, AWS, Anthropic, GitLab, Slack, Stripe, Hugging Face, Google,
-npm, PyPI, SendGrid, and Shopify. Exact formats and evidence are listed
-in [`docs/secret-catalog.md`](docs/secret-catalog.md).
+npm, PyPI, SendGrid, and Shopify.
 
 Credential-shaped values are high-severity `redact` findings. Credential
 identifiers such as Twilio `SK...` API key SIDs are deliberately excluded
 because they cannot authenticate without a separate secret.
 
-The rule does not attempt generic password or entropy detection. See
-[`docs/rule-contract.md`](docs/rule-contract.md) for the exact contract and
-limitations.
+The rule does not attempt generic password or entropy detection.
 
 ## Versioned signature catalogs
 
@@ -254,8 +243,6 @@ firewall = LLMFirewall(additional_secret_catalog=additional_catalog)
 
 The scanner never downloads or reads catalogs. The host application constructs
 and pins the catalog before scanning, making updates testable and rollbackable.
-See [`docs/secret-catalog.md`](docs/secret-catalog.md) for lifecycle and update
-guidance.
 
 The facade construction above adds the application catalog to the built-ins.
 The extension's `catalog_id` and `version` identify the final effective
@@ -339,19 +326,8 @@ py -3.14 -m venv .venv
 The deterministic generator makes one match per catalog prefix plus near-miss
 cases without LLM, network, provider, or random calls. Its manifest contains
 expected spans and a digest, not corpus values. Benchmarks report only duration,
-throughput, and finding counts; they never print scanned content. Design
-decisions are documented in
-[`docs/design.md`](docs/design.md), with reproducible measurements in
-[`docs/performance.md`](docs/performance.md).
-The deliberate compatibility inventory for the archived LLM Guard project is
-in [`docs/llm-guard-scanner-roadmap.md`](docs/llm-guard-scanner-roadmap.md).
-
-The supported production envelope is intentionally narrower than that roadmap.
-See [`docs/support.md`](docs/support.md), the
-[`release checklist`](docs/release-checklist.md), and
-[`provisional gate evidence`](docs/release-evidence.md). A release is not
-approved until the exact candidate commit passes both Windows and Linux CI and
-the owner decisions in the checklist are complete.
+throughput, and finding counts; they never print scanned content. A release is
+not approved until the exact candidate commit passes both Windows and Linux CI.
 
 ## Production process concurrency
 
@@ -389,10 +365,7 @@ request and does not stop workers.
 
 Create one long-lived pool or manager per service instance, not one per request.
 Map `ProcessPoolSaturatedError` to overload handling and treat a broken pool as
-unhealthy. See [`docs/operations.md`](docs/operations.md) for the lifecycle and
-failure contract.
-Policy profiles and custom overrides are documented in
-[`docs/policy.md`](docs/policy.md).
+unhealthy.
 
 ## License
 
