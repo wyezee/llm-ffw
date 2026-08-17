@@ -4,6 +4,8 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.5.1 - 2026-08-17
+
 ### Added
 
 - Deterministic 364-scenario PII accuracy and exact-redaction gate for the

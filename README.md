@@ -12,7 +12,7 @@ Unicode tag runs; and redacts Luhn-valid payment-card candidates. Findings
 retain original-text spans and safe category metadata rather than matched
 values.
 
-Release `0.5.0` also provides opt-in `IPAddressRule` and `EmailAddressRule`
+Release `0.5.1` also provides opt-in `IPAddressRule` and `EmailAddressRule`
 privacy controls. They use bounded deterministic parsing, default to input-only
 redaction under the balanced policy, and remain disabled until configured.
 
@@ -48,7 +48,7 @@ python -m pip install llm-ffw
 ```
 
 Pin the version in production dependency files. To use the complete synchronous
-and asynchronous API documented here, install `llm-ffw==0.5.0`. The performance
+and asynchronous API documented here, install `llm-ffw==0.5.1`. The performance
 table above remains explicitly attributed to release `0.2.0`.
 
 ## Usage
