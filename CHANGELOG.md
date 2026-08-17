@@ -10,6 +10,10 @@ All notable changes are recorded here before a tagged release.
   allowlisting, a deliberately bounded JSON-Schema subset, disclosure-safe
   fail-closed findings, and configurable depth, node, string, object, and
   array limits.
+- Provider-neutral `ToolResultRule` with immutable typed result batches,
+  call-ID linkage and uniqueness checks, exact tool-name consistency, bounded
+  string or JSON object-block content, and disclosure-safe fail-closed
+  findings.
 
 ## 0.6.0 - 2026-08-17
 
