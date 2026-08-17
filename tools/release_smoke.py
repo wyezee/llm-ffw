@@ -23,6 +23,8 @@ from llm_ffw import (
     EmailAddressRule,
     IPAddressConfig,
     IPAddressRule,
+    MACAddressConfig,
+    MACAddressRule,
     LLMFirewall,
     LLMFirewallManager,
     PaymentCardRule,
@@ -51,6 +53,7 @@ assert "additional_secret_catalog" in facade_parameters
 assert "replacement_secret_catalog" in facade_parameters
 assert "secret_catalog" not in facade_parameters
 assert "ip_address_config" in facade_parameters
+assert "mac_address_config" in facade_parameters
 assert "email_address_config" in facade_parameters
 capabilities = LLMFirewall().capabilities()
 assert capabilities.rule_count == 6
@@ -85,6 +88,13 @@ assert any(
     for rule in ip_firewall.capabilities().rules
 )
 ip_firewall.close()
+mac_firewall = LLMFirewall(mac_address_config=MACAddressConfig())
+assert mac_firewall.capabilities().mac_address.max_candidates == 128
+assert any(
+    rule.rule_id == MACAddressRule.RULE_ID
+    for rule in mac_firewall.capabilities().rules
+)
+mac_firewall.close()
 email_firewall = LLMFirewall(email_address_config=EmailAddressConfig())
 assert email_firewall.capabilities().email_address.max_candidates == 128
 assert any(

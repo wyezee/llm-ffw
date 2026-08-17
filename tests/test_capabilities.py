@@ -5,6 +5,7 @@ from llm_ffw import (
     FirewallCapabilities,
     EmailAddressCapability,
     IPAddressCapability,
+    MACAddressCapability,
     RuleCapability,
     ScanScope,
     SecretCatalogCapability,
@@ -87,6 +88,14 @@ class CapabilityValueTests(unittest.TestCase):
             EmailAddressCapability(0)
         with self.assertRaises(ValueError):
             EmailAddressCapability(True)
+
+    def test_mac_address_capability_is_bounded_and_typed(self) -> None:
+        capability = MACAddressCapability(max_candidates=128)
+        self.assertEqual(capability.max_candidates, 128)
+        with self.assertRaises(ValueError):
+            MACAddressCapability(0)
+        with self.assertRaises(ValueError):
+            MACAddressCapability(True)
 
 
 if __name__ == "__main__":

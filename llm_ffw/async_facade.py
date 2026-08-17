@@ -16,6 +16,7 @@ from .facade import (
 )
 from .inspection import ScanScope
 from .ip_address import IPAddressConfig
+from .mac_address import MACAddressConfig
 from .email_address import EmailAddressConfig
 from .json_output import JSONOutputConfig
 from .jwt_token import JWTTokenConfig
@@ -172,6 +173,7 @@ class AsyncLLMFirewall:
         json_output_config: JSONOutputConfig | None = None,
         unsafe_url_config: UnsafeURLConfig | None = None,
         ip_address_config: IPAddressConfig | None = None,
+        mac_address_config: MACAddressConfig | None = None,
         email_address_config: EmailAddressConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
@@ -193,6 +195,7 @@ class AsyncLLMFirewall:
             json_output_config=json_output_config,
             unsafe_url_config=unsafe_url_config,
             ip_address_config=ip_address_config,
+            mac_address_config=mac_address_config,
             email_address_config=email_address_config,
             payment_card_config=payment_card_config,
             private_key_config=private_key_config,
@@ -342,6 +345,7 @@ class AsyncLLMFirewallManager:
         json_output_config: JSONOutputConfig | None = None,
         unsafe_url_config: UnsafeURLConfig | None = None,
         ip_address_config: IPAddressConfig | None = None,
+        mac_address_config: MACAddressConfig | None = None,
         email_address_config: EmailAddressConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
@@ -363,6 +367,7 @@ class AsyncLLMFirewallManager:
             json_output_config=json_output_config,
             unsafe_url_config=unsafe_url_config,
             ip_address_config=ip_address_config,
+            mac_address_config=mac_address_config,
             email_address_config=email_address_config,
             payment_card_config=payment_card_config,
             private_key_config=private_key_config,

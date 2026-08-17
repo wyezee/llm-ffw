@@ -304,6 +304,7 @@ rebuilding it per request.
 | `json_output_config` | Enable bounded output-only JSON validation |
 | `unsafe_url_config` | Enable bounded input/output URL inspection |
 | `ip_address_config` | Enable bounded canonical IP-address inspection |
+| `mac_address_config` | Enable bounded canonical 48-bit MAC-address inspection |
 | `email_address_config` | Enable bounded conservative email inspection |
 | `payment_card_config` | Customize enabled payment-card limits and scopes |
 | `private_key_config` | Customize enabled private-key limits and scopes |
@@ -312,7 +313,7 @@ rebuilding it per request.
 | `request_timeout_seconds` | Per-request facade deadline; defaults to 5 seconds |
 
 The two secret-catalog parameters are mutually exclusive. Passing `None` for
-the opt-in banned-substring, JSON, unsafe-URL, IP-address, and email-address
+the opt-in banned-substring, JSON, unsafe-URL, IP-address, MAC-address, and email-address
 configurations leaves each corresponding rule disabled. Payment-card,
 private-key, JWT,
 invisible-character, and Unicode tag rules are enabled by `ScannerConfig`
@@ -385,6 +386,7 @@ Strict and audit policies can change the effective action.
 | `output.json.validity` | Opt-in | Output | Block | `JSONOutputConfig` |
 | `url.unsafe` | Opt-in | Input/output by default | Redact | `UnsafeURLConfig` |
 | `pii.ip_address` | Opt-in | Input by default | Redact | `IPAddressConfig` |
+| `pii.mac_address` | Opt-in | Input by default | Redact | `MACAddressConfig` |
 | `pii.email_address` | Opt-in | Input by default | Redact | `EmailAddressConfig` |
 
 ### Default invisible-character canonicalization
@@ -509,6 +511,28 @@ configured otherwise, redacts under balanced policy, and can independently
 disable either address family. It intentionally does not normalize obfuscated
 addresses or claim complete PII detection; the high-precision default targets
 accidental disclosure with predictable false-positive and performance bounds.
+
+### Opt-in MAC-address inspection
+
+Applications that treat hardware interface identifiers as personal or
+infrastructure-sensitive data can enable deterministic inspection:
+
+```python
+from llm_ffw import LLMFirewall, MACAddressConfig, ScanScope
+
+firewall = LLMFirewall(
+    mac_address_config=MACAddressConfig(
+        scopes=(ScanScope.INPUT, ScanScope.OUTPUT),
+    )
+)
+```
+
+`MACAddressRule` recognizes canonical 48-bit addresses written as six
+two-digit hexadecimal octets with one consistent colon or hyphen separator.
+It is input-only unless configured otherwise and redacts under balanced
+policy. Cisco dotted notation, mixed separators, EUI-64 values, obfuscation,
+and vendor ownership lookup are intentionally outside this narrow,
+high-precision rule.
 
 ### Opt-in email-address inspection
 
@@ -733,6 +757,7 @@ py -3.14 -m venv .venv
 .venv\Scripts\python benchmarks/bench_async_facade.py --size 8000000 --workers 4 --concurrency 8 --requests 16 --max-tasks-per-child 4
 .venv\Scripts\python benchmarks/bench_memory.py --size 8000000
 .venv\Scripts\python benchmarks/bench_manager_reload.py --size 8000000 --workers 2 --concurrency 4 --reloads 4 --min-requests 16 --max-tasks-per-child 8
+.venv\Scripts\python benchmarks/bench_mac_addresses.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python tools/pii_accuracy_gate.py
 .venv\Scripts\python benchmarks/generate_pii_accuracy_dataset.py
 ```
@@ -743,11 +768,12 @@ expected spans and a digest, not corpus values. Benchmarks report only duration,
 throughput, and finding counts; they never print scanned content. A release is
 not approved until the exact candidate commit passes both Windows and Linux CI.
 
-The PII accuracy gate deterministically evaluates 364 generated and curated
-email-address and IP-address scenarios. It requires exact rule ownership,
+The PII accuracy gate deterministically evaluates 480 generated and curated
+email-address, IP-address, and MAC-address scenarios. It requires exact rule ownership,
 character spans, redaction output, precision, and recall, with per-category
 confusion counts. Values use reserved example domains and documentation or
-special-purpose IP ranges; corpus creation makes no LLM or network calls. The
+special-purpose IP ranges, and locally administered synthetic MAC values;
+corpus creation makes no LLM or network calls. The
 optional expanded JSONL corpus is written under the ignored
 `benchmarks/generated/` directory, while the compact seed, group counts, and
 expected digest remain version controlled.

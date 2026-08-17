@@ -19,6 +19,7 @@ from .findings import Action, Finding, Severity, Span
 from .inspection import ScanScope
 from .json_output import JSONOutputConfig
 from .ip_address import IPAddressConfig
+from .mac_address import MACAddressConfig
 from .email_address import EmailAddressConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
@@ -31,6 +32,7 @@ from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.json_output import JSONOutputRule
 from .rules.ip_address import IPAddressRule
+from .rules.mac_address import MACAddressRule
 from .rules.email_address import EmailAddressRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
@@ -136,6 +138,7 @@ def _initialize_worker(
     json_output_config: JSONOutputConfig | None,
     unsafe_url_config: UnsafeURLConfig | None,
     ip_address_config: IPAddressConfig | None,
+    mac_address_config: MACAddressConfig | None,
     email_address_config: EmailAddressConfig | None,
     payment_card_config: PaymentCardConfig | None,
     private_key_config: PrivateKeyConfig | None,
@@ -152,6 +155,7 @@ def _initialize_worker(
         and json_output_config is None
         and unsafe_url_config is None
         and ip_address_config is None
+        and mac_address_config is None
         and email_address_config is None
         and payment_card_config is None
         and private_key_config is None
@@ -172,6 +176,8 @@ def _initialize_worker(
             rules.append(UnsafeURLRule(unsafe_url_config))
         if ip_address_config is not None:
             rules.append(IPAddressRule(ip_address_config))
+        if mac_address_config is not None:
+            rules.append(MACAddressRule(mac_address_config))
         if email_address_config is not None:
             rules.append(EmailAddressRule(email_address_config))
         if payment_card_config is not None:
@@ -310,6 +316,7 @@ class ProcessScannerPool:
         json_output_config: JSONOutputConfig | None = None,
         unsafe_url_config: UnsafeURLConfig | None = None,
         ip_address_config: IPAddressConfig | None = None,
+        mac_address_config: MACAddressConfig | None = None,
         email_address_config: EmailAddressConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
@@ -352,6 +359,12 @@ class ProcessScannerPool:
         ):
             raise TypeError(
                 "ip_address_config must be an IPAddressConfig or None"
+            )
+        if mac_address_config is not None and not isinstance(
+            mac_address_config, MACAddressConfig
+        ):
+            raise TypeError(
+                "mac_address_config must be a MACAddressConfig or None"
             )
         if email_address_config is not None and not isinstance(
             email_address_config, EmailAddressConfig
@@ -449,6 +462,11 @@ class ProcessScannerPool:
                         else ()
                     ),
                     *(
+                        ("pii.mac_address",)
+                        if mac_address_config is not None
+                        else ()
+                    ),
+                    *(
                         ("pii.email_address",)
                         if email_address_config is not None
                         else ()
@@ -479,6 +497,7 @@ class ProcessScannerPool:
                     "unicode.tag_smuggling",
                     "url.unsafe",
                     "pii.ip_address",
+                    "pii.mac_address",
                     "pii.email_address",
                     "pii.payment_card",
                     "secrets.private_key",
@@ -494,6 +513,7 @@ class ProcessScannerPool:
         self._json_output_config = json_output_config
         self._unsafe_url_config = unsafe_url_config
         self._ip_address_config = ip_address_config
+        self._mac_address_config = mac_address_config
         self._email_address_config = email_address_config
         self._payment_card_config = resolved_payment_card_config
         self._private_key_config = resolved_private_key_config
@@ -548,6 +568,10 @@ class ProcessScannerPool:
         return self._ip_address_config
 
     @property
+    def mac_address_config(self) -> MACAddressConfig | None:
+        return self._mac_address_config
+
+    @property
     def email_address_config(self) -> EmailAddressConfig | None:
         return self._email_address_config
 
@@ -586,6 +610,7 @@ class ProcessScannerPool:
                         self._json_output_config,
                         self._unsafe_url_config,
                         self._ip_address_config,
+                        self._mac_address_config,
                         self._email_address_config,
                         self._payment_card_config,
                         self._private_key_config,

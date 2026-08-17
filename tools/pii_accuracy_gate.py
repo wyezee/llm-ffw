@@ -1,4 +1,4 @@
-"""Enforce deterministic IP/email accuracy and exact-redaction thresholds."""
+"""Enforce deterministic PII accuracy and exact-redaction thresholds."""
 
 import argparse
 import math
@@ -17,9 +17,12 @@ from benchmarks.pii_accuracy import (
 _EXPECTED_CATEGORIES = {
     "curated_email_positive",
     "curated_ip_positive",
+    "curated_mac_positive",
+    "curated_mac_negative",
     "curated_negative",
     "email_positive",
     "ip_positive",
+    "mac_positive",
     "mixed_positive",
     "negative",
 }
@@ -63,6 +66,7 @@ def run_gate(
     if set(item.rule_id for item in report.rules) != {
         "pii.email_address",
         "pii.ip_address",
+        "pii.mac_address",
     }:
         raise AssertionError("PII accuracy gate rule coverage is incomplete")
     if any(item.expected_findings <= 0 for item in report.rules):

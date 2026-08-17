@@ -10,6 +10,7 @@ from .rules.base import Rule, RuleMatch
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.ip_address import IPAddressRule
+from .rules.mac_address import MACAddressRule
 from .rules.email_address import EmailAddressRule
 from .rules.json_output import JSONOutputRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
@@ -98,6 +99,7 @@ class Scanner:
             BannedSubstringsRule,
             InvisibleCharactersRule,
             IPAddressRule,
+            MACAddressRule,
             EmailAddressRule,
             JSONOutputRule,
             JWTTokenRule,

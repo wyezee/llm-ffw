@@ -4,6 +4,13 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Added
+
+- Opt-in bounded `MACAddressRule` for canonical 48-bit colon- and
+  hyphen-separated address privacy redaction, with input-only defaults,
+  policy/capability integration, a deterministic 480-scenario PII accuracy
+  corpus, and an 8 MB production performance envelope.
+
 ## 0.5.1 - 2026-08-17
 
 ### Added

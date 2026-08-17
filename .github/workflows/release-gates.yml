@@ -134,6 +134,19 @@ jobs:
           --max-peak-mib 128
           --min-process-requests-per-second 0.5
 
+      - name: Run MAC-address production envelope
+        run: >-
+          python benchmarks/bench_mac_addresses.py
+          --size 8000000
+          --rounds 3
+          --workers 2
+          --concurrency 4
+          --process-requests 8
+          --min-throughput-mib-s 3
+          --min-address-throughput-mib-s 2.5
+          --max-peak-mib 128
+          --min-process-requests-per-second 0.5
+
       - name: Run email-address production envelope
         run: >-
           python benchmarks/bench_email_addresses.py

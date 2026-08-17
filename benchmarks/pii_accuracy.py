@@ -12,13 +12,19 @@ from llm_ffw import (
     EmailAddressRule,
     IPAddressConfig,
     IPAddressRule,
+    MACAddressConfig,
+    MACAddressRule,
     ScanScope,
     Scanner,
 )
 
 
 _MANIFEST_PATH = Path(__file__).with_name("pii_accuracy_manifest.json")
-_RULE_IDS = (EmailAddressRule.RULE_ID, IPAddressRule.RULE_ID)
+_RULE_IDS = (
+    EmailAddressRule.RULE_ID,
+    IPAddressRule.RULE_ID,
+    MACAddressRule.RULE_ID,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,7 +163,7 @@ def _load_manifest(path: Path) -> dict[str, object]:
     }
     if set(manifest) != expected_keys:
         raise ValueError("PII accuracy manifest fields are invalid")
-    if manifest["schema_version"] != 2:
+    if manifest["schema_version"] != 3:
         raise ValueError("unsupported PII accuracy manifest schema")
     if not isinstance(manifest["dataset_id"], str):
         raise TypeError("dataset_id must be a string")
@@ -176,10 +182,13 @@ def _load_manifest(path: Path) -> dict[str, object]:
     expected_groups = {
         "email_positive",
         "ip_positive",
+        "mac_positive",
         "mixed_positive",
         "negative",
         "curated_email_positive",
         "curated_ip_positive",
+        "curated_mac_positive",
+        "curated_mac_negative",
         "curated_negative",
     }
     if not isinstance(groups, dict) or set(groups) != expected_groups:
@@ -261,6 +270,36 @@ def _ip_scenarios(count: int) -> list[PIIAccuracyScenario]:
                 category="ip_positive",
                 text=text,
                 expected=(_finding(IPAddressRule.RULE_ID, text, value),),
+            )
+        )
+    return scenarios
+
+
+def _mac_value(index: int) -> str:
+    """Return a deterministic, locally administered synthetic EUI-48 value."""
+
+    octets = (2, 0, (index >> 16) & 255, (index >> 8) & 255, index & 255, 1)
+    separator = ":" if index % 2 == 0 else "-"
+    return separator.join(f"{octet:02X}" for octet in octets)
+
+
+def _mac_scenarios(count: int) -> list[PIIAccuracyScenario]:
+    contexts = (
+        "adapter={value}",
+        "device [{value}]",
+        'record={{"mac":"{value}"}}',
+        "synthetic interface {value} is active",
+    )
+    scenarios: list[PIIAccuracyScenario] = []
+    for index in range(count):
+        value = _mac_value(index)
+        text = contexts[index % len(contexts)].format(value=value)
+        scenarios.append(
+            PIIAccuracyScenario(
+                scenario_id=f"mac-positive-{index:04d}",
+                category="mac_positive",
+                text=text,
+                expected=(_finding(MACAddressRule.RULE_ID, text, value),),
             )
         )
     return scenarios
@@ -423,6 +462,101 @@ def _curated_ip_scenarios(count: int) -> list[PIIAccuracyScenario]:
     ]
 
 
+def _curated_mac_scenarios(count: int) -> list[PIIAccuracyScenario]:
+    """Return explicit EUI-48 boundaries using local synthetic identifiers."""
+
+    values = (
+        "02:00:00:00:00:00",
+        "02:00:00:00:00:01",
+        "02:FF:FF:FF:FF:FF",
+        "06:12:34:56:78:9A",
+        "0A:BC:DE:F0:12:34",
+        "0E:01:23:45:67:89",
+        "02:aa:bb:cc:dd:ee",
+        "06:aB:cD:eF:01:23",
+        "02-00-00-00-00-00",
+        "02-00-00-00-00-01",
+        "02-FF-FF-FF-FF-FF",
+        "06-12-34-56-78-9A",
+        "0A-BC-DE-F0-12-34",
+        "0E-01-23-45-67-89",
+        "02-aa-bb-cc-dd-ee",
+        "06-aB-cD-eF-01-23",
+        "02:10:20:30:40:50",
+        "06:60:70:80:90:A0",
+        "0A-B0-C0-D0-E0-F0",
+        "0E-11-22-33-44-55",
+    )
+    templates = (
+        "adapter ({value})",
+        "device={value};active=true",
+        'record={{"address":"{value}"}}',
+        "before\t{value}\tafter",
+    )
+    if len(values) != count:
+        raise ValueError("curated MAC count does not match manifest")
+    return [
+        _curated_positive_scenario(
+            f"curated-mac-positive-{index:04d}",
+            "curated_mac_positive",
+            MACAddressRule.RULE_ID,
+            value,
+            templates[index % len(templates)],
+        )
+        for index, value in enumerate(values)
+    ]
+
+
+def _curated_mac_negative_scenarios(count: int) -> list[PIIAccuracyScenario]:
+    """Return MAC lookalikes outside the supported canonical syntax."""
+
+    texts = (
+        "mixed 02:00-00:00:00:01",
+        "Cisco 0200.0000.0001",
+        "short 02:00:00:00:00",
+        "long 02:00:00:00:00:01:02",
+        "EUI-64 02-00-00-00-00-00-00-01",
+        "bad hex 02:00:00:00:00:GG",
+        "single digits 2:0:0:0:0:1",
+        "triple digits 002:00:00:00:00:01",
+        "embedded host02:00:00:00:00:01",
+        "embedded 02:00:00:00:00:01host",
+        "underscore x_02:00:00:00:00:01",
+        "suffix 02:00:00:00:00:01_x",
+        "prefix-dot x.02:00:00:00:00:01",
+        "suffix-dot 02:00:00:00:00:01.example",
+        "spaces 02 : 00 : 00 : 00 : 00 : 01",
+        "commas 02,00,00,00,00,01",
+        "compact 020000000001",
+        "invalid IPv6 2001:db8:::1",
+        "UUID 550e8400-e29b-41d4-a716-446655440000",
+        "clock 12:34:56",
+        "date 20-26-08-17",
+        "version AA-BB-CC",
+        "empty colons : :",
+        "hyphen chain 02-00-00-00-00-01-extra",
+        "colon chain 02:00:00:00:00:01:extra",
+        "fullwidth ０２:００:００:００:００:０１",
+        "Arabic digits ٠٢:٠٠:٠٠:٠٠:٠٠:٠١",
+        "zero width 02:\u200b00:00:00:00:01",
+        "label <mac-address>",
+        "template {{mac_address}}",
+        "documentation says MAC address without a value",
+        "ordinary prose with no hardware identifier",
+    )
+    if len(texts) != count:
+        raise ValueError("curated MAC negative count does not match manifest")
+    return [
+        PIIAccuracyScenario(
+            scenario_id=f"curated-mac-negative-{index:04d}",
+            category="curated_mac_negative",
+            text=text,
+            expected=(),
+        )
+        for index, text in enumerate(texts)
+    ]
+
+
 def _curated_negative_scenarios(count: int) -> list[PIIAccuracyScenario]:
     """Return explicit realistic lookalikes that must remain unchanged."""
 
@@ -468,7 +602,7 @@ def _curated_negative_scenarios(count: int) -> list[PIIAccuracyScenario]:
         "release 2026.08.17",
         "decimal 1234.5678",
         "clock 12:34:56",
-        "MAC aa:bb:cc:dd:ee:ff",
+        "partial MAC aa:bb:cc:dd:ee",
         "UUID 550e8400-e29b-41d4-a716-446655440000",
         "invalid IPv6 2001:db8:::1",
         "short IPv6 2001:db8:1",
@@ -519,10 +653,13 @@ def build_corpus(
     scenarios = [
         *_email_scenarios(groups["email_positive"]),
         *_ip_scenarios(groups["ip_positive"]),
+        *_mac_scenarios(groups["mac_positive"]),
         *_mixed_scenarios(groups["mixed_positive"]),
         *_negative_scenarios(groups["negative"]),
         *_curated_email_scenarios(groups["curated_email_positive"]),
         *_curated_ip_scenarios(groups["curated_ip_positive"]),
+        *_curated_mac_scenarios(groups["curated_mac_positive"]),
+        *_curated_mac_negative_scenarios(groups["curated_mac_negative"]),
         *_curated_negative_scenarios(groups["curated_negative"]),
     ]
     seed = manifest["seed"]
@@ -569,7 +706,11 @@ def evaluate_corpus(
     if scanner is not None and not isinstance(scanner, Scanner):
         raise TypeError("scanner must be a Scanner or None")
     active_scanner = scanner or Scanner(
-        rules=(EmailAddressRule(), IPAddressRule())
+        rules=(
+            EmailAddressRule(),
+            IPAddressRule(),
+            MACAddressRule(MACAddressConfig()),
+        )
     )
     expected_by_rule: Counter[str] = Counter()
     actual_by_rule: Counter[str] = Counter()
