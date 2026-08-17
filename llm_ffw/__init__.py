@@ -79,6 +79,7 @@ from .stream_types import (
     StreamMode,
 )
 from .tool_call import ToolCall, ToolCallConfig, ToolDefinition
+from .tool_result import ToolResult, ToolResultBatch, ToolResultConfig
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.banned_substrings import BannedSubstringsRule
@@ -91,6 +92,7 @@ from .rules.payment_card import PaymentCardRule
 from .rules.private_key import PrivateKeyRule
 from .rules.jwt_token import JWTTokenRule
 from .rules.tool_call import ToolCallBlockedError, ToolCallRule
+from .rules.tool_result import ToolResultBlockedError, ToolResultRule
 
 __all__ = [
     "Action",
@@ -170,6 +172,11 @@ __all__ = [
     "ToolCallConfig",
     "ToolCallRule",
     "ToolDefinition",
+    "ToolResult",
+    "ToolResultBatch",
+    "ToolResultBlockedError",
+    "ToolResultConfig",
+    "ToolResultRule",
     "UnsafeURLCapability",
     "UnsafeURLConfig",
     "UnsafeURLRule",

@@ -391,6 +391,7 @@ Strict and audit policies can change the effective action.
 | `pii.mac_address` | Opt-in | Input by default | Redact | `MACAddressConfig` |
 | `pii.email_address` | Opt-in | Input by default | Redact | `EmailAddressConfig` |
 | `tools.call.validity` | Opt-in | Tool call | Block | `ToolDefinition`, `ToolCallConfig` |
+| `tools.result.validity` | Opt-in | Tool result | Block | `ToolResultConfig` |
 
 ### Opt-in tool-call validation
 
@@ -443,6 +444,52 @@ schema compilation does not
 occur on the request path. `enforce()` returns the same safe call or raises
 `ToolCallBlockedError`; `validate()` is available when the host wants the
 finding tuple without raising.
+
+### Opt-in tool-result validation
+
+Validate tool results as one bounded request batch before adding them to model
+context. Batch validation is necessary because result IDs must be linked to
+expected calls and unique within the request:
+
+```python
+from llm_ffw import (
+    ToolCall,
+    ToolResult,
+    ToolResultBatch,
+    ToolResultRule,
+)
+
+expected = ToolCall(
+    "get_weather",
+    {"city": "Pune"},
+    call_id="call-1",
+)
+returned = ToolResult(
+    call_id="call-1",
+    name="get_weather",
+    content="Sunny, 28 C",
+)
+safe_batch = ToolResultRule().enforce(
+    ToolResultBatch((expected,), (returned,))
+)
+add_tool_results_to_context(safe_batch.results)
+```
+
+`ToolResultRule` blocks missing or duplicate expected call IDs; missing,
+duplicate, or unmatched result IDs; missing or mismatched tool names; and
+configured batch or content resource-limit violations. A batch may contain
+results for a subset of the expected calls, but every included result must
+link exactly once. It does
+not claim that a tool actually ran or that returned content is truthful.
+
+Result content must be either a string or a list/tuple of JSON object blocks.
+This provider-neutral shape can carry simple text or multimodal references
+without accepting provider code. Values are copied into bounded immutable
+trees, and result IDs, names, content, and complete batches are excluded from
+`repr()`. The rule declares `ScanScope.TOOL_RESULT`; rejection produces one
+structured zero-width finding without dynamic IDs, names, keys, or values.
+`enforce()` raises `ToolResultBlockedError`, while `validate()` returns the
+finding tuple for hosts that apply enforcement themselves.
 
 ### Default invisible-character canonicalization
 

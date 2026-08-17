@@ -14,6 +14,7 @@ from .jwt_token import JWTTokenRule
 from .secrets import SecretsRule
 from .unsafe_url import UnsafeURLRule
 from .tool_call import ToolCallBlockedError, ToolCallRule
+from .tool_result import ToolResultBlockedError, ToolResultRule
 
 __all__ = [
     "BannedSubstringsRule",
@@ -33,4 +34,6 @@ __all__ = [
     "UnsafeURLRule",
     "ToolCallBlockedError",
     "ToolCallRule",
+    "ToolResultBlockedError",
+    "ToolResultRule",
 ]
