@@ -4,6 +4,8 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.6.0 - 2026-08-17
+
 ### Added
 
 - Opt-in bounded `MACAddressRule` for canonical 48-bit colon- and
