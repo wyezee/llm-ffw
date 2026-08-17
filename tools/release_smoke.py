@@ -9,7 +9,7 @@ import venv
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "0.6.0"
+EXPECTED_VERSION = "0.7.0"
 SMOKE_CODE = """
 from importlib.metadata import files, metadata, version
 from inspect import signature
@@ -24,6 +24,8 @@ from llm_ffw import (
     EmailAddressRule,
     IPAddressConfig,
     IPAddressRule,
+    IBANConfig,
+    IBANRule,
     MACAddressConfig,
     MACAddressRule,
     LLMFirewall,
@@ -33,11 +35,17 @@ from llm_ffw import (
     Scanner,
     SanitizationResult,
     StreamMode,
+    ToolCall,
+    ToolCallRule,
+    ToolDefinition,
+    ToolResult,
+    ToolResultBatch,
+    ToolResultRule,
     UnsafeURLConfig,
 )
 from llm_ffw.rules import SecretsRule
 
-assert version("llm-ffw") == "0.6.0"
+assert version("llm-ffw") == "0.7.0"
 assert __version__ == version("llm-ffw")
 assert metadata("llm-ffw").get_all("Requires-Dist") is None
 assert metadata("llm-ffw")["License-Expression"] == "Apache-2.0"
@@ -56,6 +64,7 @@ assert "replacement_secret_catalog" in facade_parameters
 assert "secret_catalog" not in facade_parameters
 assert "ip_address_config" in facade_parameters
 assert "mac_address_config" in facade_parameters
+assert "iban_config" in facade_parameters
 assert "email_address_config" in facade_parameters
 capabilities = LLMFirewall().capabilities()
 assert capabilities.rule_count == 6
@@ -97,6 +106,14 @@ assert any(
     for rule in mac_firewall.capabilities().rules
 )
 mac_firewall.close()
+iban_firewall = LLMFirewall(iban_config=IBANConfig())
+assert iban_firewall.capabilities().iban.max_candidates == 128
+assert iban_firewall.capabilities().iban.registry_release == "102"
+assert any(
+    rule.rule_id == IBANRule.RULE_ID
+    for rule in iban_firewall.capabilities().rules
+)
+iban_firewall.close()
 email_firewall = LLMFirewall(email_address_config=EmailAddressConfig())
 assert email_firewall.capabilities().email_address.max_candidates == 128
 assert any(
@@ -104,6 +121,22 @@ assert any(
     for rule in email_firewall.capabilities().rules
 )
 email_firewall.close()
+tool_definition = ToolDefinition(
+    "lookup",
+    {
+        "type": "object",
+        "properties": {"query": {"type": "string"}},
+        "required": ["query"],
+        "additionalProperties": False,
+    },
+)
+tool_call = ToolCall("lookup", {"query": "synthetic"}, "call-1")
+assert ToolCallRule((tool_definition,)).validate(tool_call) == ()
+tool_batch = ToolResultBatch(
+    (tool_call,),
+    (ToolResult("call-1", "synthetic result", "lookup"),),
+)
+assert ToolResultRule().validate(tool_batch) == ()
 synthetic = "sk-" + "A" * 20
 result = Firewall().process(synthetic, scope=ScanScope.INPUT)
 assert result.decision is Action.REDACT

@@ -4,6 +4,8 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.7.0 - 2026-08-17
+
 ### Added
 
 - Provider-neutral `ToolCallRule` with immutable typed calls, declared-tool
