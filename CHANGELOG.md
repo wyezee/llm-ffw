@@ -4,6 +4,8 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.8.0 - 2026-08-18
+
 ### Added
 
 - Opt-in `RepetitionRule` for conservative exact non-whitespace character,

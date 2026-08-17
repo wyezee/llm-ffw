@@ -9,7 +9,7 @@ import venv
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "0.7.0"
+EXPECTED_VERSION = "0.8.0"
 SMOKE_CODE = """
 from importlib.metadata import files, metadata, version
 from inspect import signature
@@ -33,6 +33,8 @@ from llm_ffw import (
     LLMFirewall,
     LLMFirewallManager,
     PaymentCardRule,
+    RepetitionConfig,
+    RepetitionRule,
     ScanScope,
     Scanner,
     SanitizationResult,
@@ -47,7 +49,7 @@ from llm_ffw import (
 )
 from llm_ffw.rules import SecretsRule
 
-assert version("llm-ffw") == "0.7.0"
+assert version("llm-ffw") == "0.8.0"
 assert __version__ == version("llm-ffw")
 assert metadata("llm-ffw").get_all("Requires-Dist") is None
 assert metadata("llm-ffw")["License-Expression"] == "Apache-2.0"
@@ -68,6 +70,7 @@ assert "ip_address_config" in facade_parameters
 assert "mac_address_config" in facade_parameters
 assert "iban_config" in facade_parameters
 assert "authorization_header_config" in facade_parameters
+assert "repetition_config" in facade_parameters
 assert "email_address_config" in facade_parameters
 capabilities = LLMFirewall().capabilities()
 assert capabilities.rule_count == 6
@@ -138,6 +141,18 @@ authorization_result = Firewall(
 ).process("Authorization: Bearer synthetic_bearer_token_123456")
 assert authorization_result.decision is Action.REDACT
 assert authorization_result.processed_text == "Authorization: Bearer [REDACTED]"
+repetition_firewall = LLMFirewall(repetition_config=RepetitionConfig())
+assert repetition_firewall.capabilities().repetition.max_findings == 64
+assert any(
+    rule.rule_id == RepetitionRule.RULE_ID
+    for rule in repetition_firewall.capabilities().rules
+)
+repetition_firewall.close()
+repetition_result = Firewall(
+    scanner=Scanner(rules=(RepetitionRule(),))
+).process("repeat " * 64)
+assert repetition_result.decision is Action.REVIEW
+assert repetition_result.processed_text == "repeat " * 64
 email_firewall = LLMFirewall(email_address_config=EmailAddressConfig())
 assert email_firewall.capabilities().email_address.max_candidates == 128
 assert any(

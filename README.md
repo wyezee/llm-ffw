@@ -12,12 +12,14 @@ Unicode tag runs; and redacts Luhn-valid payment-card candidates. Findings
 retain original-text spans and safe category metadata rather than matched
 values.
 
-Release `0.7.0` also provides opt-in `IPAddressRule`, `EmailAddressRule`,
+Release `0.8.0` also provides opt-in `IPAddressRule`, `EmailAddressRule`,
 `MACAddressRule`, and `IBANRule` privacy controls. They use bounded
 deterministic parsing, default to input-only redaction under the balanced
 policy, and remain disabled until configured. Provider-neutral `ToolCallRule`
 and `ToolResultRule` validate bounded typed tool traffic before execution and
-before results return to the model.
+before results return to the model. `AuthorizationHeaderRule` redacts exact
+Basic and Bearer credentials, while `RepetitionRule` reviews conservative exact
+character, token, and line runs.
 
 ## Measured performance
 
@@ -51,7 +53,7 @@ python -m pip install llm-ffw
 ```
 
 Pin the version in production dependency files. To use the complete synchronous
-and asynchronous API documented here, install `llm-ffw==0.7.0`. The performance
+and asynchronous API documented here, install `llm-ffw==0.8.0`. The performance
 table above remains explicitly attributed to release `0.2.0`.
 
 ## Usage
@@ -950,6 +952,7 @@ py -3.14 -m venv .venv
 .venv\Scripts\python benchmarks/bench_mac_addresses.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_ibans.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_authorization_headers.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
+.venv\Scripts\python benchmarks/bench_repetition.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_tool_calls.py
 .venv\Scripts\python benchmarks/bench_tool_results.py
 .venv\Scripts\python tools/pii_accuracy_gate.py
