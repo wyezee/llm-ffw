@@ -733,6 +733,8 @@ py -3.14 -m venv .venv
 .venv\Scripts\python benchmarks/bench_async_facade.py --size 8000000 --workers 4 --concurrency 8 --requests 16 --max-tasks-per-child 4
 .venv\Scripts\python benchmarks/bench_memory.py --size 8000000
 .venv\Scripts\python benchmarks/bench_manager_reload.py --size 8000000 --workers 2 --concurrency 4 --reloads 4 --min-requests 16 --max-tasks-per-child 8
+.venv\Scripts\python tools/pii_accuracy_gate.py
+.venv\Scripts\python benchmarks/generate_pii_accuracy_dataset.py
 ```
 
 The deterministic generator makes one match per catalog prefix plus near-miss
@@ -740,6 +742,14 @@ cases without LLM, network, provider, or random calls. Its manifest contains
 expected spans and a digest, not corpus values. Benchmarks report only duration,
 throughput, and finding counts; they never print scanned content. A release is
 not approved until the exact candidate commit passes both Windows and Linux CI.
+
+The PII accuracy gate deterministically evaluates 256 labeled email-address and
+IP-address scenarios. It requires exact rule ownership, character spans,
+redaction output, precision, and recall. Every value uses reserved example
+domains or documentation IP ranges; corpus creation makes no LLM or network
+calls. The optional expanded JSONL corpus is written under the ignored
+`benchmarks/generated/` directory, while the compact seed, group counts, and
+expected digest remain version controlled.
 
 ## Production process concurrency
 

@@ -4,6 +4,12 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Added
+
+- Deterministic 256-scenario PII accuracy and exact-redaction gate for the
+  opt-in email-address and IP-address rules, using only reserved synthetic
+  examples and no LLM or network calls.
+
 ## 0.5.0 - 2026-08-17
 
 ### Added

@@ -34,6 +34,9 @@ jobs:
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
 
+      - name: Enforce deterministic PII accuracy gate
+        run: python tools/pii_accuracy_gate.py
+
       - name: Compile source and test modules
         run: python -m compileall -q llm_ffw tests benchmarks tools
 

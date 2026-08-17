@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "dataset_id": "llm_ffw.pii_accuracy.v1",
+  "seed": 20260817,
+  "uses_llm": false,
+  "uses_network": false,
+  "reserved_examples_only": true,
+  "groups": {
+    "email_positive": 64,
+    "ip_positive": 64,
+    "mixed_positive": 32,
+    "negative": 96
+  },
+  "expected_sha256": "f6d966c1d352b5d6c4526361ad3cdb30496cfc569a11d41b64c11bd0b7015626"
+}

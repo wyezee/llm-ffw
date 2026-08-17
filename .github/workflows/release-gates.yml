@@ -37,6 +37,9 @@ jobs:
       - name: Run isolated wheel gate
         run: python tools/release_smoke.py
 
+      - name: Enforce deterministic PII accuracy gate
+        run: python tools/pii_accuracy_gate.py
+
       - name: Run balanced-policy performance gate
         run: python benchmarks/bench_policy.py --size 8000000 --rounds 3 --min-throughput-mib-s 5
 
