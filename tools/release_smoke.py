@@ -14,6 +14,7 @@ SMOKE_CODE = """
 from importlib.metadata import files, metadata, version
 from inspect import signature
 from llm_ffw import (
+    __version__,
     Action,
     AsyncLLMFirewall,
     AsyncLLMFirewallManager,
@@ -37,6 +38,7 @@ from llm_ffw import (
 from llm_ffw.rules import SecretsRule
 
 assert version("llm-ffw") == "0.6.0"
+assert __version__ == version("llm-ffw")
 assert metadata("llm-ffw").get_all("Requires-Dist") is None
 assert metadata("llm-ffw")["License-Expression"] == "Apache-2.0"
 assert "Development Status :: 4 - Beta" in metadata("llm-ffw").get_all(

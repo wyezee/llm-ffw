@@ -6,6 +6,12 @@ All notable changes are recorded here before a tagged release.
 
 ## 0.6.0 - 2026-08-17
 
+### Fixed
+
+- Keep the public runtime `llm_ffw.__version__` value synchronized with the
+  installed distribution version and enforce that invariant in release smoke
+  testing.
+
 ### Added
 
 - Opt-in bounded `MACAddressRule` for canonical 48-bit colon- and
