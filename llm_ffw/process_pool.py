@@ -21,6 +21,7 @@ from .json_output import JSONOutputConfig
 from .ip_address import IPAddressConfig
 from .mac_address import MACAddressConfig
 from .iban import IBANConfig
+from .authorization_header import AuthorizationHeaderConfig
 from .email_address import EmailAddressConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
@@ -35,6 +36,7 @@ from .rules.json_output import JSONOutputRule
 from .rules.ip_address import IPAddressRule
 from .rules.mac_address import MACAddressRule
 from .rules.iban import IBANRule
+from .rules.authorization_header import AuthorizationHeaderRule
 from .rules.email_address import EmailAddressRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
@@ -142,6 +144,7 @@ def _initialize_worker(
     ip_address_config: IPAddressConfig | None,
     mac_address_config: MACAddressConfig | None,
     iban_config: IBANConfig | None,
+    authorization_header_config: AuthorizationHeaderConfig | None,
     email_address_config: EmailAddressConfig | None,
     payment_card_config: PaymentCardConfig | None,
     private_key_config: PrivateKeyConfig | None,
@@ -160,6 +163,7 @@ def _initialize_worker(
         and ip_address_config is None
         and mac_address_config is None
         and iban_config is None
+        and authorization_header_config is None
         and email_address_config is None
         and payment_card_config is None
         and private_key_config is None
@@ -184,6 +188,8 @@ def _initialize_worker(
             rules.append(MACAddressRule(mac_address_config))
         if iban_config is not None:
             rules.append(IBANRule(iban_config))
+        if authorization_header_config is not None:
+            rules.append(AuthorizationHeaderRule(authorization_header_config))
         if email_address_config is not None:
             rules.append(EmailAddressRule(email_address_config))
         if payment_card_config is not None:
@@ -324,6 +330,7 @@ class ProcessScannerPool:
         ip_address_config: IPAddressConfig | None = None,
         mac_address_config: MACAddressConfig | None = None,
         iban_config: IBANConfig | None = None,
+        authorization_header_config: AuthorizationHeaderConfig | None = None,
         email_address_config: EmailAddressConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
@@ -375,6 +382,13 @@ class ProcessScannerPool:
             )
         if iban_config is not None and not isinstance(iban_config, IBANConfig):
             raise TypeError("iban_config must be an IBANConfig or None")
+        if authorization_header_config is not None and not isinstance(
+            authorization_header_config, AuthorizationHeaderConfig
+        ):
+            raise TypeError(
+                "authorization_header_config must be an "
+                "AuthorizationHeaderConfig or None"
+            )
         if email_address_config is not None and not isinstance(
             email_address_config, EmailAddressConfig
         ):
@@ -477,6 +491,11 @@ class ProcessScannerPool:
                     ),
                     *(("pii.iban",) if iban_config is not None else ()),
                     *(
+                        ("secrets.authorization_header",)
+                        if authorization_header_config is not None
+                        else ()
+                    ),
+                    *(
                         ("pii.email_address",)
                         if email_address_config is not None
                         else ()
@@ -509,6 +528,7 @@ class ProcessScannerPool:
                     "pii.ip_address",
                     "pii.mac_address",
                     "pii.iban",
+                    "secrets.authorization_header",
                     "pii.email_address",
                     "pii.payment_card",
                     "secrets.private_key",
@@ -526,6 +546,7 @@ class ProcessScannerPool:
         self._ip_address_config = ip_address_config
         self._mac_address_config = mac_address_config
         self._iban_config = iban_config
+        self._authorization_header_config = authorization_header_config
         self._email_address_config = email_address_config
         self._payment_card_config = resolved_payment_card_config
         self._private_key_config = resolved_private_key_config
@@ -588,6 +609,12 @@ class ProcessScannerPool:
         return self._iban_config
 
     @property
+    def authorization_header_config(
+        self,
+    ) -> AuthorizationHeaderConfig | None:
+        return self._authorization_header_config
+
+    @property
     def email_address_config(self) -> EmailAddressConfig | None:
         return self._email_address_config
 
@@ -628,6 +655,7 @@ class ProcessScannerPool:
                         self._ip_address_config,
                         self._mac_address_config,
                         self._iban_config,
+                        self._authorization_header_config,
                         self._email_address_config,
                         self._payment_card_config,
                         self._private_key_config,

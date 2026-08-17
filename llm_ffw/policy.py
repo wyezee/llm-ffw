@@ -479,6 +479,7 @@ def _builtin_policy(
     ip_address_action: Action,
     mac_address_action: Action,
     iban_action: Action,
+    authorization_header_action: Action,
     email_address_action: Action,
     payment_card_action: Action,
     private_key_action: Action,
@@ -508,7 +509,7 @@ def _builtin_policy(
     )
     return FirewallPolicy(
         policy_id=policy_id,
-        version="1.11.0",
+        version="1.12.0",
         overrides=(
             PolicyOverride("secrets.detected", ScanScope.INPUT, input_action),
             PolicyOverride("secrets.detected", ScanScope.OUTPUT, output_action),
@@ -558,6 +559,16 @@ def _builtin_policy(
                 "pii.iban",
                 ScanScope.OUTPUT,
                 iban_action,
+            ),
+            PolicyOverride(
+                "secrets.authorization_header",
+                ScanScope.INPUT,
+                authorization_header_action,
+            ),
+            PolicyOverride(
+                "secrets.authorization_header",
+                ScanScope.OUTPUT,
+                authorization_header_action,
             ),
             PolicyOverride(
                 "pii.email_address",
@@ -614,6 +625,7 @@ BALANCED_POLICY = _builtin_policy(
     ip_address_action=Action.REDACT,
     mac_address_action=Action.REDACT,
     iban_action=Action.REDACT,
+    authorization_header_action=Action.REDACT,
     email_address_action=Action.REDACT,
     payment_card_action=Action.REDACT,
     private_key_action=Action.REDACT,
@@ -630,6 +642,7 @@ STRICT_POLICY = _builtin_policy(
     ip_address_action=Action.BLOCK,
     mac_address_action=Action.BLOCK,
     iban_action=Action.BLOCK,
+    authorization_header_action=Action.BLOCK,
     email_address_action=Action.BLOCK,
     payment_card_action=Action.BLOCK,
     private_key_action=Action.BLOCK,
@@ -646,6 +659,7 @@ AUDIT_POLICY = _builtin_policy(
     ip_address_action=Action.REVIEW,
     mac_address_action=Action.REVIEW,
     iban_action=Action.REVIEW,
+    authorization_header_action=Action.REVIEW,
     email_address_action=Action.REVIEW,
     payment_card_action=Action.REVIEW,
     private_key_action=Action.REVIEW,
@@ -679,6 +693,7 @@ class Firewall:
                     "pii.ip_address",
                     "pii.mac_address",
                     "pii.iban",
+                    "secrets.authorization_header",
                     "pii.email_address",
                     "pii.payment_card",
                     "secrets.private_key",

@@ -18,6 +18,8 @@ from llm_ffw import (
     Action,
     AsyncLLMFirewall,
     AsyncLLMFirewallManager,
+    AuthorizationHeaderConfig,
+    AuthorizationHeaderRule,
     Firewall,
     FirewallStream,
     EmailAddressConfig,
@@ -65,6 +67,7 @@ assert "secret_catalog" not in facade_parameters
 assert "ip_address_config" in facade_parameters
 assert "mac_address_config" in facade_parameters
 assert "iban_config" in facade_parameters
+assert "authorization_header_config" in facade_parameters
 assert "email_address_config" in facade_parameters
 capabilities = LLMFirewall().capabilities()
 assert capabilities.rule_count == 6
@@ -114,6 +117,27 @@ assert any(
     for rule in iban_firewall.capabilities().rules
 )
 iban_firewall.close()
+authorization_firewall = LLMFirewall(
+    authorization_header_config=AuthorizationHeaderConfig()
+)
+assert (
+    authorization_firewall.capabilities().authorization_header.max_candidates
+    == 128
+)
+assert any(
+    rule.rule_id == AuthorizationHeaderRule.RULE_ID
+    for rule in authorization_firewall.capabilities().rules
+)
+assert authorization_firewall.capabilities().authorization_header.schemes == (
+    "basic",
+    "bearer",
+)
+authorization_firewall.close()
+authorization_result = Firewall(
+    scanner=Scanner(rules=(AuthorizationHeaderRule(),))
+).process("Authorization: Bearer synthetic_bearer_token_123456")
+assert authorization_result.decision is Action.REDACT
+assert authorization_result.processed_text == "Authorization: Bearer [REDACTED]"
 email_firewall = LLMFirewall(email_address_config=EmailAddressConfig())
 assert email_firewall.capabilities().email_address.max_candidates == 128
 assert any(

@@ -13,6 +13,7 @@ from .capabilities import (
     IPAddressCapability,
     MACAddressCapability,
     IBANCapability,
+    AuthorizationHeaderCapability,
     EmailAddressCapability,
     RuleCapability,
     SecretCatalogCapability,
@@ -33,6 +34,7 @@ from .iban import (
     IBAN_REGISTRY_ISSUED,
     IBAN_REGISTRY_RELEASE,
 )
+from .authorization_header import AuthorizationHeaderConfig
 from .email_address import EmailAddressConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
@@ -54,6 +56,7 @@ from .rules.json_output import JSONOutputRule
 from .rules.ip_address import IPAddressRule
 from .rules.mac_address import MACAddressRule
 from .rules.iban import IBANRule
+from .rules.authorization_header import AuthorizationHeaderRule
 from .rules.email_address import EmailAddressRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
@@ -138,6 +141,7 @@ class LLMFirewall:
         ip_address_config: IPAddressConfig | None = None,
         mac_address_config: MACAddressConfig | None = None,
         iban_config: IBANConfig | None = None,
+        authorization_header_config: AuthorizationHeaderConfig | None = None,
         email_address_config: EmailAddressConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
@@ -165,6 +169,7 @@ class LLMFirewall:
             ip_address_config=ip_address_config,
             mac_address_config=mac_address_config,
             iban_config=iban_config,
+            authorization_header_config=authorization_header_config,
             email_address_config=email_address_config,
             payment_card_config=payment_card_config,
             private_key_config=private_key_config,
@@ -242,6 +247,14 @@ class LLMFirewall:
                     rule_id=IBANRule.RULE_ID,
                     purpose=IBANRule.PURPOSE,
                     scopes=tuple(self._pool.iban_config.scopes),
+                )
+            )
+        if self._pool.authorization_header_config is not None:
+            rule_capabilities.append(
+                RuleCapability(
+                    rule_id=AuthorizationHeaderRule.RULE_ID,
+                    purpose=AuthorizationHeaderRule.PURPOSE,
+                    scopes=tuple(self._pool.authorization_header_config.scopes),
                 )
             )
         if self._pool.email_address_config is not None:
@@ -356,6 +369,18 @@ class LLMFirewall:
                     registry_issued=IBAN_REGISTRY_ISSUED,
                 )
                 if self._pool.iban_config is not None
+                else None
+            ),
+            authorization_header=(
+                AuthorizationHeaderCapability(
+                    max_candidates=(
+                        self._pool.authorization_header_config.max_candidates
+                    ),
+                    max_credential_chars=(
+                        self._pool.authorization_header_config.max_credential_chars
+                    ),
+                )
+                if self._pool.authorization_header_config is not None
                 else None
             ),
             email_address=(

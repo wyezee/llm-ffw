@@ -8,6 +8,7 @@ from .json_output import JSONOutputRule
 from .ip_address import IPAddressRule
 from .mac_address import MACAddressRule
 from .iban import IBANRule
+from .authorization_header import AuthorizationHeaderRule
 from .email_address import EmailAddressRule
 from .payment_card import PaymentCardRule
 from .private_key import PrivateKeyRule
@@ -25,6 +26,7 @@ __all__ = [
     "IPAddressRule",
     "MACAddressRule",
     "IBANRule",
+    "AuthorizationHeaderRule",
     "EmailAddressRule",
     "PaymentCardRule",
     "PrivateKeyRule",

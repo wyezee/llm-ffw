@@ -4,6 +4,13 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Added
+
+- Opt-in `AuthorizationHeaderRule` for exact line-oriented HTTP Basic and
+  Bearer credentials, with bounded parsing, credential-only redaction,
+  disclosure-safe findings, facade/policy/capability integration, and an 8 MB
+  performance envelope.
+
 ## 0.7.0 - 2026-08-17
 
 ### Added

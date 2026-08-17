@@ -311,6 +311,7 @@ rebuilding it per request.
 | `ip_address_config` | Enable bounded canonical IP-address inspection |
 | `mac_address_config` | Enable bounded canonical 48-bit MAC-address inspection |
 | `iban_config` | Enable registered-length and MOD-97 IBAN inspection |
+| `authorization_header_config` | Enable bounded Basic/Bearer Authorization-header inspection |
 | `email_address_config` | Enable bounded conservative email inspection |
 | `payment_card_config` | Customize enabled payment-card limits and scopes |
 | `private_key_config` | Customize enabled private-key limits and scopes |
@@ -320,7 +321,8 @@ rebuilding it per request.
 
 The two secret-catalog parameters are mutually exclusive. Passing `None` for
 the opt-in banned-substring, JSON, unsafe-URL, IP-address, MAC-address, IBAN,
-and email-address configurations leaves each corresponding rule disabled. Payment-card,
+Authorization-header, and email-address configurations leaves each corresponding
+rule disabled. Payment-card,
 private-key, JWT,
 invisible-character, and Unicode tag rules are enabled by `ScannerConfig`
 defaults; their dedicated config objects customize bounds and scopes rather
@@ -394,6 +396,7 @@ Strict and audit policies can change the effective action.
 | `pii.ip_address` | Opt-in | Input by default | Redact | `IPAddressConfig` |
 | `pii.mac_address` | Opt-in | Input by default | Redact | `MACAddressConfig` |
 | `pii.iban` | Opt-in | Input by default | Redact | `IBANConfig` |
+| `secrets.authorization_header` | Opt-in | Input/output | Redact | `AuthorizationHeaderConfig` |
 | `pii.email_address` | Opt-in | Input by default | Redact | `EmailAddressConfig` |
 | `tools.call.validity` | Opt-in | Tool call | Block | `ToolDefinition`, `ToolCallConfig` |
 | `tools.result.validity` | Opt-in | Tool result | Block | `ToolResultConfig` |
@@ -671,6 +674,34 @@ BBAN subfields or domestic check digits, repair obfuscation, accept lowercase,
 or make any network call. Registry release and issue date are exposed through
 capabilities and finding metadata so deployments can audit the pinned data.
 
+### Opt-in Authorization-header inspection
+
+Applications that may pass HTTP request dumps, logs, or generated client code
+through a model can redact Basic and Bearer credentials while preserving the
+header structure:
+
+```python
+from llm_ffw import AuthorizationHeaderConfig, LLMFirewall
+
+firewall = LLMFirewall(
+    authorization_header_config=AuthorizationHeaderConfig(),
+)
+```
+
+`AuthorizationHeaderRule` recognizes case-insensitive `Authorization:` headers
+only at the start of a normalized line. The field name must be followed
+immediately by `:`. Bearer values use the token68 alphabet with any padding
+confined to the end. Basic values must be canonical base64, decode successfully,
+and contain the required username/password colon. Only the credential span is
+redacted; the header name and authentication scheme remain.
+
+The rule is opt-in, scans input and output by default, and has hard bounds on
+candidate count and credential length. It deliberately excludes Digest,
+`Proxy-Authorization`, authentication parameters, header folding, inline prose,
+and placeholder syntax such as `<token>`. Syntactic validity does not prove
+that a credential is active or accepted by any server, and the rule makes no
+network call.
+
 ### Opt-in email-address inspection
 
 Applications that treat email addresses as personal data can enable bounded,
@@ -896,6 +927,7 @@ py -3.14 -m venv .venv
 .venv\Scripts\python benchmarks/bench_manager_reload.py --size 8000000 --workers 2 --concurrency 4 --reloads 4 --min-requests 16 --max-tasks-per-child 8
 .venv\Scripts\python benchmarks/bench_mac_addresses.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_ibans.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
+.venv\Scripts\python benchmarks/bench_authorization_headers.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_tool_calls.py
 .venv\Scripts\python benchmarks/bench_tool_results.py
 .venv\Scripts\python tools/pii_accuracy_gate.py

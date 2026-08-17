@@ -193,6 +193,32 @@ class IBANCapability:
 
 
 @dataclass(frozen=True, slots=True)
+class AuthorizationHeaderCapability:
+    """Disclosure-safe Authorization-header inspection limits."""
+
+    max_candidates: int
+    max_credential_chars: int
+    schemes: tuple[str, ...] = ("basic", "bearer")
+
+    def __post_init__(self) -> None:
+        for field_name in ("max_candidates", "max_credential_chars"):
+            value = getattr(self, field_name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value <= 0
+            ):
+                raise ValueError(f"{field_name} must be a positive integer")
+        try:
+            schemes = tuple(self.schemes)
+        except TypeError as exc:
+            raise TypeError("schemes must be iterable") from exc
+        if schemes != ("basic", "bearer"):
+            raise ValueError("schemes must be the supported Basic and Bearer set")
+        object.__setattr__(self, "schemes", schemes)
+
+
+@dataclass(frozen=True, slots=True)
 class EmailAddressCapability:
     """Disclosure-safe email-address inspection configuration."""
 
@@ -256,6 +282,7 @@ class FirewallCapabilities:
     ip_address: IPAddressCapability | None = None
     mac_address: MACAddressCapability | None = None
     iban: IBANCapability | None = None
+    authorization_header: AuthorizationHeaderCapability | None = None
     email_address: EmailAddressCapability | None = None
     payment_card: PaymentCardCapability | None = None
     private_key: PrivateKeyCapability | None = None
@@ -306,6 +333,13 @@ class FirewallCapabilities:
             )
         if self.iban is not None and not isinstance(self.iban, IBANCapability):
             raise TypeError("iban must be an IBANCapability or None")
+        if self.authorization_header is not None and not isinstance(
+            self.authorization_header, AuthorizationHeaderCapability
+        ):
+            raise TypeError(
+                "authorization_header must be an AuthorizationHeaderCapability "
+                "or None"
+            )
         if self.email_address is not None and not isinstance(
             self.email_address, EmailAddressCapability
         ):
@@ -345,6 +379,7 @@ __all__ = [
     "IPAddressCapability",
     "MACAddressCapability",
     "IBANCapability",
+    "AuthorizationHeaderCapability",
     "PaymentCardCapability",
     "PrivateKeyCapability",
     "JWTTokenCapability",

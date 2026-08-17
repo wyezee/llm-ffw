@@ -12,6 +12,7 @@ from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.ip_address import IPAddressRule
 from .rules.mac_address import MACAddressRule
 from .rules.iban import IBANRule
+from .rules.authorization_header import AuthorizationHeaderRule
 from .rules.email_address import EmailAddressRule
 from .rules.json_output import JSONOutputRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
@@ -102,6 +103,7 @@ class Scanner:
             IPAddressRule,
             MACAddressRule,
             IBANRule,
+            AuthorizationHeaderRule,
             EmailAddressRule,
             JSONOutputRule,
             JWTTokenRule,
