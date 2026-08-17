@@ -4,6 +4,13 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Added
+
+- Provider-neutral `ToolCallRule` with immutable typed calls, declared-tool
+  allowlisting, a deliberately bounded JSON-Schema subset, disclosure-safe
+  fail-closed findings, and configurable depth, node, string, object, and
+  array limits.
+
 ## 0.6.0 - 2026-08-17
 
 ### Fixed

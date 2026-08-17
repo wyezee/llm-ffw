@@ -9,10 +9,12 @@ from .normalizers import NormalizedText, normalize_text
 
 
 class ScanScope(str, Enum):
-    """Direction of text crossing the language-model boundary."""
+    """Kind of content crossing the language-model boundary."""
 
     INPUT = "input"
     OUTPUT = "output"
+    TOOL_CALL = "tool_call"
+    TOOL_RESULT = "tool_result"
 
 
 class InspectionFeature(str, Enum):

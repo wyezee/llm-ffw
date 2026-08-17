@@ -66,6 +66,7 @@ Choose the highest-level API that fits the integration:
 | `Firewall` | Same-process scanning plus policy application |
 | `Scanner` | Same-process detection when the host applies findings itself |
 | `ProcessScannerPool` | Advanced process orchestration and explicit overload control |
+| `ToolCallRule` | Provider-neutral allowlist and typed argument validation before tool execution |
 
 Production integrations should use `LLMFirewall`. Its balanced default redacts
 detected secrets in both directions while preserving flow:
@@ -389,6 +390,59 @@ Strict and audit policies can change the effective action.
 | `pii.ip_address` | Opt-in | Input by default | Redact | `IPAddressConfig` |
 | `pii.mac_address` | Opt-in | Input by default | Redact | `MACAddressConfig` |
 | `pii.email_address` | Opt-in | Input by default | Redact | `EmailAddressConfig` |
+| `tools.call.validity` | Opt-in | Tool call | Block | `ToolDefinition`, `ToolCallConfig` |
+
+### Opt-in tool-call validation
+
+Applications that execute model-selected tools can declare the callable tools
+and a bounded JSON-Schema subset once at startup. Validate the provider's
+decoded tool call immediately before dispatch:
+
+```python
+from llm_ffw import ToolCall, ToolCallRule, ToolDefinition
+
+tool_calls = ToolCallRule(
+    (
+        ToolDefinition(
+            name="get_weather",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "city": {"type": "string"},
+                    "units": {
+                        "type": "string",
+                        "enum": ["celsius", "fahrenheit"],
+                    },
+                },
+                "required": ["city"],
+                "additionalProperties": False,
+            },
+        ),
+    )
+)
+
+call = ToolCall("get_weather", {"city": "Pune", "units": "celsius"})
+safe_call = tool_calls.enforce(call)
+dispatch(safe_call.name, safe_call.arguments)
+```
+
+`ToolCallRule` blocks undeclared tools, arguments supplied to no-argument
+tools, type and enum mismatches, missing required properties, forbidden extra
+properties, and configured resource-limit violations. Its supported schema
+keywords are `type`, `properties`, `required`, `additionalProperties`, `items`,
+and scalar `enum`; each schema node must declare one of `object`, `array`,
+`string`, `number`, `integer`, `boolean`, or `null`. Regex, references,
+combinators, coercion, and defaults are deliberately unsupported.
+
+`ToolCall` copies decoded built-in JSON values into an immutable bounded tree
+and excludes arguments and call IDs from `repr()`. The rule declares
+`ScanScope.TOOL_CALL`. A rejected call produces one disclosure-safe `Finding`
+with a structured zero-width span and no tool name, argument key, or argument
+value taken from untrusted input. Construct `ToolCallRule` once and reuse it;
+schema compilation does not
+occur on the request path. `enforce()` returns the same safe call or raises
+`ToolCallBlockedError`; `validate()` is available when the host wants the
+finding tuple without raising.
 
 ### Default invisible-character canonicalization
 

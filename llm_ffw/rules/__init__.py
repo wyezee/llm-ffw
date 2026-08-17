@@ -1,6 +1,6 @@
 """Built-in deterministic scanning rules."""
 
-from .base import Rule, RuleMatch
+from .base import Rule, RuleMatch, StructuredRule
 from .banned_substrings import BannedSubstringsRule
 from .invisible_characters import InvisibleCharactersRule
 from .unicode_tag_smuggling import UnicodeTagSmugglingRule
@@ -13,6 +13,7 @@ from .private_key import PrivateKeyRule
 from .jwt_token import JWTTokenRule
 from .secrets import SecretsRule
 from .unsafe_url import UnsafeURLRule
+from .tool_call import ToolCallBlockedError, ToolCallRule
 
 __all__ = [
     "BannedSubstringsRule",
@@ -27,6 +28,9 @@ __all__ = [
     "JWTTokenRule",
     "Rule",
     "RuleMatch",
+    "StructuredRule",
     "SecretsRule",
     "UnsafeURLRule",
+    "ToolCallBlockedError",
+    "ToolCallRule",
 ]
