@@ -307,6 +307,7 @@ rebuilding it per request.
 | `unsafe_url_config` | Enable bounded input/output URL inspection |
 | `ip_address_config` | Enable bounded canonical IP-address inspection |
 | `mac_address_config` | Enable bounded canonical 48-bit MAC-address inspection |
+| `iban_config` | Enable registered-length and MOD-97 IBAN inspection |
 | `email_address_config` | Enable bounded conservative email inspection |
 | `payment_card_config` | Customize enabled payment-card limits and scopes |
 | `private_key_config` | Customize enabled private-key limits and scopes |
@@ -315,8 +316,8 @@ rebuilding it per request.
 | `request_timeout_seconds` | Per-request facade deadline; defaults to 5 seconds |
 
 The two secret-catalog parameters are mutually exclusive. Passing `None` for
-the opt-in banned-substring, JSON, unsafe-URL, IP-address, MAC-address, and email-address
-configurations leaves each corresponding rule disabled. Payment-card,
+the opt-in banned-substring, JSON, unsafe-URL, IP-address, MAC-address, IBAN,
+and email-address configurations leaves each corresponding rule disabled. Payment-card,
 private-key, JWT,
 invisible-character, and Unicode tag rules are enabled by `ScannerConfig`
 defaults; their dedicated config objects customize bounds and scopes rather
@@ -389,6 +390,7 @@ Strict and audit policies can change the effective action.
 | `url.unsafe` | Opt-in | Input/output by default | Redact | `UnsafeURLConfig` |
 | `pii.ip_address` | Opt-in | Input by default | Redact | `IPAddressConfig` |
 | `pii.mac_address` | Opt-in | Input by default | Redact | `MACAddressConfig` |
+| `pii.iban` | Opt-in | Input by default | Redact | `IBANConfig` |
 | `pii.email_address` | Opt-in | Input by default | Redact | `EmailAddressConfig` |
 | `tools.call.validity` | Opt-in | Tool call | Block | `ToolDefinition`, `ToolCallConfig` |
 | `tools.result.validity` | Opt-in | Tool result | Block | `ToolResultConfig` |
@@ -636,6 +638,36 @@ policy. Cisco dotted notation, mixed separators, EUI-64 values, obfuscation,
 and vendor ownership lookup are intentionally outside this narrow,
 high-precision rule.
 
+### Opt-in IBAN inspection
+
+Applications that treat bank-account identifiers as sensitive can enable
+deterministic IBAN inspection:
+
+```python
+from llm_ffw import IBANConfig, LLMFirewall, ScanScope
+
+firewall = LLMFirewall(
+    iban_config=IBANConfig(
+        scopes=(ScanScope.INPUT, ScanScope.OUTPUT),
+    )
+)
+```
+
+`IBANRule` recognizes uppercase electronic IBANs and canonical space-grouped
+print forms. A candidate must use a country code and exact length pinned to
+the
+[SWIFT IBAN Registry Release 102 (June 2026)](https://www.swift.com/swift-resource/9606/download),
+contain only the standard uppercase alphanumeric alphabet, and pass the
+ISO/IEC 7064 MOD-97-10 check. It is input-only unless configured otherwise and
+redacts under balanced policy.
+
+The checksum and registered length make this substantially narrower than a
+generic account-number regex, but they do not prove that an account exists,
+is active, or belongs to anyone. The rule does not validate country-specific
+BBAN subfields or domestic check digits, repair obfuscation, accept lowercase,
+or make any network call. Registry release and issue date are exposed through
+capabilities and finding metadata so deployments can audit the pinned data.
+
 ### Opt-in email-address inspection
 
 Applications that treat email addresses as personal data can enable bounded,
@@ -860,6 +892,9 @@ py -3.14 -m venv .venv
 .venv\Scripts\python benchmarks/bench_memory.py --size 8000000
 .venv\Scripts\python benchmarks/bench_manager_reload.py --size 8000000 --workers 2 --concurrency 4 --reloads 4 --min-requests 16 --max-tasks-per-child 8
 .venv\Scripts\python benchmarks/bench_mac_addresses.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
+.venv\Scripts\python benchmarks/bench_ibans.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
+.venv\Scripts\python benchmarks/bench_tool_calls.py
+.venv\Scripts\python benchmarks/bench_tool_results.py
 .venv\Scripts\python tools/pii_accuracy_gate.py
 .venv\Scripts\python benchmarks/generate_pii_accuracy_dataset.py
 ```
@@ -870,11 +905,13 @@ expected spans and a digest, not corpus values. Benchmarks report only duration,
 throughput, and finding counts; they never print scanned content. A release is
 not approved until the exact candidate commit passes both Windows and Linux CI.
 
-The PII accuracy gate deterministically evaluates 480 generated and curated
-email-address, IP-address, and MAC-address scenarios. It requires exact rule ownership,
-character spans, redaction output, precision, and recall, with per-category
-confusion counts. Values use reserved example domains and documentation or
-special-purpose IP ranges, and locally administered synthetic MAC values;
+The PII accuracy gate deterministically evaluates 601 generated and curated
+email-address, IP-address, MAC-address, and IBAN scenarios. It requires exact
+rule ownership, character spans, redaction output, precision, and recall, with
+per-category confusion counts. Values use reserved example domains and
+documentation or special-purpose IP ranges, locally administered synthetic
+MAC values, and checksum-valid synthetic IBAN values for every registered
+country length;
 corpus creation makes no LLM or network calls. The
 optional expanded JSONL corpus is written under the ignored
 `benchmarks/generated/` directory, while the compact seed, group counts, and

@@ -7,6 +7,7 @@ from .capabilities import (
     JSONOutputCapability,
     IPAddressCapability,
     MACAddressCapability,
+    IBANCapability,
     RuleCapability,
     SecretCatalogCapability,
     UnsafeURLCapability,
@@ -37,6 +38,7 @@ from .inspection import (
 from .json_output import JSONOutputConfig
 from .ip_address import IPAddressConfig
 from .mac_address import MACAddressConfig
+from .iban import IBANConfig
 from .email_address import EmailAddressConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
@@ -86,6 +88,7 @@ from .rules.banned_substrings import BannedSubstringsRule
 from .rules.json_output import JSONOutputRule
 from .rules.ip_address import IPAddressRule
 from .rules.mac_address import MACAddressRule
+from .rules.iban import IBANRule
 from .rules.email_address import EmailAddressRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
@@ -129,6 +132,9 @@ __all__ = [
     "IPAddressConfig",
     "IPAddressRule",
     "MACAddressCapability",
+    "IBANCapability",
+    "IBANConfig",
+    "IBANRule",
     "MACAddressConfig",
     "MACAddressRule",
     "LLMFirewall",

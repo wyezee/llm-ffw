@@ -12,6 +12,7 @@ from .capabilities import (
     JSONOutputCapability,
     IPAddressCapability,
     MACAddressCapability,
+    IBANCapability,
     EmailAddressCapability,
     RuleCapability,
     SecretCatalogCapability,
@@ -27,6 +28,11 @@ from .inspection import ScanScope
 from .json_output import JSONOutputConfig
 from .ip_address import IPAddressConfig
 from .mac_address import MACAddressConfig
+from .iban import (
+    IBANConfig,
+    IBAN_REGISTRY_ISSUED,
+    IBAN_REGISTRY_RELEASE,
+)
 from .email_address import EmailAddressConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
@@ -47,6 +53,7 @@ from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.json_output import JSONOutputRule
 from .rules.ip_address import IPAddressRule
 from .rules.mac_address import MACAddressRule
+from .rules.iban import IBANRule
 from .rules.email_address import EmailAddressRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
@@ -130,6 +137,7 @@ class LLMFirewall:
         unsafe_url_config: UnsafeURLConfig | None = None,
         ip_address_config: IPAddressConfig | None = None,
         mac_address_config: MACAddressConfig | None = None,
+        iban_config: IBANConfig | None = None,
         email_address_config: EmailAddressConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
@@ -156,6 +164,7 @@ class LLMFirewall:
             unsafe_url_config=unsafe_url_config,
             ip_address_config=ip_address_config,
             mac_address_config=mac_address_config,
+            iban_config=iban_config,
             email_address_config=email_address_config,
             payment_card_config=payment_card_config,
             private_key_config=private_key_config,
@@ -225,6 +234,14 @@ class LLMFirewall:
                     rule_id=MACAddressRule.RULE_ID,
                     purpose=MACAddressRule.PURPOSE,
                     scopes=tuple(self._pool.mac_address_config.scopes),
+                )
+            )
+        if self._pool.iban_config is not None:
+            rule_capabilities.append(
+                RuleCapability(
+                    rule_id=IBANRule.RULE_ID,
+                    purpose=IBANRule.PURPOSE,
+                    scopes=tuple(self._pool.iban_config.scopes),
                 )
             )
         if self._pool.email_address_config is not None:
@@ -330,6 +347,15 @@ class LLMFirewall:
                     ),
                 )
                 if self._pool.mac_address_config is not None
+                else None
+            ),
+            iban=(
+                IBANCapability(
+                    max_candidates=self._pool.iban_config.max_candidates,
+                    registry_release=IBAN_REGISTRY_RELEASE,
+                    registry_issued=IBAN_REGISTRY_ISSUED,
+                )
+                if self._pool.iban_config is not None
                 else None
             ),
             email_address=(

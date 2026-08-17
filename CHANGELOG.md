@@ -14,6 +14,10 @@ All notable changes are recorded here before a tagged release.
   call-ID linkage and uniqueness checks, exact tool-name consistency, bounded
   string or JSON object-block content, and disclosure-safe fail-closed
   findings.
+- Opt-in `IBANRule` pinned to SWIFT IBAN Registry Release 102, with exact
+  registered-country lengths, canonical electronic and print forms, streaming
+  MOD-97 validation, bounded candidate handling, policy/capability integration,
+  exhaustive registered-country tests, and an 8 MB performance envelope.
 
 ## 0.6.0 - 2026-08-17
 

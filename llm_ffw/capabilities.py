@@ -174,6 +174,25 @@ class MACAddressCapability:
 
 
 @dataclass(frozen=True, slots=True)
+class IBANCapability:
+    """Disclosure-safe IBAN inspection configuration and registry pin."""
+
+    max_candidates: int
+    registry_release: str
+    registry_issued: str
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.max_candidates, bool)
+            or not isinstance(self.max_candidates, int)
+            or self.max_candidates <= 0
+        ):
+            raise ValueError("max_candidates must be a positive integer")
+        _non_empty(self.registry_release, "registry_release")
+        _non_empty(self.registry_issued, "registry_issued")
+
+
+@dataclass(frozen=True, slots=True)
 class EmailAddressCapability:
     """Disclosure-safe email-address inspection configuration."""
 
@@ -236,6 +255,7 @@ class FirewallCapabilities:
     unsafe_url: UnsafeURLCapability | None = None
     ip_address: IPAddressCapability | None = None
     mac_address: MACAddressCapability | None = None
+    iban: IBANCapability | None = None
     email_address: EmailAddressCapability | None = None
     payment_card: PaymentCardCapability | None = None
     private_key: PrivateKeyCapability | None = None
@@ -284,6 +304,8 @@ class FirewallCapabilities:
             raise TypeError(
                 "mac_address must be a MACAddressCapability or None"
             )
+        if self.iban is not None and not isinstance(self.iban, IBANCapability):
+            raise TypeError("iban must be an IBANCapability or None")
         if self.email_address is not None and not isinstance(
             self.email_address, EmailAddressCapability
         ):
@@ -322,6 +344,7 @@ __all__ = [
     "JSONOutputCapability",
     "IPAddressCapability",
     "MACAddressCapability",
+    "IBANCapability",
     "PaymentCardCapability",
     "PrivateKeyCapability",
     "JWTTokenCapability",

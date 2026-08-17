@@ -1,6 +1,6 @@
 {
-  "schema_version": 3,
-  "dataset_id": "llm_ffw.pii_accuracy.v3",
+  "schema_version": 4,
+  "dataset_id": "llm_ffw.pii_accuracy.v4",
   "seed": 20260817,
   "uses_llm": false,
   "uses_network": false,
@@ -9,13 +9,15 @@
     "email_positive": 64,
     "ip_positive": 64,
     "mac_positive": 64,
+    "iban_positive": 89,
     "mixed_positive": 32,
     "negative": 96,
     "curated_email_positive": 20,
     "curated_ip_positive": 24,
     "curated_mac_positive": 20,
     "curated_mac_negative": 32,
+    "curated_iban_negative": 32,
     "curated_negative": 64
   },
-  "expected_sha256": "bd97ac7e717b4fd3d7b70d3549419549727e71a38fd7774a2dd0590ca15797e1"
+  "expected_sha256": "33fd63fb34f40a60d81e3ddb619fa7acdd6c6ea8460e8206e39e506562eef4e3"
 }

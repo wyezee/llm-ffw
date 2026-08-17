@@ -17,11 +17,13 @@ from benchmarks.pii_accuracy import (
 _EXPECTED_CATEGORIES = {
     "curated_email_positive",
     "curated_ip_positive",
+    "curated_iban_negative",
     "curated_mac_positive",
     "curated_mac_negative",
     "curated_negative",
     "email_positive",
     "ip_positive",
+    "iban_positive",
     "mac_positive",
     "mixed_positive",
     "negative",
@@ -66,6 +68,7 @@ def run_gate(
     if set(item.rule_id for item in report.rules) != {
         "pii.email_address",
         "pii.ip_address",
+        "pii.iban",
         "pii.mac_address",
     }:
         raise AssertionError("PII accuracy gate rule coverage is incomplete")

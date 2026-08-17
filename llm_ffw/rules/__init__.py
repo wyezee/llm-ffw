@@ -7,6 +7,7 @@ from .unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .json_output import JSONOutputRule
 from .ip_address import IPAddressRule
 from .mac_address import MACAddressRule
+from .iban import IBANRule
 from .email_address import EmailAddressRule
 from .payment_card import PaymentCardRule
 from .private_key import PrivateKeyRule
@@ -23,6 +24,7 @@ __all__ = [
     "JSONOutputRule",
     "IPAddressRule",
     "MACAddressRule",
+    "IBANRule",
     "EmailAddressRule",
     "PaymentCardRule",
     "PrivateKeyRule",

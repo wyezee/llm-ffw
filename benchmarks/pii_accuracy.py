@@ -14,9 +14,12 @@ from llm_ffw import (
     IPAddressRule,
     MACAddressConfig,
     MACAddressRule,
+    IBANConfig,
+    IBANRule,
     ScanScope,
     Scanner,
 )
+from llm_ffw.iban import IBAN_LENGTHS
 
 
 _MANIFEST_PATH = Path(__file__).with_name("pii_accuracy_manifest.json")
@@ -24,6 +27,7 @@ _RULE_IDS = (
     EmailAddressRule.RULE_ID,
     IPAddressRule.RULE_ID,
     MACAddressRule.RULE_ID,
+    IBANRule.RULE_ID,
 )
 
 
@@ -163,7 +167,7 @@ def _load_manifest(path: Path) -> dict[str, object]:
     }
     if set(manifest) != expected_keys:
         raise ValueError("PII accuracy manifest fields are invalid")
-    if manifest["schema_version"] != 3:
+    if manifest["schema_version"] != 4:
         raise ValueError("unsupported PII accuracy manifest schema")
     if not isinstance(manifest["dataset_id"], str):
         raise TypeError("dataset_id must be a string")
@@ -183,12 +187,14 @@ def _load_manifest(path: Path) -> dict[str, object]:
         "email_positive",
         "ip_positive",
         "mac_positive",
+        "iban_positive",
         "mixed_positive",
         "negative",
         "curated_email_positive",
         "curated_ip_positive",
         "curated_mac_positive",
         "curated_mac_negative",
+        "curated_iban_negative",
         "curated_negative",
     }
     if not isinstance(groups, dict) or set(groups) != expected_groups:
@@ -300,6 +306,45 @@ def _mac_scenarios(count: int) -> list[PIIAccuracyScenario]:
                 category="mac_positive",
                 text=text,
                 expected=(_finding(MACAddressRule.RULE_ID, text, value),),
+            )
+        )
+    return scenarios
+
+
+def _iban_mod97(country: str, bban: str) -> str:
+    remainder = 0
+    for character in bban + country + "00":
+        if "0" <= character <= "9":
+            remainder = (remainder * 10 + ord(character) - ord("0")) % 97
+        else:
+            remainder = (
+                remainder * 100 + ord(character) - ord("A") + 10
+            ) % 97
+    return f"{98 - remainder:02d}"
+
+
+def _iban_scenarios(count: int) -> list[PIIAccuracyScenario]:
+    """Return one synthetic checksum-valid value per registered country."""
+
+    if count != len(IBAN_LENGTHS):
+        raise ValueError("IBAN positive count must match the pinned registry")
+    contexts = (
+        "account={value}",
+        "beneficiary [{value}]",
+        'record={{"iban":"{value}"}}',
+        "synthetic transfer destination {value}.",
+    )
+    scenarios: list[PIIAccuracyScenario] = []
+    for index, (country, length) in enumerate(IBAN_LENGTHS.items()):
+        bban = f"{index + 1:0{length - 4}d}"
+        value = country + _iban_mod97(country, bban) + bban
+        text = contexts[index % len(contexts)].format(value=value)
+        scenarios.append(
+            PIIAccuracyScenario(
+                scenario_id=f"iban-positive-{country.lower()}",
+                category="iban_positive",
+                text=text,
+                expected=(_finding(IBANRule.RULE_ID, text, value),),
             )
         )
     return scenarios
@@ -557,6 +602,58 @@ def _curated_mac_negative_scenarios(count: int) -> list[PIIAccuracyScenario]:
     ]
 
 
+def _curated_iban_negative_scenarios(
+    count: int,
+) -> list[PIIAccuracyScenario]:
+    """Return invalid checksums, lengths, alphabets, and boundaries."""
+
+    texts = (
+        "bad checksum DE00370400440532013000",
+        "bad checksum GB00NWBK60161331926819",
+        "short DE8937040044053201300",
+        "long DE893704004405320130000",
+        "unknown US89370400440532013000",
+        "lowercase de89370400440532013000",
+        "mixed case De89370400440532013000",
+        "hyphens DE89-3704-0044-0532-0130-00",
+        "double spaces DE89  3704 0044 0532 0130 00",
+        "tabs DE89\t3704\t0044\t0532\t0130\t00",
+        "embedded prefixDE89370400440532013000",
+        "embedded DE89370400440532013000suffix",
+        "underscore DE89370400440532013000_suffix",
+        "punctuation DE89.3704.0044.0532.0130.00",
+        "slashes DE89/3704/0044/0532/0130/00",
+        "fullwidth ＤＥ８９３７０４００４４０５３２０１３０００",
+        "zero width DE89\u200b370400440532013000",
+        "letter check digits DEA9370400440532013000",
+        "digit country 1E89370400440532013000",
+        "space prefix D E89370400440532013000",
+        "ordinary account 370400440532013000",
+        "credit-card lookalike 4242424242424242",
+        "UUID 550e8400-e29b-41d4-a716-446655440000",
+        "hex digest DE89370400440532013000ABCDEF",
+        "template {{iban}}",
+        "template <bank-account>",
+        "documentation says IBAN without a value",
+        "country only DE",
+        "empty value IBAN=",
+        "spaces only DE89                    ",
+        "invalid print tail GB29 NWBK 6016 1331 9268 1X",
+        "newline DE89\n3704 0044 0532 0130 00",
+    )
+    if len(texts) != count:
+        raise ValueError("curated IBAN negative count does not match manifest")
+    return [
+        PIIAccuracyScenario(
+            scenario_id=f"curated-iban-negative-{index:04d}",
+            category="curated_iban_negative",
+            text=text,
+            expected=(),
+        )
+        for index, text in enumerate(texts)
+    ]
+
+
 def _curated_negative_scenarios(count: int) -> list[PIIAccuracyScenario]:
     """Return explicit realistic lookalikes that must remain unchanged."""
 
@@ -654,12 +751,14 @@ def build_corpus(
         *_email_scenarios(groups["email_positive"]),
         *_ip_scenarios(groups["ip_positive"]),
         *_mac_scenarios(groups["mac_positive"]),
+        *_iban_scenarios(groups["iban_positive"]),
         *_mixed_scenarios(groups["mixed_positive"]),
         *_negative_scenarios(groups["negative"]),
         *_curated_email_scenarios(groups["curated_email_positive"]),
         *_curated_ip_scenarios(groups["curated_ip_positive"]),
         *_curated_mac_scenarios(groups["curated_mac_positive"]),
         *_curated_mac_negative_scenarios(groups["curated_mac_negative"]),
+        *_curated_iban_negative_scenarios(groups["curated_iban_negative"]),
         *_curated_negative_scenarios(groups["curated_negative"]),
     ]
     seed = manifest["seed"]
@@ -710,6 +809,7 @@ def evaluate_corpus(
             EmailAddressRule(),
             IPAddressRule(),
             MACAddressRule(MACAddressConfig()),
+            IBANRule(IBANConfig()),
         )
     )
     expected_by_rule: Counter[str] = Counter()

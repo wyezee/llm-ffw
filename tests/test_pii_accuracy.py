@@ -16,12 +16,18 @@ from benchmarks.pii_accuracy import (
     evaluate_corpus,
     write_corpus,
 )
-from llm_ffw import EmailAddressRule, IPAddressRule, MACAddressRule, Scanner
+from llm_ffw import (
+    EmailAddressRule,
+    IBANRule,
+    IPAddressRule,
+    MACAddressRule,
+    Scanner,
+)
 from tools import pii_accuracy_gate
 
 
 EXPECTED_DIGEST = (
-    "bd97ac7e717b4fd3d7b70d3549419549727e71a38fd7774a2dd0590ca15797e1"
+    "33fd63fb34f40a60d81e3ddb619fa7acdd6c6ea8460e8206e39e506562eef4e3"
 )
 
 
@@ -32,7 +38,7 @@ class PIIAccuracyCorpusTests(unittest.TestCase):
 
         self.assertEqual(first, second)
         self.assertEqual(first.sha256, EXPECTED_DIGEST)
-        self.assertEqual(len(first.scenarios), 480)
+        self.assertEqual(len(first.scenarios), 601)
         self.assertFalse(first.uses_llm)
         self.assertFalse(first.uses_network)
         self.assertTrue(first.synthetic_examples_only)
@@ -84,6 +90,15 @@ class PIIAccuracyCorpusTests(unittest.TestCase):
                     self.assertEqual(len(octets), 6)
                     self.assertTrue(all(len(item) == 2 for item in octets))
                     self.assertEqual(int(octets[0], 16) & 2, 2)
+                elif finding.rule_id == IBANRule.RULE_ID:
+                    compact = value.replace(" ", "")
+                    converted = "".join(
+                        character
+                        if character.isdigit()
+                        else str(ord(character) - ord("A") + 10)
+                        for character in compact[4:] + compact[:4]
+                    )
+                    self.assertEqual(int(converted) % 97, 1)
                 else:
                     self.fail(f"unexpected rule_id: {finding.rule_id}")
 
@@ -106,7 +121,7 @@ class PIIAccuracyCorpusTests(unittest.TestCase):
                 manifest_path.read_text(encoding="utf-8")
             )
 
-        self.assertEqual(len(lines), 480)
+        self.assertEqual(len(lines), 601)
         self.assertEqual(generated_manifest["sha256"], EXPECTED_DIGEST)
         self.assertTrue(generated_manifest["synthetic_examples_only"])
         self.assertEqual(
@@ -114,11 +129,13 @@ class PIIAccuracyCorpusTests(unittest.TestCase):
             {
                 "curated_email_positive": 20,
                 "curated_ip_positive": 24,
+                "curated_iban_negative": 32,
                 "curated_mac_positive": 20,
                 "curated_mac_negative": 32,
                 "curated_negative": 64,
                 "email_positive": 64,
                 "ip_positive": 64,
+                "iban_positive": 89,
                 "mac_positive": 64,
                 "mixed_positive": 32,
                 "negative": 96,
@@ -169,10 +186,10 @@ class PIIAccuracyEvaluationTests(unittest.TestCase):
     def test_current_rules_pass_exact_accuracy_and_redaction(self) -> None:
         report = evaluate_corpus(build_corpus())
 
-        self.assertEqual(report.expected_findings, 320)
-        self.assertEqual(report.actual_findings, 320)
-        self.assertEqual(report.true_positives, 320)
-        self.assertEqual(report.true_negative_scenarios, 192)
+        self.assertEqual(report.expected_findings, 409)
+        self.assertEqual(report.actual_findings, 409)
+        self.assertEqual(report.true_positives, 409)
+        self.assertEqual(report.true_negative_scenarios, 224)
         self.assertEqual(report.false_positives, 0)
         self.assertEqual(report.false_negatives, 0)
         self.assertEqual(report.redaction_failures, 0)
@@ -191,6 +208,7 @@ class PIIAccuracyEvaluationTests(unittest.TestCase):
             },
             {
                 EmailAddressRule.RULE_ID: (116, 116, 0, 0),
+                IBANRule.RULE_ID: (89, 89, 0, 0),
                 IPAddressRule.RULE_ID: (120, 120, 0, 0),
                 MACAddressRule.RULE_ID: (84, 84, 0, 0),
             },
@@ -208,11 +226,13 @@ class PIIAccuracyEvaluationTests(unittest.TestCase):
             {
                 "curated_email_positive": (20, 0, 0, 0),
                 "curated_ip_positive": (24, 0, 0, 0),
+                "curated_iban_negative": (32, 0, 0, 0),
                 "curated_mac_positive": (20, 0, 0, 0),
                 "curated_mac_negative": (32, 0, 0, 0),
                 "curated_negative": (64, 0, 0, 0),
                 "email_positive": (64, 0, 0, 0),
                 "ip_positive": (64, 0, 0, 0),
+                "iban_positive": (89, 0, 0, 0),
                 "mac_positive": (64, 0, 0, 0),
                 "mixed_positive": (32, 0, 0, 0),
                 "negative": (96, 0, 0, 0),

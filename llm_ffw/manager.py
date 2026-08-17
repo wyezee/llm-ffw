@@ -11,6 +11,7 @@ from .facade import FirewallUnavailableError, LLMFirewall
 from .json_output import JSONOutputConfig
 from .ip_address import IPAddressConfig
 from .mac_address import MACAddressConfig
+from .iban import IBANConfig
 from .email_address import EmailAddressConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
@@ -67,6 +68,7 @@ class LLMFirewallManager:
         unsafe_url_config: UnsafeURLConfig | None = None,
         ip_address_config: IPAddressConfig | None = None,
         mac_address_config: MACAddressConfig | None = None,
+        iban_config: IBANConfig | None = None,
         email_address_config: EmailAddressConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
@@ -83,6 +85,7 @@ class LLMFirewallManager:
         self._unsafe_url_config = unsafe_url_config
         self._ip_address_config = ip_address_config
         self._mac_address_config = mac_address_config
+        self._iban_config = iban_config
         self._email_address_config = email_address_config
         self._payment_card_config = payment_card_config
         self._private_key_config = private_key_config
@@ -114,6 +117,7 @@ class LLMFirewallManager:
             unsafe_url_config=self._unsafe_url_config,
             ip_address_config=self._ip_address_config,
             mac_address_config=self._mac_address_config,
+            iban_config=self._iban_config,
             email_address_config=self._email_address_config,
             payment_card_config=self._payment_card_config,
             private_key_config=self._private_key_config,
