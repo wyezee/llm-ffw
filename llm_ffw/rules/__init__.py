@@ -13,6 +13,7 @@ from .email_address import EmailAddressRule
 from .payment_card import PaymentCardRule
 from .private_key import PrivateKeyRule
 from .jwt_token import JWTTokenRule
+from .repetition import RepetitionRule
 from .secrets import SecretsRule
 from .unsafe_url import UnsafeURLRule
 from .tool_call import ToolCallBlockedError, ToolCallRule
@@ -31,6 +32,7 @@ __all__ = [
     "PaymentCardRule",
     "PrivateKeyRule",
     "JWTTokenRule",
+    "RepetitionRule",
     "Rule",
     "RuleMatch",
     "StructuredRule",

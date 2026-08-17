@@ -6,6 +6,10 @@ All notable changes are recorded here before a tagged release.
 
 ### Added
 
+- Opt-in `RepetitionRule` for conservative exact non-whitespace character,
+  token, and non-empty line runs, with immutable thresholds, review-first
+  findings, bounded-memory fallbacks, facade/capability integration, and an
+  8 MB concurrent performance envelope.
 - Opt-in `AuthorizationHeaderRule` for exact line-oriented HTTP Basic and
   Bearer credentials, with bounded parsing, credential-only redaction,
   disclosure-safe findings, facade/policy/capability integration, and an 8 MB

@@ -269,6 +269,27 @@ class JWTTokenCapability:
 
 
 @dataclass(frozen=True, slots=True)
+class RepetitionCapability:
+    """Disclosure-safe thresholds pinned to excessive-repetition inspection."""
+
+    character_run_threshold: int
+    token_repeat_threshold: int
+    line_repeat_threshold: int
+    max_findings: int
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "character_run_threshold",
+            "token_repeat_threshold",
+            "line_repeat_threshold",
+            "max_findings",
+        ):
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{field_name} must be a positive integer")
+
+
+@dataclass(frozen=True, slots=True)
 class FirewallCapabilities:
     """Safe summary of the rules, catalog, and policy pinned to one facade."""
 
@@ -287,6 +308,7 @@ class FirewallCapabilities:
     payment_card: PaymentCardCapability | None = None
     private_key: PrivateKeyCapability | None = None
     jwt_token: JWTTokenCapability | None = None
+    repetition: RepetitionCapability | None = None
 
     def __post_init__(self) -> None:
         try:
@@ -360,6 +382,12 @@ class FirewallCapabilities:
             self.jwt_token, JWTTokenCapability
         ):
             raise TypeError("jwt_token must be a JWTTokenCapability or None")
+        if self.repetition is not None and not isinstance(
+            self.repetition, RepetitionCapability
+        ):
+            raise TypeError(
+                "repetition must be a RepetitionCapability or None"
+            )
         object.__setattr__(
             self,
             "rules",
@@ -384,6 +412,7 @@ __all__ = [
     "PrivateKeyCapability",
     "JWTTokenCapability",
     "RuleCapability",
+    "RepetitionCapability",
     "SecretCatalogCapability",
     "UnsafeURLCapability",
 ]

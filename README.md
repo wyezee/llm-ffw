@@ -316,12 +316,13 @@ rebuilding it per request.
 | `payment_card_config` | Customize enabled payment-card limits and scopes |
 | `private_key_config` | Customize enabled private-key limits and scopes |
 | `jwt_token_config` | Customize enabled JWT limits and scopes |
+| `repetition_config` | Enable conservative exact character, token, and line repetition inspection |
 | `policy` | Select balanced, strict, audit, or a versioned custom policy |
 | `request_timeout_seconds` | Per-request facade deadline; defaults to 5 seconds |
 
 The two secret-catalog parameters are mutually exclusive. Passing `None` for
 the opt-in banned-substring, JSON, unsafe-URL, IP-address, MAC-address, IBAN,
-Authorization-header, and email-address configurations leaves each corresponding
+Authorization-header, email-address, and repetition configurations leaves each corresponding
 rule disabled. Payment-card,
 private-key, JWT,
 invisible-character, and Unicode tag rules are enabled by `ScannerConfig`
@@ -398,6 +399,7 @@ Strict and audit policies can change the effective action.
 | `pii.iban` | Opt-in | Input by default | Redact | `IBANConfig` |
 | `secrets.authorization_header` | Opt-in | Input/output | Redact | `AuthorizationHeaderConfig` |
 | `pii.email_address` | Opt-in | Input by default | Redact | `EmailAddressConfig` |
+| `text.excessive_repetition` | Opt-in | Input/output | Review | `RepetitionConfig` |
 | `tools.call.validity` | Opt-in | Tool call | Block | `ToolDefinition`, `ToolCallConfig` |
 | `tools.result.validity` | Opt-in | Tool result | Block | `ToolResultConfig` |
 
@@ -724,6 +726,26 @@ label, domain, and total-length bounds, and redacts under balanced policy. It
 does not attempt RFC-complete quoted local parts, comments, address literals,
 Unicode mailbox syntax, DNS ownership checks, or obfuscation repair. These
 limits deliberately favor predictable high-precision privacy protection.
+
+### Opt-in excessive-repetition inspection
+
+Applications that want a deterministic signal for degenerate prompts or model
+outputs can enable exact repetition inspection:
+
+```python
+from llm_ffw import LLMFirewall, RepetitionConfig
+
+firewall = LLMFirewall(repetition_config=RepetitionConfig())
+```
+
+`RepetitionRule` reports non-whitespace character runs of 256 characters,
+identical whitespace-delimited tokens repeated 64 times, and identical non-empty
+lines repeated 32 times by default. It scans input and output, returns `REVIEW`,
+and never labels content as semantic "gibberish." Punctuation-only token runs,
+blank lines, tokens longer than 128 characters, and lines longer than 4,096
+characters are deliberately excluded to keep the signal conservative and memory
+bounded. Thresholds and the finding limit are immutable startup configuration;
+capabilities expose their effective values.
 
 ### Default payment-card inspection
 

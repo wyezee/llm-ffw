@@ -27,6 +27,7 @@ from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
 from .private_key import PrivateKeyConfig
 from .jwt_token import JWTTokenConfig
+from .repetition import RepetitionConfig
 from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult, PolicyOverride
 from .rules.secrets import SecretsRule
 from .rules.banned_substrings import BannedSubstringsRule
@@ -42,6 +43,7 @@ from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
 from .rules.private_key import PrivateKeyRule
 from .rules.jwt_token import JWTTokenRule
+from .rules.repetition import RepetitionRule
 from .secret_catalog import BUILTIN_SECRET_CATALOG, SecretCatalog
 
 
@@ -149,6 +151,7 @@ def _initialize_worker(
     payment_card_config: PaymentCardConfig | None,
     private_key_config: PrivateKeyConfig | None,
     jwt_token_config: JWTTokenConfig | None,
+    repetition_config: RepetitionConfig | None,
     policy_id: str,
     policy_version: str,
     policy_overrides: tuple[PolicyOverride, ...],
@@ -168,6 +171,7 @@ def _initialize_worker(
         and payment_card_config is None
         and private_key_config is None
         and jwt_token_config is None
+        and repetition_config is None
     ):
         _WORKER_SCANNER = Scanner(config=scanner_config)
     else:
@@ -198,6 +202,8 @@ def _initialize_worker(
             rules.append(PrivateKeyRule(private_key_config))
         if jwt_token_config is not None:
             rules.append(JWTTokenRule(jwt_token_config))
+        if repetition_config is not None:
+            rules.append(RepetitionRule(repetition_config))
         _WORKER_SCANNER = Scanner(
             rules=rules,
             config=scanner_config,
@@ -335,6 +341,7 @@ class ProcessScannerPool:
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
         jwt_token_config: JWTTokenConfig | None = None,
+        repetition_config: RepetitionConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
     ) -> None:
         if scanner_config is not None and not isinstance(scanner_config, ScannerConfig):
@@ -411,6 +418,12 @@ class ProcessScannerPool:
             jwt_token_config, JWTTokenConfig
         ):
             raise TypeError("jwt_token_config must be a JWTTokenConfig or None")
+        if repetition_config is not None and not isinstance(
+            repetition_config, RepetitionConfig
+        ):
+            raise TypeError(
+                "repetition_config must be a RepetitionConfig or None"
+            )
         if not isinstance(policy, FirewallPolicy):
             raise TypeError("policy must be a FirewallPolicy")
         resolved_scanner_config = scanner_config or ScannerConfig()
@@ -515,6 +528,11 @@ class ProcessScannerPool:
                         if resolved_jwt_token_config is not None
                         else ()
                     ),
+                    *(
+                        ("text.excessive_repetition",)
+                        if repetition_config is not None
+                        else ()
+                    ),
                 )
             ),
             supported_rule_ids=frozenset(
@@ -533,6 +551,7 @@ class ProcessScannerPool:
                     "pii.payment_card",
                     "secrets.private_key",
                     "secrets.jwt_token",
+                    "text.excessive_repetition",
                 )
             ),
         )
@@ -551,6 +570,7 @@ class ProcessScannerPool:
         self._payment_card_config = resolved_payment_card_config
         self._private_key_config = resolved_private_key_config
         self._jwt_token_config = resolved_jwt_token_config
+        self._repetition_config = repetition_config
         self._json_output_rule = (
             JSONOutputRule(json_output_config)
             if json_output_config is not None
@@ -630,6 +650,10 @@ class ProcessScannerPool:
     def jwt_token_config(self) -> JWTTokenConfig | None:
         return self._jwt_token_config
 
+    @property
+    def repetition_config(self) -> RepetitionConfig | None:
+        return self._repetition_config
+
     def start(self) -> "ProcessScannerPool":
         """Start workers and validate process execution before accepting traffic."""
 
@@ -660,6 +684,7 @@ class ProcessScannerPool:
                         self._payment_card_config,
                         self._private_key_config,
                         self._jwt_token_config,
+                        self._repetition_config,
                         self._policy.policy_id,
                         self._policy.version,
                         self._policy.overrides,

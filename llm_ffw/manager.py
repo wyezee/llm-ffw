@@ -18,6 +18,7 @@ from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
 from .private_key import PrivateKeyConfig
 from .jwt_token import JWTTokenConfig
+from .repetition import RepetitionConfig
 from .policy import BALANCED_POLICY, FirewallPolicy
 from .process_pool import ProcessScannerPoolConfig
 from .secret_catalog import BUILTIN_SECRET_CATALOG, SecretCatalog
@@ -75,6 +76,7 @@ class LLMFirewallManager:
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
         jwt_token_config: JWTTokenConfig | None = None,
+        repetition_config: RepetitionConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
         request_timeout_seconds: float = 5.0,
     ) -> None:
@@ -93,6 +95,7 @@ class LLMFirewallManager:
         self._payment_card_config = payment_card_config
         self._private_key_config = private_key_config
         self._jwt_token_config = jwt_token_config
+        self._repetition_config = repetition_config
         initial = self._build_firewall(
             additional_secret_catalog=additional_secret_catalog,
             replacement_secret_catalog=replacement_secret_catalog,
@@ -126,6 +129,7 @@ class LLMFirewallManager:
             payment_card_config=self._payment_card_config,
             private_key_config=self._private_key_config,
             jwt_token_config=self._jwt_token_config,
+            repetition_config=self._repetition_config,
             policy=self._policy,
             request_timeout_seconds=self._request_timeout_seconds,
         )

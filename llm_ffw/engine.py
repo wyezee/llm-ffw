@@ -21,6 +21,7 @@ from .rules.private_key import PrivateKeyRule
 from .rules.jwt_token import JWTTokenRule
 from .rules.secrets import SecretsRule
 from .rules.unsafe_url import UnsafeURLRule
+from .rules.repetition import RepetitionRule
 
 
 class Scanner:
@@ -112,6 +113,7 @@ class Scanner:
             SecretsRule,
             UnicodeTagSmugglingRule,
             UnsafeURLRule,
+            RepetitionRule,
         )
         self._supports_staged_canonicalization = all(
             type(rule) in staged_safe_types for rule in self._rules

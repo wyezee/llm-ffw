@@ -22,6 +22,7 @@ from .authorization_header import AuthorizationHeaderConfig
 from .email_address import EmailAddressConfig
 from .json_output import JSONOutputConfig
 from .jwt_token import JWTTokenConfig
+from .repetition import RepetitionConfig
 from .manager import (
     FirewallManagerState,
     LLMFirewallManager,
@@ -182,6 +183,7 @@ class AsyncLLMFirewall:
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
         jwt_token_config: JWTTokenConfig | None = None,
+        repetition_config: RepetitionConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
         request_timeout_seconds: float = 5.0,
     ) -> None:
@@ -206,6 +208,7 @@ class AsyncLLMFirewall:
             payment_card_config=payment_card_config,
             private_key_config=private_key_config,
             jwt_token_config=jwt_token_config,
+            repetition_config=repetition_config,
             policy=policy,
             request_timeout_seconds=request_timeout_seconds,
         )
@@ -358,6 +361,7 @@ class AsyncLLMFirewallManager:
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
         jwt_token_config: JWTTokenConfig | None = None,
+        repetition_config: RepetitionConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
         request_timeout_seconds: float = 5.0,
     ) -> None:
@@ -382,6 +386,7 @@ class AsyncLLMFirewallManager:
             payment_card_config=payment_card_config,
             private_key_config=private_key_config,
             jwt_token_config=jwt_token_config,
+            repetition_config=repetition_config,
             policy=policy,
             request_timeout_seconds=request_timeout_seconds,
         )

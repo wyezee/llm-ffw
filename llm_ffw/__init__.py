@@ -15,6 +15,7 @@ from .capabilities import (
     PaymentCardCapability,
     PrivateKeyCapability,
     JWTTokenCapability,
+    RepetitionCapability,
 )
 from .banned_substring_catalog import (
     BannedSubstring,
@@ -46,6 +47,7 @@ from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
 from .private_key import PrivateKeyConfig
 from .jwt_token import JWTTokenConfig
+from .repetition import RepetitionConfig
 from .manager import (
     FirewallManagerState,
     FirewallReloadError,
@@ -97,6 +99,7 @@ from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
 from .rules.private_key import PrivateKeyRule
 from .rules.jwt_token import JWTTokenRule
+from .rules.repetition import RepetitionRule
 from .rules.tool_call import ToolCallBlockedError, ToolCallRule
 from .rules.tool_result import ToolResultBlockedError, ToolResultRule
 
@@ -162,6 +165,9 @@ __all__ = [
     "JWTTokenCapability",
     "JWTTokenConfig",
     "JWTTokenRule",
+    "RepetitionConfig",
+    "RepetitionCapability",
+    "RepetitionRule",
     "Scanner",
     "ScannerConfig",
     "ScanScope",

@@ -21,6 +21,7 @@ from .capabilities import (
     PaymentCardCapability,
     PrivateKeyCapability,
     JWTTokenCapability,
+    RepetitionCapability,
 )
 from .banned_substring_catalog import BannedSubstringCatalog
 from .config import ScannerConfig
@@ -40,6 +41,7 @@ from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
 from .private_key import PrivateKeyConfig
 from .jwt_token import JWTTokenConfig
+from .repetition import RepetitionConfig
 from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult
 from .process_pool import (
     ProcessPoolNotRunningError,
@@ -62,6 +64,7 @@ from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
 from .rules.private_key import PrivateKeyRule
 from .rules.jwt_token import JWTTokenRule
+from .rules.repetition import RepetitionRule
 from .secret_catalog import (
     BUILTIN_SECRET_CATALOG,
     SecretCatalog,
@@ -146,6 +149,7 @@ class LLMFirewall:
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
         jwt_token_config: JWTTokenConfig | None = None,
+        repetition_config: RepetitionConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
         request_timeout_seconds: float = 5.0,
     ) -> None:
@@ -174,6 +178,7 @@ class LLMFirewall:
             payment_card_config=payment_card_config,
             private_key_config=private_key_config,
             jwt_token_config=jwt_token_config,
+            repetition_config=repetition_config,
             policy=policy,
         )
         catalog = self._pool.secret_catalog
@@ -287,6 +292,14 @@ class LLMFirewall:
                     rule_id=JWTTokenRule.RULE_ID,
                     purpose=JWTTokenRule.PURPOSE,
                     scopes=tuple(self._pool.jwt_token_config.scopes),
+                )
+            )
+        if self._pool.repetition_config is not None:
+            rule_capabilities.append(
+                RuleCapability(
+                    rule_id=RepetitionRule.RULE_ID,
+                    purpose=RepetitionRule.PURPOSE,
+                    scopes=tuple(self._pool.repetition_config.scopes),
                 )
             )
         self._capabilities = FirewallCapabilities(
@@ -423,6 +436,22 @@ class LLMFirewall:
                     ),
                 )
                 if self._pool.jwt_token_config is not None
+                else None
+            ),
+            repetition=(
+                RepetitionCapability(
+                    character_run_threshold=(
+                        self._pool.repetition_config.character_run_threshold
+                    ),
+                    token_repeat_threshold=(
+                        self._pool.repetition_config.token_repeat_threshold
+                    ),
+                    line_repeat_threshold=(
+                        self._pool.repetition_config.line_repeat_threshold
+                    ),
+                    max_findings=self._pool.repetition_config.max_findings,
+                )
+                if self._pool.repetition_config is not None
                 else None
             ),
         )
