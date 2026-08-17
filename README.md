@@ -743,11 +743,12 @@ expected spans and a digest, not corpus values. Benchmarks report only duration,
 throughput, and finding counts; they never print scanned content. A release is
 not approved until the exact candidate commit passes both Windows and Linux CI.
 
-The PII accuracy gate deterministically evaluates 256 labeled email-address and
-IP-address scenarios. It requires exact rule ownership, character spans,
-redaction output, precision, and recall. Every value uses reserved example
-domains or documentation IP ranges; corpus creation makes no LLM or network
-calls. The optional expanded JSONL corpus is written under the ignored
+The PII accuracy gate deterministically evaluates 364 generated and curated
+email-address and IP-address scenarios. It requires exact rule ownership,
+character spans, redaction output, precision, and recall, with per-category
+confusion counts. Values use reserved example domains and documentation or
+special-purpose IP ranges; corpus creation makes no LLM or network calls. The
+optional expanded JSONL corpus is written under the ignored
 `benchmarks/generated/` directory, while the compact seed, group counts, and
 expected digest remain version controlled.
 

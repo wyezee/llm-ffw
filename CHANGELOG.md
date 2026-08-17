@@ -6,9 +6,15 @@ All notable changes are recorded here before a tagged release.
 
 ### Added
 
-- Deterministic 256-scenario PII accuracy and exact-redaction gate for the
-  opt-in email-address and IP-address rules, using only reserved synthetic
+- Deterministic 364-scenario PII accuracy and exact-redaction gate for the
+  opt-in email-address and IP-address rules, combining generated coverage with
+  curated syntax boundaries and realistic near misses, using only synthetic
   examples and no LLM or network calls.
+
+### Fixed
+
+- Detect canonical IPv4 and IPv6 addresses followed by a sentence period while
+  continuing to reject dotted identifier suffixes.
 
 ## 0.5.0 - 2026-08-17
 

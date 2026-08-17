@@ -21,7 +21,7 @@ from tools import pii_accuracy_gate
 
 
 EXPECTED_DIGEST = (
-    "f6d966c1d352b5d6c4526361ad3cdb30496cfc569a11d41b64c11bd0b7015626"
+    "315c53c4730ea81c391fcf9995503d5538da8337fa2f1cb85b7f859171da31d7"
 )
 
 
@@ -32,17 +32,27 @@ class PIIAccuracyCorpusTests(unittest.TestCase):
 
         self.assertEqual(first, second)
         self.assertEqual(first.sha256, EXPECTED_DIGEST)
-        self.assertEqual(len(first.scenarios), 256)
+        self.assertEqual(len(first.scenarios), 364)
         self.assertFalse(first.uses_llm)
         self.assertFalse(first.uses_network)
-        self.assertTrue(first.reserved_examples_only)
+        self.assertTrue(first.synthetic_examples_only)
 
-    def test_positive_values_use_only_reserved_examples(self) -> None:
-        documentation_networks = (
+    def test_positive_values_use_only_synthetic_examples(self) -> None:
+        synthetic_networks = (
             ipaddress.ip_network("192.0.2.0/24"),
             ipaddress.ip_network("198.51.100.0/24"),
             ipaddress.ip_network("203.0.113.0/24"),
             ipaddress.ip_network("2001:db8::/32"),
+            ipaddress.ip_network("0.0.0.0/32"),
+            ipaddress.ip_network("10.0.0.0/8"),
+            ipaddress.ip_network("127.0.0.0/8"),
+            ipaddress.ip_network("169.254.0.0/16"),
+            ipaddress.ip_network("172.16.0.0/12"),
+            ipaddress.ip_network("192.168.0.0/16"),
+            ipaddress.ip_network("255.255.255.255/32"),
+            ipaddress.ip_network("::/128"),
+            ipaddress.ip_network("::1/128"),
+            ipaddress.ip_network("fe80::/10"),
         )
 
         for scenario in build_corpus().scenarios:
@@ -50,21 +60,24 @@ class PIIAccuracyCorpusTests(unittest.TestCase):
                 value = scenario.text[finding.start : finding.end]
                 if finding.rule_id == EmailAddressRule.RULE_ID:
                     domain = value.rsplit("@", 1)[1].lower()
+                    reserved_domains = {
+                        "example.com",
+                        "example.org",
+                        "example.net",
+                        "example.test",
+                        "example.invalid",
+                    }
                     self.assertTrue(
-                        domain == "example.com"
+                        domain in reserved_domains
                         or domain.endswith(
-                            (
-                                ".example.org",
-                                ".example.net",
-                                ".example.test",
-                                ".example.invalid",
-                            )
+                            tuple(f".{item}" for item in reserved_domains)
+                            + (".example",)
                         )
                     )
                 elif finding.rule_id == IPAddressRule.RULE_ID:
                     address = ipaddress.ip_address(value)
                     self.assertTrue(
-                        any(address in network for network in documentation_networks)
+                        any(address in network for network in synthetic_networks)
                     )
                 else:
                     self.fail(f"unexpected rule_id: {finding.rule_id}")
@@ -88,8 +101,21 @@ class PIIAccuracyCorpusTests(unittest.TestCase):
                 manifest_path.read_text(encoding="utf-8")
             )
 
-        self.assertEqual(len(lines), 256)
+        self.assertEqual(len(lines), 364)
         self.assertEqual(generated_manifest["sha256"], EXPECTED_DIGEST)
+        self.assertTrue(generated_manifest["synthetic_examples_only"])
+        self.assertEqual(
+            generated_manifest["category_counts"],
+            {
+                "curated_email_positive": 20,
+                "curated_ip_positive": 24,
+                "curated_negative": 64,
+                "email_positive": 64,
+                "ip_positive": 64,
+                "mixed_positive": 32,
+                "negative": 96,
+            },
+        )
         self.assertNotIn("text", generated_manifest)
         self.assertNotIn("expected", generated_manifest)
         self.assertNotIn("example.com", json.dumps(generated_manifest))
@@ -135,10 +161,10 @@ class PIIAccuracyEvaluationTests(unittest.TestCase):
     def test_current_rules_pass_exact_accuracy_and_redaction(self) -> None:
         report = evaluate_corpus(build_corpus())
 
-        self.assertEqual(report.expected_findings, 192)
-        self.assertEqual(report.actual_findings, 192)
-        self.assertEqual(report.true_positives, 192)
-        self.assertEqual(report.true_negative_scenarios, 96)
+        self.assertEqual(report.expected_findings, 236)
+        self.assertEqual(report.actual_findings, 236)
+        self.assertEqual(report.true_positives, 236)
+        self.assertEqual(report.true_negative_scenarios, 160)
         self.assertEqual(report.false_positives, 0)
         self.assertEqual(report.false_negatives, 0)
         self.assertEqual(report.redaction_failures, 0)
@@ -156,8 +182,28 @@ class PIIAccuracyEvaluationTests(unittest.TestCase):
                 for item in report.rules
             },
             {
-                EmailAddressRule.RULE_ID: (96, 96, 0, 0),
-                IPAddressRule.RULE_ID: (96, 96, 0, 0),
+                EmailAddressRule.RULE_ID: (116, 116, 0, 0),
+                IPAddressRule.RULE_ID: (120, 120, 0, 0),
+            },
+        )
+        self.assertEqual(
+            {
+                item.category: (
+                    item.scenario_count,
+                    item.false_positives,
+                    item.false_negatives,
+                    item.redaction_failures,
+                )
+                for item in report.categories
+            },
+            {
+                "curated_email_positive": (20, 0, 0, 0),
+                "curated_ip_positive": (24, 0, 0, 0),
+                "curated_negative": (64, 0, 0, 0),
+                "email_positive": (64, 0, 0, 0),
+                "ip_positive": (64, 0, 0, 0),
+                "mixed_positive": (32, 0, 0, 0),
+                "negative": (96, 0, 0, 0),
             },
         )
 
@@ -237,6 +283,7 @@ class PIIAccuracyGateTests(unittest.TestCase):
         rendered = output.getvalue()
         self.assertIn("pii_accuracy_gate=passed", rendered)
         self.assertIn(f"corpus_sha256={EXPECTED_DIGEST}", rendered)
+        self.assertIn("category_curated_negative_scenarios=64", rendered)
         self.assertNotIn("synthetic@example.com", rendered)
         self.assertNotIn("2001:db8", rendered)
 
@@ -255,7 +302,7 @@ def _corpus(scenario: PIIAccuracyScenario) -> PIIAccuracyCorpus:
         seed=0,
         uses_llm=False,
         uses_network=False,
-        reserved_examples_only=True,
+        synthetic_examples_only=True,
         scenarios=(scenario,),
     )
 

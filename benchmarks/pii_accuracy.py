@@ -48,7 +48,7 @@ class PIIAccuracyCorpus:
     seed: int
     uses_llm: bool
     uses_network: bool
-    reserved_examples_only: bool
+    synthetic_examples_only: bool
     scenarios: tuple[PIIAccuracyScenario, ...]
 
     @property
@@ -91,6 +91,21 @@ class RuleAccuracy:
 
 
 @dataclass(frozen=True, slots=True)
+class CategoryAccuracy:
+    """Disclosure-safe confusion counts for one scenario category."""
+
+    category: str
+    scenario_count: int
+    expected_findings: int
+    actual_findings: int
+    true_positives: int
+    true_negative_scenarios: int
+    false_positives: int
+    false_negatives: int
+    redaction_failures: int
+
+
+@dataclass(frozen=True, slots=True)
 class PIIAccuracyReport:
     """Aggregate evidence without retaining scenario text."""
 
@@ -105,6 +120,7 @@ class PIIAccuracyReport:
     false_negatives: int
     redaction_failures: int
     rules: tuple[RuleAccuracy, ...]
+    categories: tuple[CategoryAccuracy, ...]
 
     @property
     def precision(self) -> float:
@@ -135,13 +151,13 @@ def _load_manifest(path: Path) -> dict[str, object]:
         "seed",
         "uses_llm",
         "uses_network",
-        "reserved_examples_only",
+        "synthetic_examples_only",
         "groups",
         "expected_sha256",
     }
     if set(manifest) != expected_keys:
         raise ValueError("PII accuracy manifest fields are invalid")
-    if manifest["schema_version"] != 1:
+    if manifest["schema_version"] != 2:
         raise ValueError("unsupported PII accuracy manifest schema")
     if not isinstance(manifest["dataset_id"], str):
         raise TypeError("dataset_id must be a string")
@@ -152,7 +168,7 @@ def _load_manifest(path: Path) -> dict[str, object]:
     for field_name in (
         "uses_llm",
         "uses_network",
-        "reserved_examples_only",
+        "synthetic_examples_only",
     ):
         if not isinstance(manifest[field_name], bool):
             raise TypeError(f"{field_name} must be a boolean")
@@ -162,6 +178,9 @@ def _load_manifest(path: Path) -> dict[str, object]:
         "ip_positive",
         "mixed_positive",
         "negative",
+        "curated_email_positive",
+        "curated_ip_positive",
+        "curated_negative",
     }
     if not isinstance(groups, dict) or set(groups) != expected_groups:
         raise ValueError("PII accuracy groups are invalid")
@@ -306,6 +325,186 @@ def _negative_scenarios(count: int) -> list[PIIAccuracyScenario]:
     return scenarios
 
 
+def _curated_positive_scenario(
+    scenario_id: str,
+    category: str,
+    rule_id: str,
+    value: str,
+    template: str,
+) -> PIIAccuracyScenario:
+    text = template.format(value=value)
+    return PIIAccuracyScenario(
+        scenario_id=scenario_id,
+        category=category,
+        text=text,
+        expected=(_finding(rule_id, text, value),),
+    )
+
+
+def _curated_email_scenarios(count: int) -> list[PIIAccuracyScenario]:
+    """Return explicit syntax boundaries in reserved DNS namespaces."""
+
+    cases = (
+        ("user@example.com", "Contact ({value}), please."),
+        ("USER@EXAMPLE.COM", "Uppercase <{value}>."),
+        ("first.last@example.org", "owner={value};status=active"),
+        ("team+alerts@example.net", "mailto:{value}?subject=synthetic"),
+        ("account_name@example.test", 'record={{"email":"{value}"}}'),
+        ("percent%tag@example.invalid", "recipient [{value}]"),
+        ("a@example.com", "minimal local part: {value}"),
+        ("customer@sub.example.org", "nested domain {value}."),
+        ("user@xn--bcher-kva.example", "punycode {value}"),
+        ("ops@deep.sub.example.com", "path/{value}?source=test"),
+        ("tag+one@service.example.net", "before\t{value}\tafter"),
+        ("under_score@example.com", "CSV,{value},synthetic"),
+        ("dash-tag@example.com", "Markdown **{value}**"),
+        ("plus+two@example.org", "query owner={value}&ok=1"),
+        ("mixed.Case+tag@example.test", "value='{value}'"),
+        ("x%y@example.invalid", "percent local {value}"),
+        ("a" * 64 + "@example.com", "max local <{value}>"),
+        ("a@" + "b" * 63 + ".example", "max label <{value}>"),
+        ("edge@example.com", "sentence starts {value}."),
+        ("final@example.org", "{value}"),
+    )
+    if len(cases) != count:
+        raise ValueError("curated email count does not match manifest")
+    return [
+        _curated_positive_scenario(
+            f"curated-email-positive-{index:04d}",
+            "curated_email_positive",
+            EmailAddressRule.RULE_ID,
+            value,
+            template,
+        )
+        for index, (value, template) in enumerate(cases)
+    ]
+
+
+def _curated_ip_scenarios(count: int) -> list[PIIAccuracyScenario]:
+    """Return explicit canonical forms in non-user-assigned address space."""
+
+    cases = (
+        ("192.0.2.0", "network edge ({value})"),
+        ("192.0.2.255", "broadcast-shaped {value}."),
+        ("198.51.100.1", "host={value}:443"),
+        ("203.0.113.254", "CIDR {value}/24"),
+        ("192.0.2.42", 'record={{"ip":"{value}"}}'),
+        ("198.51.100.200", "route from {value}, then continue"),
+        ("0.0.0.0", "unspecified {value}"),
+        ("127.0.0.1", "loopback {value}:8080"),
+        ("10.0.0.1", "private endpoint {value}"),
+        ("172.16.0.1", "private endpoint [{value}]"),
+        ("192.168.255.255", "private boundary {value}"),
+        ("169.254.1.1", "link-local {value}"),
+        ("255.255.255.255", "limited broadcast {value}"),
+        ("2001:db8::", "IPv6 [{value}]"),
+        ("2001:db8::1", "endpoint=[{value}]:443"),
+        ("2001:db8:0:1:1:1:1:1", "expanded {value}."),
+        ("2001:db8:ffff:ffff:ffff:ffff:ffff:ffff", "boundary {value}"),
+        ("2001:db8::192.0.2.128", "mapped syntax [{value}]"),
+        ("2001:0db8:0000:0000:0000:0000:0000:0001", "full {value}"),
+        ("::", "unspecified IPv6 [{value}]"),
+        ("::1", "loopback IPv6 [{value}]"),
+        ("fe80::1", "link-local IPv6 [{value}]"),
+        ("2001:db8:abcd::1234", "CSV,{value},synthetic"),
+        ("203.0.113.7", "{value}"),
+    )
+    if len(cases) != count:
+        raise ValueError("curated IP count does not match manifest")
+    return [
+        _curated_positive_scenario(
+            f"curated-ip-positive-{index:04d}",
+            "curated_ip_positive",
+            IPAddressRule.RULE_ID,
+            value,
+            template,
+        )
+        for index, (value, template) in enumerate(cases)
+    ]
+
+
+def _curated_negative_scenarios(count: int) -> list[PIIAccuracyScenario]:
+    """Return explicit realistic lookalikes that must remain unchanged."""
+
+    texts = (
+        "mailbox alice@example",
+        "mailbox alice@localhost",
+        "mailbox .alice@example.com",
+        "mailbox alice.@example.com",
+        "mailbox alice..smith@example.com",
+        "mailbox alice@example..com",
+        "mailbox alice@-example.com",
+        "mailbox alice@example-.com",
+        "mailbox alice@example.c",
+        "mailbox alice@example.123",
+        "mailbox alice@exam_ple.com",
+        "mailbox a@b.com@c.com",
+        "mailbox éAlice@example.com",
+        "mailbox alice@example.comé",
+        "mailbox alice@example.com_suffix",
+        'mailbox "alice smith"@example.com',
+        "mailbox alice@[999.0.2.1]",
+        "mailbox alice＠example.com",
+        "mailbox alice@exаmple.com",
+        "mailbox alice@\u200bexample.com",
+        "mailbox user_at_example_dot_com",
+        "mailbox @example.com",
+        "mailbox alice@.example.com",
+        "mailbox alice@example.com-embedded",
+        "invalid IPv4 999.1.1.1",
+        "invalid IPv4 192.168.1.999",
+        "noncanonical IPv4 01.2.3.4",
+        "short IPv4 1.2.3",
+        "long IPv4 1.2.3.4.5",
+        "embedded host192.168.1.1",
+        "embedded 192.168.1.1host",
+        "hyphenated host-192.168.1.1",
+        "hyphenated 192.168.1.1-host",
+        "invalid IPv4 256.256.256.256",
+        "invalid IPv4 192.0.2.-1",
+        "spaced IPv4 192 . 0 . 2 . 1",
+        "comma IPv4 192,0,2,1",
+        "release 1.2.3-beta",
+        "release 2026.08.17",
+        "decimal 1234.5678",
+        "clock 12:34:56",
+        "MAC aa:bb:cc:dd:ee:ff",
+        "UUID 550e8400-e29b-41d4-a716-446655440000",
+        "invalid IPv6 2001:db8:::1",
+        "short IPv6 2001:db8:1",
+        "invalid IPv6 2001:db8::gggg",
+        "zone IPv6 fe80:::1%eth0",
+        "embedded host2001:db8::1",
+        "embedded 2001:db8::1host",
+        "too many groups 2001:db8:1:2:3:4:5:6:7",
+        "multiple compression 2001:db8::1::2",
+        "trailing colon 2001:db8:0:1:1:1:1:1:",
+        "leading colon :::2001:db8:0:1:1:1:1:1",
+        "IPv4 suffix 192.0.2.1.example",
+        "IPv4 prefix build-192.0.2.1",
+        "fullwidth digits １９２.０.２.１",
+        "Arabic digits ١٩٢.٠.٢.١",
+        "documentation says email address without a value",
+        "documentation says IPv4 and IPv6 without values",
+        "template {{user}}@{{domain}}",
+        "template $email_address",
+        "template <ip-address>",
+        "empty brackets [] and empty mailbox <>",
+        "ordinary prose with no identifiers",
+    )
+    if len(texts) != count:
+        raise ValueError("curated negative count does not match manifest")
+    return [
+        PIIAccuracyScenario(
+            scenario_id=f"curated-negative-{index:04d}",
+            category="curated_negative",
+            text=text,
+            expected=(),
+        )
+        for index, text in enumerate(texts)
+    ]
+
+
 def build_corpus(
     manifest_path: Path = _MANIFEST_PATH,
 ) -> PIIAccuracyCorpus:
@@ -322,6 +521,9 @@ def build_corpus(
         *_ip_scenarios(groups["ip_positive"]),
         *_mixed_scenarios(groups["mixed_positive"]),
         *_negative_scenarios(groups["negative"]),
+        *_curated_email_scenarios(groups["curated_email_positive"]),
+        *_curated_ip_scenarios(groups["curated_ip_positive"]),
+        *_curated_negative_scenarios(groups["curated_negative"]),
     ]
     seed = manifest["seed"]
     if not isinstance(seed, int):
@@ -332,7 +534,7 @@ def build_corpus(
         seed=seed,
         uses_llm=bool(manifest["uses_llm"]),
         uses_network=bool(manifest["uses_network"]),
-        reserved_examples_only=bool(manifest["reserved_examples_only"]),
+        synthetic_examples_only=bool(manifest["synthetic_examples_only"]),
         scenarios=tuple(scenarios),
     )
     expected_sha256 = manifest["expected_sha256"]
@@ -374,6 +576,14 @@ def evaluate_corpus(
     true_by_rule: Counter[str] = Counter()
     false_positive_by_rule: Counter[str] = Counter()
     false_negative_by_rule: Counter[str] = Counter()
+    scenario_by_category: Counter[str] = Counter()
+    expected_by_category: Counter[str] = Counter()
+    actual_by_category: Counter[str] = Counter()
+    true_by_category: Counter[str] = Counter()
+    true_negative_by_category: Counter[str] = Counter()
+    false_positive_by_category: Counter[str] = Counter()
+    false_negative_by_category: Counter[str] = Counter()
+    redaction_failure_by_category: Counter[str] = Counter()
     true_positives = 0
     false_positives = 0
     false_negatives = 0
@@ -405,12 +615,21 @@ def evaluate_corpus(
         true_by_rule.update(item[0] for item in shared)
         false_positive_by_rule.update(item[0] for item in unexpected)
         false_negative_by_rule.update(item[0] for item in missing)
+        scenario_by_category[scenario.category] += 1
+        expected_by_category[scenario.category] += len(expected)
+        actual_by_category[scenario.category] += len(actual)
+        true_by_category[scenario.category] += len(shared)
+        false_positive_by_category[scenario.category] += len(unexpected)
+        false_negative_by_category[scenario.category] += len(missing)
         if not expected and not actual:
             true_negative_scenarios += 1
-        if active_scanner.redact(scenario.text, findings) != _expected_redaction(
-            scenario
-        ):
+            true_negative_by_category[scenario.category] += 1
+        redaction_failed = active_scanner.redact(
+            scenario.text, findings
+        ) != _expected_redaction(scenario)
+        if redaction_failed:
             redaction_failures += 1
+            redaction_failure_by_category[scenario.category] += 1
     discovered_rule_ids = set(expected_by_rule) | set(actual_by_rule)
     rules = tuple(
         RuleAccuracy(
@@ -421,6 +640,20 @@ def evaluate_corpus(
             false_negatives=false_negative_by_rule[rule_id],
         )
         for rule_id in sorted(discovered_rule_ids)
+    )
+    categories = tuple(
+        CategoryAccuracy(
+            category=category,
+            scenario_count=scenario_by_category[category],
+            expected_findings=expected_by_category[category],
+            actual_findings=actual_by_category[category],
+            true_positives=true_by_category[category],
+            true_negative_scenarios=true_negative_by_category[category],
+            false_positives=false_positive_by_category[category],
+            false_negatives=false_negative_by_category[category],
+            redaction_failures=redaction_failure_by_category[category],
+        )
+        for category in sorted(scenario_by_category)
     )
     return PIIAccuracyReport(
         dataset_id=corpus.dataset_id,
@@ -434,6 +667,7 @@ def evaluate_corpus(
         false_negatives=false_negatives,
         redaction_failures=redaction_failures,
         rules=rules,
+        categories=categories,
     )
 
 
@@ -481,10 +715,17 @@ def write_corpus(
                 "expected_finding_count": sum(
                     len(item.expected) for item in corpus.scenarios
                 ),
+                "category_counts": dict(
+                    sorted(
+                        Counter(
+                            item.category for item in corpus.scenarios
+                        ).items()
+                    )
+                ),
                 "sha256": corpus.sha256,
                 "uses_llm": corpus.uses_llm,
                 "uses_network": corpus.uses_network,
-                "reserved_examples_only": corpus.reserved_examples_only,
+                "synthetic_examples_only": corpus.synthetic_examples_only,
             },
             indent=2,
             sort_keys=True,
@@ -497,6 +738,7 @@ def write_corpus(
 
 __all__ = [
     "ExpectedPIIFinding",
+    "CategoryAccuracy",
     "PIIAccuracyCorpus",
     "PIIAccuracyReport",
     "PIIAccuracyScenario",

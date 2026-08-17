@@ -14,6 +14,17 @@ from benchmarks.pii_accuracy import (
 )
 
 
+_EXPECTED_CATEGORIES = {
+    "curated_email_positive",
+    "curated_ip_positive",
+    "curated_negative",
+    "email_positive",
+    "ip_positive",
+    "mixed_positive",
+    "negative",
+}
+
+
 def _rate(value: object, name: str) -> float:
     if (
         isinstance(value, bool)
@@ -46,8 +57,8 @@ def run_gate(
     corpus = build_corpus()
     if corpus.uses_llm or corpus.uses_network:
         raise AssertionError("PII corpus provenance gate failed")
-    if not corpus.reserved_examples_only:
-        raise AssertionError("PII corpus must use reserved examples only")
+    if not corpus.synthetic_examples_only:
+        raise AssertionError("PII corpus must use synthetic examples only")
     report = evaluate_corpus(corpus)
     if set(item.rule_id for item in report.rules) != {
         "pii.email_address",
@@ -56,6 +67,10 @@ def run_gate(
         raise AssertionError("PII accuracy gate rule coverage is incomplete")
     if any(item.expected_findings <= 0 for item in report.rules):
         raise AssertionError("PII accuracy gate has an untested rule")
+    if {item.category for item in report.categories} != _EXPECTED_CATEGORIES:
+        raise AssertionError("PII accuracy gate category coverage is incomplete")
+    if any(item.scenario_count <= 0 for item in report.categories):
+        raise AssertionError("PII accuracy gate has an empty category")
     if report.precision < precision_threshold:
         raise AssertionError("PII accuracy precision threshold failed")
     if report.recall < recall_threshold:
@@ -103,6 +118,12 @@ def main() -> None:
         print(f"{prefix}_true_positives={rule.true_positives}")
         print(f"{prefix}_false_positives={rule.false_positives}")
         print(f"{prefix}_false_negatives={rule.false_negatives}")
+    for category in report.categories:
+        prefix = f"category_{category.category}"
+        print(f"{prefix}_scenarios={category.scenario_count}")
+        print(f"{prefix}_false_positives={category.false_positives}")
+        print(f"{prefix}_false_negatives={category.false_negatives}")
+        print(f"{prefix}_redaction_failures={category.redaction_failures}")
     print("uses_llm=false")
     print("uses_network=false")
     print("pii_accuracy_gate=passed")

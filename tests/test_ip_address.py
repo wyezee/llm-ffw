@@ -115,6 +115,23 @@ class IPAddressRuleTests(unittest.TestCase):
                 )
                 self.assertEqual(finding.metadata["ip_version"], "6")
 
+    def test_trims_sentence_period_without_matching_dotted_suffixes(self) -> None:
+        scanner = _scanner()
+        for address in ("192.0.2.255", "2001:db8:0:1:1:1:1:1"):
+            with self.subTest(address=address):
+                text = f"Endpoint {address}. Continue."
+                finding = scanner.scan(text, scope=ScanScope.INPUT)[0]
+                self.assertEqual(
+                    text[finding.span.start : finding.span.end],
+                    address,
+                )
+        for text in (
+            "host 192.0.2.1.example",
+            "host 2001:db8:0:1:1:1:1:1.example",
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(scanner.scan(text, scope=ScanScope.INPUT), ())
+
     def test_rejects_noncanonical_invalid_and_embedded_lookalikes(self) -> None:
         cases = (
             "999.1.1.1",

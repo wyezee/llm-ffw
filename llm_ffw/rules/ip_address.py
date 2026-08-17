@@ -17,7 +17,7 @@ from .base import Rule, RuleMatch
 _IPV4_CANDIDATE = re.compile(
     r"(?<![A-Za-z0-9_.-])"
     r"(?P<address>[0-9]{1,3}(?:\.[0-9]{1,3}){3})"
-    r"(?![A-Za-z0-9_.-])",
+    r"(?![A-Za-z0-9_-]|\.[A-Za-z0-9_-])",
     re.ASCII,
 )
 _IPV6_TOKEN_CHARS = frozenset("0123456789abcdefABCDEF:.")
@@ -37,6 +37,18 @@ def _is_ascii_identifier(character: str) -> bool:
         or "A" <= character <= "Z"
         or "a" <= character <= "z"
         or character in "_.-"
+    )
+
+
+def _has_right_identifier_boundary(text: str, end: int) -> bool:
+    if end >= len(text):
+        return False
+    following = text[end]
+    if following != ".":
+        return _is_ascii_identifier(following)
+    return end + 1 < len(text) and (
+        text[end + 1].isascii()
+        and (text[end + 1].isalnum() or text[end + 1] in "_-")
     )
 
 
@@ -72,7 +84,7 @@ def _ipv6_candidates(text: str) -> Iterator[_AddressCandidate]:
             continue
         if start and _is_ascii_identifier(text[start - 1]):
             continue
-        if end < text_length and _is_ascii_identifier(text[end]):
+        if _has_right_identifier_boundary(text, end):
             continue
         candidate = text[start:end]
         colon_count = candidate.count(":")
