@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Mapping
 
-from ..findings import Action, Severity, Span
+from ..findings import Action, Finding, Severity, Span
 from ..inspection import Inspection, InspectionFeature, ScanScope
 
 
@@ -72,3 +72,26 @@ class Rule(ABC):
     @abstractmethod
     def scan(self, inspection: Inspection) -> tuple[RuleMatch, ...]:
         """Return normalized-text matches without retaining matched values."""
+
+
+class StructuredRule[ValueT](ABC):
+    """Side-effect-free deterministic rule for non-text typed values."""
+
+    @property
+    @abstractmethod
+    def rule_id(self) -> str:
+        """Return the stable identity for this rule's semantics."""
+
+    @property
+    @abstractmethod
+    def purpose(self) -> str:
+        """Return a concise description of the rule's behavior."""
+
+    @property
+    @abstractmethod
+    def scopes(self) -> frozenset[ScanScope]:
+        """Return the structured scopes where this rule applies."""
+
+    @abstractmethod
+    def validate(self, value: ValueT) -> tuple[Finding, ...]:
+        """Return disclosure-safe findings for one immutable typed value."""
