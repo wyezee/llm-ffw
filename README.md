@@ -67,7 +67,7 @@ The distribution includes a PEP 561 `py.typed` marker, so type checkers such as
 mypy and Pyright consume the library's inline annotations.
 
 ```console
-python -m pip install llm-ffw==0.10.0
+python -m pip install llm-ffw==0.11.0
 ```
 
 Create one facade during application startup and reuse it for every request:

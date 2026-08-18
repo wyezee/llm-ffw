@@ -4,10 +4,23 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.11.0 - 2026-08-19
+
 ### Added
 
 - Added an explicitly packaged PEP 561 `py.typed` marker plus installed-wheel
   checks for canonical public API annotations.
+- Added strict mypy checks for all runtime modules and typed synchronous,
+  asynchronous, streaming, configuration, and structured-tool consumer
+  examples, including verification against the installed wheel.
+- Added a pinned Ruff correctness gate, GitHub CodeQL scanning for Python and
+  Actions workflows, and weekly Dependabot maintenance for pinned Actions.
+
+### Changed
+
+- Made internal configuration forwarding, heterogeneous rule collections,
+  immutable JSON validation, async future tracking, and streaming invariants
+  statically precise without adding runtime dependencies.
 
 ### Documentation
 
