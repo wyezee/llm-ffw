@@ -51,24 +51,30 @@ hooks instead of constructing a facade per request.
 
 ## Measured performance
 
-Release `0.2.0` was benchmarked on GitHub-hosted Ubuntu and Windows runners
-with Python 3.14.7. The test payload contains 8,000,000 synthetic ASCII
+The current implementation was benchmarked on GitHub-hosted Ubuntu and Windows
+runners with Python 3.14.7. Each request contains 8,000,000 synthetic ASCII
 characters (about 7.63 MiB), representative of a million-token-scale prompt.
 This is a size comparison rather than an exact token count: tokenization varies
 by model, tokenizer, language, and content.
 
-| Scenario | Ubuntu | Windows |
+| Rules and payload | Ubuntu req/s / MiB/s / p95 | Windows req/s / MiB/s / p95 |
 | --- | ---: | ---: |
-| Single policy scan, median | 609 ms / 12.53 MiB/s | 637 ms / 11.97 MiB/s |
-| Concurrent soak, 4 workers and 8 callers | 3.33 requests/s | 3.19 requests/s |
-| Concurrent aggregate throughput | 25.41 MiB/s | 24.37 MiB/s |
-| Separate single-process memory benchmark, peak RSS | 47.22 MiB | 48.77 MiB |
+| Default 6, clean input | 4.742 / 36.181 / 6.44 s | 3.333 / 25.426 / 9.57 s |
+| Default 6, valid JSON output | 5.131 / 39.144 / 6.04 s | 2.413 / 18.407 / 13.21 s |
+| All 15, clean input | 1.693 / 12.916 / 18.72 s | 1.151 / 8.783 / 27.74 s |
+| All 15, valid JSON output | 0.789 / 6.020 / 39.52 s | 0.482 / 3.681 / 66.27 s |
 
-The concurrent soak processed 32 complete payloads, validated every result,
-and recycled each worker after four tasks. These are reproducible CI
-measurements, not universal latency guarantees; performance varies with input,
-enabled rules, policy, CPU, and concurrency. See the
-[exact release-gate run](https://github.com/wyezee/llm-ffw/actions/runs/31952014903)
+Each row uses four workers, eight concurrent callers, and 32 requests per
+round for three rounds: 96 measured requests per row and 384 per operating
+system. Throughput is the median of the three rounds. The pooled end-to-end
+p95 includes caller queueing from submitting 32 requests to eight caller
+slots; it is not single-request service time. All 768 measured requests across
+both operating systems completed with exact expected findings and no rejection,
+timeout, or failure. Peak process-tree RSS ranged from 206 to 613 MiB.
+
+These are reproducible CI measurements, not universal latency guarantees;
+performance varies with input, enabled rules, policy, CPU, and concurrency.
+See the [exact publication run](https://github.com/wyezee/llm-ffw/actions/runs/32127412115)
 and the commands under [Development and validation](#development-and-validation).
 
 ## Usage
@@ -989,6 +995,7 @@ py -3.14 -m venv .venv
 .venv\Scripts\python benchmarks/generate_pii_accuracy_dataset.py
 .venv\Scripts\python benchmarks/generate_all_rules_dataset.py --size 8000000
 .venv\Scripts\python benchmarks/bench_all_rules.py --sizes 8192,131072,1000000,8000000 --workers 1,2,4 --catalog-patterns 1,100,1000
+.venv\Scripts\python benchmarks/bench_all_rules.py --sizes 8000000 --profiles clean-input,clean-output-json --workers 4 --rule-sets default,all --rounds 3 --requests-per-worker 8 --concurrency-multiplier 2 --catalog-patterns 1 --max-tasks-per-child 1000 --timeout 240 --json-output benchmark.json
 ```
 
 The deterministic generator makes one match per catalog prefix plus near-miss
