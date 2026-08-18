@@ -8,6 +8,8 @@ All notable changes are recorded here before a tagged release.
 
 - Upgraded artifact upload and download actions to their SHA-pinned,
   Node 24-compatible v7 releases for future workflows.
+- Added a top-level rule matrix documenting activation, default scope,
+  balanced-policy handling, and supported policy choices.
 
 ## 0.9.0 - 2026-08-18
 

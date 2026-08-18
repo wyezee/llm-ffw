@@ -21,6 +21,44 @@ before results return to the model. `AuthorizationHeaderRule` redacts exact
 Basic and Bearer credentials, while `RepetitionRule` reviews conservative exact
 character, token, and line runs.
 
+## Rule coverage and policy
+
+`BALANCED_POLICY` is the default. Scope below means the scope selected by the
+normal configuration or `FirewallConfig.all_text_rules()`; configurable rules
+can be narrowed, and the input-only PII defaults can explicitly enable output
+inspection. The library exposes 15 text rules plus two structured validators:
+
+| Rule | Activation | Default scope | Balanced handling | Policy choices |
+| --- | --- | --- | --- | --- |
+| `SecretsRule` | Default | Both | Redact | Standard¹ |
+| `InvisibleCharactersRule` | Default | Input | Remove² | Standard¹ |
+| `UnicodeTagSmugglingRule` | Default | Input | Remove² | Standard¹ |
+| `PaymentCardRule` | Default | Both | Redact | Standard¹ |
+| `PrivateKeyRule` | Default | Both | Redact | Standard¹ |
+| `JWTTokenRule` | Default | Both | Redact | Standard¹ |
+| `BannedSubstringsRule` | Opt-in catalog | Both by default | Catalog action; redact by default² | Per-entry action and Standard¹ override |
+| `JSONOutputRule` | Opt-in | Output | Block | Review or block |
+| `UnsafeURLRule` | Opt-in | Both | Redact | Standard¹ |
+| `IPAddressRule` | Opt-in | Input; output configurable | Redact | Standard¹ |
+| `MACAddressRule` | Opt-in | Input; output configurable | Redact | Standard¹ |
+| `IBANRule` | Opt-in | Input; output configurable | Redact | Standard¹ |
+| `AuthorizationHeaderRule` | Opt-in | Both | Redact | Standard¹ |
+| `EmailAddressRule` | Opt-in | Input; output configurable | Redact | Standard¹ |
+| `RepetitionRule` | Opt-in | Both | Review² | Standard¹ |
+| `ToolCallRule` | Explicit structured API | Tool call | Block finding | Outside text policy; host enforces |
+| `ToolResultRule` | Explicit structured API | Tool result | Block finding | Outside text policy; host enforces |
+
+¹ Standard policy choices are `ALLOW`, `REVIEW`, `REMOVE`, `REDACT`, and
+`BLOCK`, selected per rule and scope with `PolicyOverride`. JSON validity is
+deliberately restricted to `REVIEW` or `BLOCK`.
+
+² The listed action describes an ordinary match. Malformed input, candidate
+overflow, or another resource-limit condition can produce a fail-closed
+`BLOCK` finding when the active policy does not override it.
+
+The bundled alternatives are `STRICT_POLICY` and `AUDIT_POLICY`. A custom
+immutable `FirewallPolicy` provides finer per-rule, per-scope control.
+
 ## Installation and quick start
 
 LLM FFW requires Python 3.14.7 or a newer Python 3.14 patch release. Its base
