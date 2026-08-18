@@ -8,9 +8,7 @@ from pathlib import Path
 import random
 
 from llm_ffw import (
-    EmailAddressConfig,
     EmailAddressRule,
-    IPAddressConfig,
     IPAddressRule,
     MACAddressConfig,
     MACAddressRule,

@@ -10,7 +10,6 @@ from llm_ffw import (
     AuthorizationHeaderConfig,
     AuthorizationHeaderCapability,
     AuthorizationHeaderRule,
-    ContentBlockedError,
     RuleEngine,
     Firewall,
     FirewallManager,

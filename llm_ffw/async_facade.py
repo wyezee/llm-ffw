@@ -14,7 +14,6 @@ from .facade import (
     FirewallUnavailableError,
     SanitizationResult,
 )
-from .inspection import ScanScope
 from .ip_address import IPAddressConfig
 from .mac_address import MACAddressConfig
 from .iban import IBANConfig
