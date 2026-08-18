@@ -13,6 +13,7 @@ EXPECTED_VERSION = "0.10.0"
 SMOKE_CODE = """
 from importlib.metadata import files, metadata, version
 from inspect import signature
+from typing import get_type_hints
 from llm_ffw import (
     __version__,
     Action,
@@ -65,6 +66,7 @@ assert "Development Status :: 4 - Beta" in metadata("llm-ffw").get_all(
     "Classifier"
 )
 assert any(str(path).endswith("licenses/LICENSE") for path in files("llm-ffw"))
+assert any(str(path) == "llm_ffw/py.typed" for path in files("llm-ffw"))
 assert Firewall.__module__ == "llm_ffw.facade"
 assert AsyncFirewall.__module__ == "llm_ffw.async_facade"
 assert AsyncFirewallManager.__module__ == "llm_ffw.async_facade"
@@ -74,6 +76,15 @@ assert LLMFirewallManager is FirewallManager
 assert AsyncLLMFirewallManager is AsyncFirewallManager
 assert Scanner is RuleScanner
 assert ScannerConfig is RuleScannerConfig
+for public_method in (
+    Firewall.sanitize_input,
+    AsyncFirewall.sanitize_input,
+    RuleEngine.process,
+    RuleScanner.scan,
+):
+    hints = get_type_hints(public_method)
+    assert hints["text"] is str
+    assert "return" in hints
 assert SanitizationResult.__module__ == "llm_ffw.facade"
 assert FirewallConfig.__module__ == "llm_ffw.facade_config"
 assert FirewallStream.__module__ == "llm_ffw.streaming"

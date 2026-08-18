@@ -63,6 +63,8 @@ immutable `FirewallPolicy` provides finer per-rule, per-scope control.
 
 LLM FFW requires Python 3.14.7 or a newer Python 3.14 patch release. Its base
 installation has no runtime dependencies outside the Python standard library.
+The distribution includes a PEP 561 `py.typed` marker, so type checkers such as
+mypy and Pyright consume the library's inline annotations.
 
 ```console
 python -m pip install llm-ffw==0.10.0

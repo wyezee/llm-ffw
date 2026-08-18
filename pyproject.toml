@@ -20,3 +20,6 @@ classifiers = [
 
 [tool.setuptools.packages.find]
 include = ["llm_ffw*"]
+
+[tool.setuptools.package-data]
+llm_ffw = ["py.typed"]

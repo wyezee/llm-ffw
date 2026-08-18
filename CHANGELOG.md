@@ -4,6 +4,11 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Added
+
+- Added an explicitly packaged PEP 561 `py.typed` marker plus installed-wheel
+  checks for canonical public API annotations.
+
 ### Documentation
 
 - Added copy-paste recipes to the README and a tested `EXAMPLES.md` guide for
