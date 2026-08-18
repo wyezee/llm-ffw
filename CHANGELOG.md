@@ -4,6 +4,12 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Documentation
+
+- Added copy-paste recipes to the README and a tested `EXAMPLES.md` guide for
+  the production facades, presets, lower-level rule APIs, streaming, catalog
+  reloads, and direct process-pool orchestration.
+
 ## 0.10.0 - 2026-08-18
 
 ### Changed

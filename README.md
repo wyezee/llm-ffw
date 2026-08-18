@@ -87,6 +87,61 @@ The entry-point guard is required because the facade uses worker processes.
 Long-lived services should call `start()` and `close()` from their lifecycle
 hooks instead of constructing a facade per request.
 
+## Common recipes
+
+Use the privacy preset when email, IP, MAC, and IBAN values must not leave the
+application in prompts:
+
+```python
+from llm_ffw import Firewall, FirewallConfig
+
+def main() -> None:
+    text = "Contact alex@example.com from 192.0.2.10."
+    with Firewall.from_config(FirewallConfig.privacy_input()) as firewall:
+        safe_text = firewall.sanitize_input(text)
+    assert safe_text == "Contact [REDACTED] from [REDACTED]."
+
+if __name__ == "__main__":
+    main()
+```
+
+Use `RuleScanner` when the host needs findings but will make its own enforcement
+decision; findings contain safe metadata, so do not recover matched text from
+their spans:
+
+```python
+from llm_ffw import RuleScanner, ScanScope
+
+synthetic = "sk-" + "A" * 20
+findings = RuleScanner().scan(synthetic, scope=ScanScope.INPUT)
+assert [finding.rule_id for finding in findings] == ["secrets.detected"]
+assert findings[0].redacted_preview == "[REDACTED:openai_api_key]"
+```
+
+Use the JSON API preset when model output must be valid JSON and URLs need
+structural inspection:
+
+```python
+from llm_ffw import ContentBlockedError, Firewall, FirewallConfig
+
+def main() -> None:
+    with Firewall.from_config(FirewallConfig.json_api()) as firewall:
+        try:
+            firewall.sanitize_output('{"score": NaN}')
+        except ContentBlockedError as exc:
+            assert exc.findings[0].rule_id == "output.json.validity"
+        else:
+            raise AssertionError("invalid JSON was not blocked")
+
+if __name__ == "__main__":
+    main()
+```
+
+See the
+[complete runnable examples](https://github.com/wyezee/llm-ffw/blob/master/EXAMPLES.md)
+for the synchronous and async facades, lower-level APIs, streaming, catalog
+reloads, and direct process-pool orchestration.
+
 ## Measured performance
 
 The current implementation was benchmarked on GitHub-hosted Ubuntu and Windows
