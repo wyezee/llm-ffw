@@ -101,6 +101,16 @@ def _many_token_repeats(text: str, threshold: int) -> Iterator[_Repeat]:
         yield _Repeat(run_start, run_end, "token_run", count, len(previous))
 
 
+def _contains_alphanumeric(value: str) -> bool:
+    """Return whether a bounded token contains an alphanumeric character."""
+
+    # Ordinary tokens usually begin or end with an alphanumeric character.
+    # Preserve the exact Unicode-aware fallback for punctuation-wrapped tokens.
+    if value[0].isalnum() or value[-1].isalnum():
+        return True
+    return any(character.isalnum() for character in value[1:-1])
+
+
 def _token_repeats(
     text: str, threshold: int, limit: int
 ) -> Iterator[_Repeat]:
@@ -118,7 +128,7 @@ def _token_repeats(
     runs: list[tuple[int, int, str]] = []
     for index, value in enumerate(tokens):
         token = value if len(value) <= _MAX_TRACKED_TOKEN_CHARS else None
-        if token is not None and not any(character.isalnum() for character in token):
+        if token is not None and not _contains_alphanumeric(token):
             token = None
         if token is not None and token == previous:
             count += 1

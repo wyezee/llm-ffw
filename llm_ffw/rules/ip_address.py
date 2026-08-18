@@ -101,10 +101,12 @@ def _ipv6_candidates(text: str) -> Iterator[_AddressCandidate]:
 
 def _ordered_candidates(
     text: str,
-    config: IPAddressConfig,
+    *,
+    include_ipv4: bool,
+    include_ipv6: bool,
 ) -> Iterator[_AddressCandidate]:
-    ipv4 = iter(_ipv4_candidates(text)) if config.include_ipv4 else iter(())
-    ipv6 = iter(_ipv6_candidates(text)) if config.include_ipv6 else iter(())
+    ipv4 = iter(_ipv4_candidates(text)) if include_ipv4 else iter(())
+    ipv6 = iter(_ipv6_candidates(text)) if include_ipv6 else iter(())
     next_ipv4 = next(ipv4, None)
     next_ipv6 = next(ipv6, None)
     while next_ipv4 is not None or next_ipv6 is not None:
@@ -175,16 +177,23 @@ class IPAddressRule(Rule):
         if not isinstance(inspection, Inspection):
             raise TypeError("inspection must be an Inspection")
         text = inspection.text
-        if (
-            (not self._config.include_ipv4 or "." not in text)
-            and (not self._config.include_ipv6 or ":" not in text)
-        ):
+        include_ipv4 = self._config.include_ipv4 and "." in text
+        # Every IPv6 candidate accepted below has at least two colons. Find
+        # those delimiters in C before entering the character-by-character
+        # candidate iterator for large ordinary documents.
+        first_colon = text.find(":") if self._config.include_ipv6 else -1
+        include_ipv6 = first_colon >= 0 and text.find(":", first_colon + 1) >= 0
+        if not include_ipv4 and not include_ipv6:
             return ()
 
         matches: list[RuleMatch] = []
         candidate_count = 0
         covered_until = 0
-        for candidate in _ordered_candidates(text, self._config):
+        for candidate in _ordered_candidates(
+            text,
+            include_ipv4=include_ipv4,
+            include_ipv6=include_ipv6,
+        ):
             if candidate.start < covered_until:
                 continue
             if candidate_count >= self._config.max_candidates:

@@ -229,6 +229,7 @@ class IPAddressRuleTests(unittest.TestCase):
         scanner = _scanner()
         workloads = (
             "a" * 8_000_000,
+            ("a" * 4_000_000) + ":" + ("a" * 3_999_999),
             ":" * 8_000_000,
             ("999." * 2_000_000)[:8_000_000],
         )

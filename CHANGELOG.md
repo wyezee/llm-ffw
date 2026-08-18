@@ -4,6 +4,12 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Changed
+
+- Skip impossible IPv6 candidate traversal when text contains fewer than two
+  colons, and accelerate common token classification in `RepetitionRule`
+  without changing findings or configured limits.
+
 ## 0.11.0 - 2026-08-19
 
 ### Added

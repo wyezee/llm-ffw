@@ -90,6 +90,15 @@ class RepetitionRuleTests(unittest.TestCase):
             with self.subTest(text=text[:40]):
                 self.assertEqual(scanner.scan(text), ())
 
+    def test_token_alphanumeric_check_preserves_edges_and_middle(self) -> None:
+        scanner = _scanner()
+        for token in ("a___", "___a", "__a__", "__9__"):
+            with self.subTest(token=token):
+                finding = scanner.scan((token + " ") * 64)[0]
+                self.assertEqual(finding.metadata["reason"], "token_run")
+                self.assertEqual(finding.metadata["repeat_count"], "64")
+        self.assertEqual(scanner.scan(("___ " * 64)), ())
+
     def test_finding_limit_fails_closed_over_uninspected_remainder(self) -> None:
         scanner = _scanner(
             RepetitionConfig(
