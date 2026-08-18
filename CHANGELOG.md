@@ -4,6 +4,11 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Changed
+
+- Upgraded artifact upload and download actions to their SHA-pinned,
+  Node 24-compatible v7 releases for future workflows.
+
 ## 0.9.0 - 2026-08-18
 
 ### Added
@@ -22,7 +27,7 @@ All notable changes are recorded here before a tagged release.
 ### Changed
 
 - Refreshed the SHA-pinned artifact transfer actions used by Trusted
-  Publishing to their Node 24-compatible v5 releases.
+  Publishing to their v5 releases.
 
 ## 0.8.0 - 2026-08-18
 
