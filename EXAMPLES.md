@@ -1,6 +1,6 @@
 # LLM FFW examples
 
-These examples target `llm-ffw==0.11.0`. Every Python block is a complete
+These examples target `llm-ffw==0.11.1`. Every Python block is a complete
 program and is executed by the documentation regression test. All credentials,
 addresses, and identifiers are deterministic synthetic values.
 

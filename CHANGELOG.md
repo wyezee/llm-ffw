@@ -4,6 +4,8 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.11.1 - 2026-08-19
+
 ### Changed
 
 - Skip impossible IPv6 candidate traversal when text contains fewer than two
