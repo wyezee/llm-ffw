@@ -4,6 +4,8 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.10.0 - 2026-08-18
+
 ### Changed
 
 - Upgraded artifact upload and download actions to their SHA-pinned,

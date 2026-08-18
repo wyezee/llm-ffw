@@ -16,9 +16,8 @@ revocation of any accidentally exposed credential remain owner responsibilities.
 
 ## Supported versions
 
-Until the first tagged stable release, security fixes are applied only to the
-latest `0.1.x` pre-release line. Older snapshots and untagged forks are not
-supported.
+Security fixes are applied only to the latest published minor release line.
+Older minor lines, snapshots, and untagged forks are not supported.
 
 ## Security boundary
 

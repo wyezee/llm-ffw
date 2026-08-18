@@ -65,14 +65,8 @@ LLM FFW requires Python 3.14.7 or a newer Python 3.14 patch release. Its base
 installation has no runtime dependencies outside the Python standard library.
 
 ```console
-python -m pip install llm-ffw==0.9.0
+python -m pip install llm-ffw==0.10.0
 ```
-
-The canonical API names documented below are currently available on the
-unreleased `master` branch and will ship in the next minor release. Published
-0.9.0 applications should continue to use `LLMFirewall`, `AsyncLLMFirewall`,
-`LLMFirewallManager`, and `AsyncLLMFirewallManager`; those names remain
-compatible aliases after the migration.
 
 Create one facade during application startup and reuse it for every request:
 
