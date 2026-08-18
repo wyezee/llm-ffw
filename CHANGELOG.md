@@ -4,6 +4,8 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.9.0 - 2026-08-18
+
 ### Added
 
 - Immutable `FirewallConfig` presets shared by synchronous, asynchronous, and
@@ -16,6 +18,11 @@ All notable changes are recorded here before a tagged release.
   harness covering all 15 text rules plus structured tool fixtures, exact
   expectation checks, latency percentiles, queue/service timing, process-tree
   memory, lifecycle timing, saturation counters, and catalog-size scaling.
+
+### Changed
+
+- Refreshed the SHA-pinned artifact transfer actions used by Trusted
+  Publishing to their Node 24-compatible v5 releases.
 
 ## 0.8.0 - 2026-08-18
 

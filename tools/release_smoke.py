@@ -9,7 +9,7 @@ import venv
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "0.8.0"
+EXPECTED_VERSION = "0.9.0"
 SMOKE_CODE = """
 from importlib.metadata import files, metadata, version
 from inspect import signature
@@ -28,6 +28,7 @@ from llm_ffw import (
     IPAddressRule,
     IBANConfig,
     IBANRule,
+    FirewallConfig,
     MACAddressConfig,
     MACAddressRule,
     LLMFirewall,
@@ -49,7 +50,7 @@ from llm_ffw import (
 )
 from llm_ffw.rules import SecretsRule
 
-assert version("llm-ffw") == "0.8.0"
+assert version("llm-ffw") == "0.9.0"
 assert __version__ == version("llm-ffw")
 assert metadata("llm-ffw").get_all("Requires-Dist") is None
 assert metadata("llm-ffw")["License-Expression"] == "Apache-2.0"
@@ -61,6 +62,7 @@ assert LLMFirewall.__module__ == "llm_ffw.facade"
 assert AsyncLLMFirewall.__module__ == "llm_ffw.async_facade"
 assert AsyncLLMFirewallManager.__module__ == "llm_ffw.async_facade"
 assert SanitizationResult.__module__ == "llm_ffw.facade"
+assert FirewallConfig.__module__ == "llm_ffw.facade_config"
 assert FirewallStream.__module__ == "llm_ffw.streaming"
 facade_parameters = signature(LLMFirewall).parameters
 assert "additional_secret_catalog" in facade_parameters
@@ -90,7 +92,13 @@ assert "sk-" not in repr(capabilities)
 assert "https://" not in repr(capabilities)
 manager = LLMFirewallManager()
 assert manager.capabilities() == capabilities
+assert callable(manager.sanitize_input_result)
+assert callable(manager.sanitize_output_result)
 manager.close()
+configured = LLMFirewall.from_config(FirewallConfig.default())
+assert configured.capabilities() == capabilities
+configured.close()
+assert callable(AsyncLLMFirewallManager.from_config)
 url_firewall = LLMFirewall(unsafe_url_config=UnsafeURLConfig())
 assert url_firewall.capabilities().unsafe_url.max_candidates == 128
 assert any(

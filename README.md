@@ -12,7 +12,7 @@ Unicode tag runs; and redacts Luhn-valid payment-card candidates. Findings
 retain original-text spans and safe category metadata rather than matched
 values.
 
-Release `0.8.0` also provides opt-in `IPAddressRule`, `EmailAddressRule`,
+LLM FFW also provides opt-in `IPAddressRule`, `EmailAddressRule`,
 `MACAddressRule`, and `IBANRule` privacy controls. They use bounded
 deterministic parsing, default to input-only redaction under the balanced
 policy, and remain disabled until configured. Provider-neutral `ToolCallRule`
@@ -27,7 +27,7 @@ LLM FFW requires Python 3.14.7 or a newer Python 3.14 patch release. Its base
 installation has no runtime dependencies outside the Python standard library.
 
 ```console
-python -m pip install llm-ffw==0.8.0
+python -m pip install llm-ffw==0.9.0
 ```
 
 Create one facade during application startup and reuse it for every request:
