@@ -5,20 +5,20 @@ from llm_ffw import (
     STRICT_POLICY,
     Action,
     ContentBlockedError,
+    RuleEngine,
     Firewall,
-    LLMFirewall,
-    LLMFirewallManager,
+    FirewallManager,
     PaymentCardConfig,
     PaymentCardRule,
     ProcessScannerPoolConfig,
     ScanScope,
-    Scanner,
-    ScannerConfig,
+    RuleScanner,
+    RuleScannerConfig,
 )
 
 
-def _scanner(config: PaymentCardConfig | None = None) -> Scanner:
-    return Scanner(rules=(PaymentCardRule(config),))
+def _scanner(config: PaymentCardConfig | None = None) -> RuleScanner:
+    return RuleScanner(rules=(PaymentCardRule(config),))
 
 
 def _single_worker_config() -> ProcessScannerPoolConfig:
@@ -136,7 +136,7 @@ class PaymentCardRuleTests(unittest.TestCase):
         self.assertEqual(finding.metadata["reason"], "candidate_limit_exceeded")
         self.assertEqual(finding.span.start, text.index("5555"))
         self.assertEqual(finding.span.end, len(text))
-        result = Firewall(scanner=scanner).process(text)
+        result = RuleEngine(scanner=scanner).process(text)
         self.assertEqual(
             result.processed_text,
             "4242424242424241 then [REDACTED]",
@@ -152,11 +152,11 @@ class PaymentCardRuleTests(unittest.TestCase):
         text = "Card 4242 4242 4242 4242"
         for scope in (ScanScope.INPUT, ScanScope.OUTPUT):
             with self.subTest(scope=scope):
-                balanced = Firewall(scanner=_scanner()).process(text, scope=scope)
-                strict = Firewall(
+                balanced = RuleEngine(scanner=_scanner()).process(text, scope=scope)
+                strict = RuleEngine(
                     scanner=_scanner(), policy=STRICT_POLICY
                 ).process(text, scope=scope)
-                audit = Firewall(
+                audit = RuleEngine(
                     scanner=_scanner(), policy=AUDIT_POLICY
                 ).process(text, scope=scope)
                 self.assertEqual(balanced.processed_text, "Card [REDACTED]")
@@ -167,12 +167,12 @@ class PaymentCardRuleTests(unittest.TestCase):
 
 class PaymentCardFacadeTests(unittest.TestCase):
     def test_is_default_opt_out_and_advertises_bounded_configuration(self) -> None:
-        enabled = LLMFirewall(pool_config=_single_worker_config())
-        disabled = LLMFirewall(
-            scanner_config=ScannerConfig(enable_payment_cards=False),
+        enabled = Firewall(pool_config=_single_worker_config())
+        disabled = Firewall(
+            scanner_config=RuleScannerConfig(enable_payment_cards=False),
             pool_config=_single_worker_config(),
         )
-        customized = LLMFirewall(
+        customized = Firewall(
             pool_config=_single_worker_config(),
             payment_card_config=PaymentCardConfig(max_candidates=32),
         )
@@ -206,17 +206,17 @@ class PaymentCardFacadeTests(unittest.TestCase):
 
     def test_rejects_payment_config_when_rule_is_disabled(self) -> None:
         with self.assertRaisesRegex(ValueError, "enable_payment_cards"):
-            LLMFirewall(
-                scanner_config=ScannerConfig(enable_payment_cards=False),
+            Firewall(
+                scanner_config=RuleScannerConfig(enable_payment_cards=False),
                 payment_card_config=PaymentCardConfig(),
             )
 
     def test_worker_redacts_and_strict_policy_blocks(self) -> None:
-        balanced = LLMFirewall(
+        balanced = Firewall(
             pool_config=_single_worker_config(),
             payment_card_config=PaymentCardConfig(),
         )
-        strict = LLMFirewall(
+        strict = Firewall(
             pool_config=_single_worker_config(),
             payment_card_config=PaymentCardConfig(),
             policy=STRICT_POLICY,
@@ -232,10 +232,10 @@ class PaymentCardFacadeTests(unittest.TestCase):
 
     def test_rejects_non_config_value(self) -> None:
         with self.assertRaises(TypeError):
-            LLMFirewall(payment_card_config=True)  # type: ignore[arg-type]
+            Firewall(payment_card_config=True)  # type: ignore[arg-type]
 
     def test_manager_propagates_configuration(self) -> None:
-        manager = LLMFirewallManager(
+        manager = FirewallManager(
             pool_config=_single_worker_config(),
             payment_card_config=PaymentCardConfig(),
         ).start()

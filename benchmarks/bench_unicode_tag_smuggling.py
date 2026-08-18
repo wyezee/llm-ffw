@@ -12,11 +12,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from llm_ffw import (
     Action,
-    Firewall,
+    RuleEngine,
     ProcessScannerPool,
     ProcessScannerPoolConfig,
-    Scanner,
-    ScannerConfig,
+    RuleScanner,
+    RuleScannerConfig,
     UnicodeTagSmugglingRule,
 )
 from llm_ffw.rules.secrets import SecretsRule
@@ -66,9 +66,9 @@ def benchmark(
         rgi_flag * (size // len(rgi_flag)),
         size,
     )
-    scanner_config = ScannerConfig(max_input_chars=size)
-    firewall = Firewall(
-        scanner=Scanner(
+    scanner_config = RuleScannerConfig(max_input_chars=size)
+    firewall = RuleEngine(
+        scanner=RuleScanner(
             rules=(SecretsRule(), UnicodeTagSmugglingRule()),
             config=scanner_config,
         )

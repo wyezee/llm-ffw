@@ -8,15 +8,15 @@ from llm_ffw import (
     BALANCED_POLICY,
     STRICT_POLICY,
     Action,
-    Firewall,
+    RuleEngine,
     FirewallPolicy,
     InvisibleCharactersRule,
-    LLMFirewall,
+    Firewall,
     PolicyOverride,
     ProcessScannerPoolConfig,
     ScanScope,
-    Scanner,
-    ScannerConfig,
+    RuleScanner,
+    RuleScannerConfig,
     SecretCatalog,
     SecretSignature,
 )
@@ -25,9 +25,9 @@ from llm_ffw import (
 _ZWSP = "\u200b"
 
 
-def _enabled_scanner(*, max_input_chars: int = 8_000_000) -> Scanner:
-    return Scanner(
-        config=ScannerConfig(
+def _enabled_scanner(*, max_input_chars: int = 8_000_000) -> RuleScanner:
+    return RuleScanner(
+        config=RuleScannerConfig(
             max_input_chars=max_input_chars,
             enable_invisible_characters=True,
         )
@@ -38,7 +38,7 @@ class InvisibleCharactersRuleTests(unittest.TestCase):
     def test_matches_contextual_run_with_safe_metadata(self) -> None:
         text = "alpha" + _ZWSP * 2 + "beta"
 
-        finding = Scanner(rules=(InvisibleCharactersRule(),)).scan(text)[0]
+        finding = RuleScanner(rules=(InvisibleCharactersRule(),)).scan(text)[0]
 
         self.assertEqual(finding.rule_id, "unicode.invisible_characters")
         self.assertEqual(finding.severity.value, "high")
@@ -53,7 +53,7 @@ class InvisibleCharactersRuleTests(unittest.TestCase):
         self.assertNotIn(_ZWSP, tuple(finding.metadata.values()))
 
     def test_ignores_non_contextual_and_legitimate_unicode_controls(self) -> None:
-        scanner = Scanner(rules=(InvisibleCharactersRule(),))
+        scanner = RuleScanner(rules=(InvisibleCharactersRule(),))
         values = (
             "safe ASCII",
             _ZWSP + "prefix",
@@ -76,16 +76,16 @@ class InvisibleCharactersRuleTests(unittest.TestCase):
     def test_excessive_runs_return_one_bounded_block_recommendation(self) -> None:
         text = "a" + (_ZWSP + "a") * 65
 
-        findings = Scanner(rules=(InvisibleCharactersRule(),)).scan(text)
+        findings = RuleScanner(rules=(InvisibleCharactersRule(),)).scan(text)
 
         self.assertEqual(len(findings), 1)
         self.assertEqual(findings[0].action, Action.BLOCK)
         self.assertEqual(findings[0].metadata["limit"], "64")
 
     def test_marker_fast_path_and_adversarial_non_match_are_fast(self) -> None:
-        scanner = Scanner(
+        scanner = RuleScanner(
             rules=(InvisibleCharactersRule(),),
-            config=ScannerConfig(max_input_chars=8_000_000),
+            config=RuleScannerConfig(max_input_chars=8_000_000),
         )
         ascii_text = "x" * 8_000_000
         hostile_non_match = ("a" + _ZWSP + " ") * 333_333
@@ -105,13 +105,13 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
     def test_builtin_profiles_apply_documented_actions(self) -> None:
         text = "hello" + _ZWSP + "world"
 
-        balanced = Firewall(
+        balanced = RuleEngine(
             scanner=_enabled_scanner(), policy=BALANCED_POLICY
         ).process(text)
-        strict = Firewall(
+        strict = RuleEngine(
             scanner=_enabled_scanner(), policy=STRICT_POLICY
         ).process(text)
-        audit = Firewall(
+        audit = RuleEngine(
             scanner=_enabled_scanner(), policy=AUDIT_POLICY
         ).process(text)
 
@@ -126,7 +126,7 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
     def test_balanced_profile_preserves_overflow_block(self) -> None:
         text = "a" + (_ZWSP + "a") * 65
 
-        result = Firewall(scanner=_enabled_scanner()).process(text)
+        result = RuleEngine(scanner=_enabled_scanner()).process(text)
 
         self.assertEqual(result.decision, Action.BLOCK)
         self.assertIsNone(result.processed_text)
@@ -139,7 +139,7 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
 
     def test_rescan_occurs_only_when_removal_is_effective(self) -> None:
         scanner = _enabled_scanner()
-        firewall = Firewall(scanner=scanner)
+        firewall = RuleEngine(scanner=scanner)
 
         with (
             patch.object(scanner, "scan", wraps=scanner.scan) as rescan,
@@ -160,7 +160,7 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
             self.assertEqual(remaining.call_count, 1)
 
     def test_balanced_policy_removes_then_rescans_secrets(self) -> None:
-        firewall = Firewall(scanner=_enabled_scanner())
+        firewall = RuleEngine(scanner=_enabled_scanner())
         secret = "sk-" + "A" * 20
         obfuscated = secret[:3] + _ZWSP + secret[3:]
 
@@ -190,7 +190,7 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
         self.assertNotIn(secret, result.processed_text or "")
 
     def test_compact_mapping_handles_removals_before_and_inside_match(self) -> None:
-        firewall = Firewall(scanner=_enabled_scanner())
+        firewall = RuleEngine(scanner=_enabled_scanner())
         secret = "sk-" + "C" * 20
         text = (
             "a"
@@ -214,7 +214,7 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
         )
 
     def test_remove_is_idempotent_and_output_scope_is_unchanged(self) -> None:
-        firewall = Firewall(scanner=_enabled_scanner())
+        firewall = RuleEngine(scanner=_enabled_scanner())
         text = "hello" + _ZWSP + "world"
 
         first = firewall.process(text)
@@ -240,7 +240,7 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
                 ),
             ),
         )
-        result = Firewall(scanner=_enabled_scanner(), policy=policy).process(
+        result = RuleEngine(scanner=_enabled_scanner(), policy=policy).process(
             "hello" + _ZWSP + "world"
         )
 
@@ -250,7 +250,7 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
     def test_process_facade_default_survives_worker_recycling(self) -> None:
         secret = "sk-" + "B" * 20
         obfuscated = secret[:3] + _ZWSP + secret[3:]
-        firewall = LLMFirewall(
+        firewall = Firewall(
             pool_config=ProcessScannerPoolConfig(
                 max_workers=1,
                 max_in_flight=1,
@@ -296,8 +296,8 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
             source="internal://security/acme-token",
         )
         catalog = SecretCatalog("acme.catalog", "1", (signature,))
-        firewall = LLMFirewall(
-            scanner_config=ScannerConfig(enable_invisible_characters=True),
+        firewall = Firewall(
+            scanner_config=RuleScannerConfig(enable_invisible_characters=True),
             pool_config=ProcessScannerPoolConfig(
                 max_workers=1,
                 max_in_flight=1,

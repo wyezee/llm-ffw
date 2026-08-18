@@ -6,23 +6,23 @@ from llm_ffw import (
     AUDIT_POLICY,
     STRICT_POLICY,
     Action,
-    AsyncLLMFirewall,
+    AsyncFirewall,
     ContentBlockedError,
-    Firewall,
+    RuleEngine,
     IPAddressConfig,
     IPAddressRule,
-    LLMFirewall,
-    LLMFirewallManager,
+    Firewall,
+    FirewallManager,
     ProcessScannerPoolConfig,
     ScanScope,
-    Scanner,
+    RuleScanner,
     StreamMode,
     StreamingSupport,
 )
 
 
-def _scanner(config: IPAddressConfig | None = None) -> Scanner:
-    return Scanner(rules=(IPAddressRule(config),))
+def _scanner(config: IPAddressConfig | None = None) -> RuleScanner:
+    return RuleScanner(rules=(IPAddressRule(config),))
 
 
 def _single_worker_config() -> ProcessScannerPoolConfig:
@@ -63,7 +63,7 @@ class IPAddressConfigTests(unittest.TestCase):
 class IPAddressRuleTests(unittest.TestCase):
     def test_is_opt_in_and_input_only_by_default(self) -> None:
         text = "internal host 192.168.10.12"
-        self.assertEqual(Scanner().scan(text, scope=ScanScope.INPUT), ())
+        self.assertEqual(RuleScanner().scan(text, scope=ScanScope.INPUT), ())
         scanner = _scanner()
         self.assertEqual(len(scanner.scan(text, scope=ScanScope.INPUT)), 1)
         self.assertEqual(scanner.scan(text, scope=ScanScope.OUTPUT), ())
@@ -181,7 +181,7 @@ class IPAddressRuleTests(unittest.TestCase):
         self.assertEqual(finding.redacted_preview, "[REDACTED:ip_address]")
         self.assertNotIn(address, finding.message)
         self.assertNotIn(address, repr(finding))
-        result = Firewall(scanner=_scanner()).process(
+        result = RuleEngine(scanner=_scanner()).process(
             text,
             scope=ScanScope.INPUT,
         )
@@ -197,7 +197,7 @@ class IPAddressRuleTests(unittest.TestCase):
             "candidate_limit_exceeded",
         )
         self.assertEqual(finding.span.end, len(text))
-        result = Firewall(scanner=scanner).process(text, scope=ScanScope.INPUT)
+        result = RuleEngine(scanner=scanner).process(text, scope=ScanScope.INPUT)
         self.assertEqual(
             result.processed_text,
             "999.999.999.999 then [REDACTED]",
@@ -205,20 +205,20 @@ class IPAddressRuleTests(unittest.TestCase):
 
     def test_builtin_policies_redact_block_and_review(self) -> None:
         text = "source 192.168.1.1"
-        balanced = Firewall(scanner=_scanner()).process(
+        balanced = RuleEngine(scanner=_scanner()).process(
             text,
             scope=ScanScope.INPUT,
         )
         self.assertEqual(balanced.decision, Action.REDACT)
         with self.assertRaises(ContentBlockedError):
-            firewall = LLMFirewall(
+            firewall = Firewall(
                 pool_config=_single_worker_config(),
                 ip_address_config=IPAddressConfig(),
                 policy=STRICT_POLICY,
             )
             with firewall:
                 firewall.sanitize_input(text)
-        audit = Firewall(scanner=_scanner(), policy=AUDIT_POLICY).process(
+        audit = RuleEngine(scanner=_scanner(), policy=AUDIT_POLICY).process(
             text,
             scope=ScanScope.INPUT,
         )
@@ -245,7 +245,7 @@ class IPAddressFacadeTests(unittest.TestCase):
             include_ipv6=False,
             scopes=(ScanScope.INPUT, ScanScope.OUTPUT),
         )
-        firewall = LLMFirewall(
+        firewall = Firewall(
             pool_config=_single_worker_config(),
             ip_address_config=config,
         )
@@ -258,7 +258,7 @@ class IPAddressFacadeTests(unittest.TestCase):
             IPAddressRule.RULE_ID,
             tuple(rule.rule_id for rule in capabilities.rules),
         )
-        stream = Firewall(scanner=_scanner()).stream()
+        stream = RuleEngine(scanner=_scanner()).stream()
         ip_capability = next(
             item
             for item in stream.rule_capabilities
@@ -273,7 +273,7 @@ class IPAddressFacadeTests(unittest.TestCase):
             )
 
     def test_manager_and_async_facade_preserve_opt_in_configuration(self) -> None:
-        manager = LLMFirewallManager(
+        manager = FirewallManager(
             pool_config=_single_worker_config(),
             ip_address_config=IPAddressConfig(),
         )
@@ -284,7 +284,7 @@ class IPAddressFacadeTests(unittest.TestCase):
                 "host [REDACTED]",
             )
 
-        asynchronous = AsyncLLMFirewall(
+        asynchronous = AsyncFirewall(
             pool_config=_single_worker_config(),
             ip_address_config=IPAddressConfig(),
         )
@@ -301,7 +301,7 @@ class IPAddressFacadeTests(unittest.TestCase):
 
     def test_rejects_non_config_value(self) -> None:
         with self.assertRaises(TypeError):
-            LLMFirewall(ip_address_config=object())
+            Firewall(ip_address_config=object())
 
 
 if __name__ == "__main__":

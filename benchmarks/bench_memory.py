@@ -11,7 +11,7 @@ import tracemalloc
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from benchmarks.synthetic_data import build_dataset
-from llm_ffw import Action, Firewall, Scanner, ScannerConfig
+from llm_ffw import Action, RuleEngine, RuleScanner, RuleScannerConfig
 
 
 def _peak_rss_bytes() -> int:
@@ -62,7 +62,7 @@ def _measure(size: int, connection: Connection) -> None:
     try:
         tracemalloc.start()
         dataset = build_dataset(size)
-        firewall = Firewall(scanner=Scanner(config=ScannerConfig(max_input_chars=size)))
+        firewall = RuleEngine(scanner=RuleScanner(config=RuleScannerConfig(max_input_chars=size)))
         result = firewall.process(dataset.text)
         _, python_peak = tracemalloc.get_traced_memory()
         if result.decision is not Action.REDACT or result.processed_text is None:

@@ -10,6 +10,20 @@ All notable changes are recorded here before a tagged release.
   Node 24-compatible v7 releases for future workflows.
 - Added a top-level rule matrix documenting activation, default scope,
   balanced-policy handling, and supported policy choices.
+- Made `Firewall`, `AsyncFirewall`, `FirewallManager`, and
+  `AsyncFirewallManager` the canonical production facades; renamed the
+  detection-only engine to `RuleScanner` and the in-process scan-and-policy
+  class to `RuleEngine`.
+- **Breaking:** package-root `Firewall` now identifies the production facade.
+  Code using the former low-level `Firewall(scanner=..., policy=...)` must use
+  `RuleEngine(scanner=..., policy=...)`.
+
+### Deprecated
+
+- `LLMFirewall`, `AsyncLLMFirewall`, `LLMFirewallManager`,
+  `AsyncLLMFirewallManager`, `Scanner`, and `ScannerConfig` remain compatibility
+  aliases for their canonical replacements during the pre-1.0 migration
+  window.
 
 ## 0.9.0 - 2026-08-18
 

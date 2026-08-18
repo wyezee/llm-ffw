@@ -9,10 +9,10 @@ from llm_ffw import (
     STRICT_POLICY,
     ContentBlockedError,
     FirewallUnavailableError,
-    LLMFirewall,
+    Firewall,
     ProcessPoolState,
     ProcessScannerPoolConfig,
-    ScannerConfig,
+    RuleScannerConfig,
     SanitizationResult,
     ScanScope,
     SecretCatalog,
@@ -52,7 +52,7 @@ def _additional_catalog() -> SecretCatalog:
 
 class LLMFirewallTests(unittest.TestCase):
     def test_builtin_capabilities_are_safe_and_available_before_start(self) -> None:
-        firewall = LLMFirewall(pool_config=_single_worker_config())
+        firewall = Firewall(pool_config=_single_worker_config())
 
         capabilities = firewall.capabilities()
 
@@ -91,7 +91,7 @@ class LLMFirewallTests(unittest.TestCase):
     def test_custom_catalog_is_summarized_and_used_by_workers(self) -> None:
         catalog = _additional_catalog()
         value = "acme_live_" + "A" * 12
-        firewall = LLMFirewall(
+        firewall = Firewall(
             pool_config=ProcessScannerPoolConfig(
                 max_workers=1,
                 max_in_flight=1,
@@ -126,7 +126,7 @@ class LLMFirewallTests(unittest.TestCase):
         catalog = _additional_catalog()
         value = "acme_live_" + "A" * 12
         builtin_value = "sk-" + "A" * 20
-        firewall = LLMFirewall(
+        firewall = Firewall(
             pool_config=_single_worker_config(),
             replacement_secret_catalog=catalog,
         )
@@ -141,14 +141,14 @@ class LLMFirewallTests(unittest.TestCase):
 
     def test_rejects_non_catalog_configuration(self) -> None:
         with self.assertRaises(TypeError):
-            LLMFirewall(additional_secret_catalog={})  # type: ignore[arg-type]
+            Firewall(additional_secret_catalog={})  # type: ignore[arg-type]
         with self.assertRaises(TypeError):
-            LLMFirewall(replacement_secret_catalog={})  # type: ignore[arg-type]
+            Firewall(replacement_secret_catalog={})  # type: ignore[arg-type]
 
     def test_rejects_ambiguous_catalog_configuration(self) -> None:
         catalog = _additional_catalog()
         with self.assertRaisesRegex(ValueError, "mutually exclusive"):
-            LLMFirewall(
+            Firewall(
                 additional_secret_catalog=catalog,
                 replacement_secret_catalog=catalog,
             )
@@ -160,7 +160,7 @@ class LLMFirewallTests(unittest.TestCase):
             signatures=(BUILTIN_SECRET_CATALOG.signatures[0],),
         )
         with self.assertRaisesRegex(ValueError, "overlap built-in"):
-            LLMFirewall(additional_secret_catalog=collision)
+            Firewall(additional_secret_catalog=collision)
 
     def test_extension_rejects_nested_builtin_prefixes(self) -> None:
         nested_signature = SecretSignature(
@@ -180,18 +180,18 @@ class LLMFirewallTests(unittest.TestCase):
             signatures=(nested_signature,),
         )
         with self.assertRaisesRegex(ValueError, "overlap built-in"):
-            LLMFirewall(additional_secret_catalog=nested)
+            Firewall(additional_secret_catalog=nested)
 
     def test_rejects_legacy_ambiguous_catalog_keyword(self) -> None:
         with self.assertRaises(TypeError):
-            LLMFirewall(  # type: ignore[call-arg]
+            Firewall(  # type: ignore[call-arg]
                 secret_catalog=_additional_catalog(),
             )
 
     def test_context_sanitizes_input_and_output_and_closes(self) -> None:
         input_value = "sk-" + "I" * 20
         output_value = "sk-" + "O" * 20
-        firewall = LLMFirewall(pool_config=_single_worker_config())
+        firewall = Firewall(pool_config=_single_worker_config())
 
         with firewall:
             self.assertEqual(firewall.state, ProcessPoolState.RUNNING)
@@ -211,7 +211,7 @@ class LLMFirewallTests(unittest.TestCase):
 
     def test_structured_results_are_forwardable_and_disclosure_safe(self) -> None:
         secret = "sk-" + "D" * 20
-        firewall = LLMFirewall(pool_config=_single_worker_config())
+        firewall = Firewall(pool_config=_single_worker_config())
 
         with firewall:
             input_result = firewall.sanitize_input_result(
@@ -252,7 +252,7 @@ class LLMFirewallTests(unittest.TestCase):
 
     def test_audit_result_omits_unchanged_sensitive_text_from_repr(self) -> None:
         secret = "sk-" + "R" * 20
-        firewall = LLMFirewall(
+        firewall = Firewall(
             pool_config=_single_worker_config(),
             policy=AUDIT_POLICY,
         )
@@ -267,9 +267,9 @@ class LLMFirewallTests(unittest.TestCase):
     def test_secure_baseline_defaults_and_explicit_opt_outs_reach_workers(self) -> None:
         invisible = "hello\u200bworld"
         card = "Card 4242424242424242"
-        default = LLMFirewall(pool_config=_single_worker_config())
-        opted_out = LLMFirewall(
-            scanner_config=ScannerConfig(
+        default = Firewall(pool_config=_single_worker_config())
+        opted_out = Firewall(
+            scanner_config=RuleScannerConfig(
                 enable_invisible_characters=False,
                 enable_unicode_tag_smuggling=False,
                 enable_payment_cards=False,
@@ -287,7 +287,7 @@ class LLMFirewallTests(unittest.TestCase):
             self.assertEqual(opted_out.sanitize_output(card), card)
 
     def test_explicit_lifecycle_is_idempotent_while_running(self) -> None:
-        firewall = LLMFirewall(pool_config=_single_worker_config())
+        firewall = Firewall(pool_config=_single_worker_config())
 
         self.assertIs(firewall.start(), firewall)
         self.assertIs(firewall.start(), firewall)
@@ -299,7 +299,7 @@ class LLMFirewallTests(unittest.TestCase):
 
     def test_strict_block_exposes_only_safe_metadata(self) -> None:
         value = "sk-" + "B" * 20
-        firewall = LLMFirewall(
+        firewall = Firewall(
             pool_config=_single_worker_config(),
             policy=STRICT_POLICY,
         )
@@ -320,7 +320,7 @@ class LLMFirewallTests(unittest.TestCase):
         self.assertNotIn(value, tuple(error.findings[0].metadata.values()))
 
     def test_unavailable_error_suppresses_internal_exception_chain(self) -> None:
-        firewall = LLMFirewall(pool_config=_single_worker_config())
+        firewall = Firewall(pool_config=_single_worker_config())
 
         with self.assertRaises(FirewallUnavailableError) as raised:
             firewall.sanitize_input("safe")
@@ -334,7 +334,7 @@ class LLMFirewallTests(unittest.TestCase):
 
     def test_unexpected_worker_error_does_not_escape_public_exception(self) -> None:
         value = "sk-" + "X" * 20
-        firewall = LLMFirewall(pool_config=_single_worker_config())
+        firewall = Firewall(pool_config=_single_worker_config())
 
         def unsafe_failure(*args: object, **kwargs: object) -> object:
             raise RuntimeError(f"internal failure contained {value}")
@@ -357,10 +357,10 @@ class LLMFirewallTests(unittest.TestCase):
             with self.subTest(timeout=timeout), self.assertRaises(
                 (TypeError, ValueError)
             ):
-                LLMFirewall(request_timeout_seconds=timeout)  # type: ignore[arg-type]
+                Firewall(request_timeout_seconds=timeout)  # type: ignore[arg-type]
 
-        firewall = LLMFirewall(
-            scanner_config=ScannerConfig(max_input_chars=4),
+        firewall = Firewall(
+            scanner_config=RuleScannerConfig(max_input_chars=4),
             pool_config=_single_worker_config(),
         )
         with self.assertRaises(TypeError):

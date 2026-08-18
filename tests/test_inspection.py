@@ -9,8 +9,8 @@ from llm_ffw import (
     InspectionFeature,
     InspectionFeatureUnavailableError,
     ScanScope,
-    Scanner,
-    ScannerConfig,
+    RuleScanner,
+    RuleScannerConfig,
     Severity,
     Span,
 )
@@ -101,7 +101,7 @@ class InspectionTests(unittest.TestCase):
         self.assertTrue(inspection.is_ascii)
 
     def test_scope_dispatch_runs_only_applicable_rules(self) -> None:
-        scanner = Scanner(
+        scanner = RuleScanner(
             rules=(
                 _ProbeRule("probe.input", scopes=frozenset((ScanScope.INPUT,))),
                 _ProbeRule("probe.output", scopes=frozenset((ScanScope.OUTPUT,))),
@@ -119,7 +119,7 @@ class InspectionTests(unittest.TestCase):
 
     def test_ascii_feature_is_computed_once_for_all_active_rules(self) -> None:
         ascii_feature = frozenset((InspectionFeature.ASCII,))
-        scanner = Scanner(
+        scanner = RuleScanner(
             rules=(
                 _ProbeRule(
                     "probe.ascii.first",
@@ -144,7 +144,7 @@ class InspectionTests(unittest.TestCase):
         compute_ascii.assert_called_once_with("plain ASCII")
 
     def test_features_for_inapplicable_rules_are_not_computed(self) -> None:
-        scanner = Scanner(
+        scanner = RuleScanner(
             rules=(
                 _ProbeRule(
                     "probe.input.ascii",
@@ -160,7 +160,7 @@ class InspectionTests(unittest.TestCase):
         compute_ascii.assert_not_called()
 
     def test_prompt_context_is_normalized_only_for_output_rule_requesting_it(self) -> None:
-        scanner = Scanner(
+        scanner = RuleScanner(
             rules=(
                 _ProbeRule(
                     "probe.output.context",
@@ -182,7 +182,7 @@ class InspectionTests(unittest.TestCase):
         self.assertNotIn("first", tuple(findings[0].metadata.values()))
 
     def test_rejects_invalid_scope_and_prompt_context(self) -> None:
-        scanner = Scanner(config=ScannerConfig(max_input_chars=5))
+        scanner = RuleScanner(config=RuleScannerConfig(max_input_chars=5))
 
         with self.assertRaises(TypeError):
             scanner.scan("safe", scope="input")  # type: ignore[arg-type]
@@ -203,7 +203,7 @@ class InspectionTests(unittest.TestCase):
 
     def test_rejects_empty_scope_contract(self) -> None:
         with self.assertRaisesRegex(ValueError, "scopes"):
-            Scanner(rules=(_ProbeRule("probe.invalid", scopes=frozenset()),))
+            RuleScanner(rules=(_ProbeRule("probe.invalid", scopes=frozenset()),))
 
     def test_rejects_unknown_inspection_feature_contract(self) -> None:
         rule = _ProbeRule(
@@ -213,10 +213,10 @@ class InspectionTests(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(ValueError, "inspection_features"):
-            Scanner(rules=(rule,))
+            RuleScanner(rules=(rule,))
 
     def test_shared_ascii_feature_is_fast_on_eight_million_characters(self) -> None:
-        scanner = Scanner(
+        scanner = RuleScanner(
             rules=(
                 _ProbeRule(
                     "probe.long.first",

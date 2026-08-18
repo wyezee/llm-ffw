@@ -16,11 +16,13 @@ from inspect import signature
 from llm_ffw import (
     __version__,
     Action,
+    AsyncFirewall,
+    AsyncFirewallManager,
     AsyncLLMFirewall,
     AsyncLLMFirewallManager,
     AuthorizationHeaderConfig,
     AuthorizationHeaderRule,
-    Firewall,
+    RuleEngine,
     FirewallStream,
     EmailAddressConfig,
     EmailAddressRule,
@@ -31,13 +33,18 @@ from llm_ffw import (
     FirewallConfig,
     MACAddressConfig,
     MACAddressRule,
+    Firewall,
+    FirewallManager,
     LLMFirewall,
     LLMFirewallManager,
     PaymentCardRule,
     RepetitionConfig,
     RepetitionRule,
     ScanScope,
+    RuleScanner,
+    RuleScannerConfig,
     Scanner,
+    ScannerConfig,
     SanitizationResult,
     StreamMode,
     ToolCall,
@@ -58,13 +65,19 @@ assert "Development Status :: 4 - Beta" in metadata("llm-ffw").get_all(
     "Classifier"
 )
 assert any(str(path).endswith("licenses/LICENSE") for path in files("llm-ffw"))
-assert LLMFirewall.__module__ == "llm_ffw.facade"
-assert AsyncLLMFirewall.__module__ == "llm_ffw.async_facade"
-assert AsyncLLMFirewallManager.__module__ == "llm_ffw.async_facade"
+assert Firewall.__module__ == "llm_ffw.facade"
+assert AsyncFirewall.__module__ == "llm_ffw.async_facade"
+assert AsyncFirewallManager.__module__ == "llm_ffw.async_facade"
+assert LLMFirewall is Firewall
+assert AsyncLLMFirewall is AsyncFirewall
+assert LLMFirewallManager is FirewallManager
+assert AsyncLLMFirewallManager is AsyncFirewallManager
+assert Scanner is RuleScanner
+assert ScannerConfig is RuleScannerConfig
 assert SanitizationResult.__module__ == "llm_ffw.facade"
 assert FirewallConfig.__module__ == "llm_ffw.facade_config"
 assert FirewallStream.__module__ == "llm_ffw.streaming"
-facade_parameters = signature(LLMFirewall).parameters
+facade_parameters = signature(Firewall).parameters
 assert "additional_secret_catalog" in facade_parameters
 assert "replacement_secret_catalog" in facade_parameters
 assert "secret_catalog" not in facade_parameters
@@ -74,7 +87,7 @@ assert "iban_config" in facade_parameters
 assert "authorization_header_config" in facade_parameters
 assert "repetition_config" in facade_parameters
 assert "email_address_config" in facade_parameters
-capabilities = LLMFirewall().capabilities()
+capabilities = Firewall().capabilities()
 assert capabilities.rule_count == 6
 assert tuple(rule.rule_id for rule in capabilities.rules) == (
     "pii.payment_card",
@@ -90,37 +103,37 @@ assert capabilities.jwt_token.max_candidates == 128
 assert capabilities.secret_catalog.signature_count == 28
 assert "sk-" not in repr(capabilities)
 assert "https://" not in repr(capabilities)
-manager = LLMFirewallManager()
+manager = FirewallManager()
 assert manager.capabilities() == capabilities
 assert callable(manager.sanitize_input_result)
 assert callable(manager.sanitize_output_result)
 manager.close()
-configured = LLMFirewall.from_config(FirewallConfig.default())
+configured = Firewall.from_config(FirewallConfig.default())
 assert configured.capabilities() == capabilities
 configured.close()
-assert callable(AsyncLLMFirewallManager.from_config)
-url_firewall = LLMFirewall(unsafe_url_config=UnsafeURLConfig())
+assert callable(AsyncFirewallManager.from_config)
+url_firewall = Firewall(unsafe_url_config=UnsafeURLConfig())
 assert url_firewall.capabilities().unsafe_url.max_candidates == 128
 assert any(
     rule.rule_id == "url.unsafe"
     for rule in url_firewall.capabilities().rules
 )
 url_firewall.close()
-ip_firewall = LLMFirewall(ip_address_config=IPAddressConfig())
+ip_firewall = Firewall(ip_address_config=IPAddressConfig())
 assert ip_firewall.capabilities().ip_address.max_candidates == 128
 assert any(
     rule.rule_id == IPAddressRule.RULE_ID
     for rule in ip_firewall.capabilities().rules
 )
 ip_firewall.close()
-mac_firewall = LLMFirewall(mac_address_config=MACAddressConfig())
+mac_firewall = Firewall(mac_address_config=MACAddressConfig())
 assert mac_firewall.capabilities().mac_address.max_candidates == 128
 assert any(
     rule.rule_id == MACAddressRule.RULE_ID
     for rule in mac_firewall.capabilities().rules
 )
 mac_firewall.close()
-iban_firewall = LLMFirewall(iban_config=IBANConfig())
+iban_firewall = Firewall(iban_config=IBANConfig())
 assert iban_firewall.capabilities().iban.max_candidates == 128
 assert iban_firewall.capabilities().iban.registry_release == "102"
 assert any(
@@ -128,7 +141,7 @@ assert any(
     for rule in iban_firewall.capabilities().rules
 )
 iban_firewall.close()
-authorization_firewall = LLMFirewall(
+authorization_firewall = Firewall(
     authorization_header_config=AuthorizationHeaderConfig()
 )
 assert (
@@ -144,24 +157,24 @@ assert authorization_firewall.capabilities().authorization_header.schemes == (
     "bearer",
 )
 authorization_firewall.close()
-authorization_result = Firewall(
-    scanner=Scanner(rules=(AuthorizationHeaderRule(),))
+authorization_result = RuleEngine(
+    scanner=RuleScanner(rules=(AuthorizationHeaderRule(),))
 ).process("Authorization: Bearer synthetic_bearer_token_123456")
 assert authorization_result.decision is Action.REDACT
 assert authorization_result.processed_text == "Authorization: Bearer [REDACTED]"
-repetition_firewall = LLMFirewall(repetition_config=RepetitionConfig())
+repetition_firewall = Firewall(repetition_config=RepetitionConfig())
 assert repetition_firewall.capabilities().repetition.max_findings == 64
 assert any(
     rule.rule_id == RepetitionRule.RULE_ID
     for rule in repetition_firewall.capabilities().rules
 )
 repetition_firewall.close()
-repetition_result = Firewall(
-    scanner=Scanner(rules=(RepetitionRule(),))
+repetition_result = RuleEngine(
+    scanner=RuleScanner(rules=(RepetitionRule(),))
 ).process("repeat " * 64)
 assert repetition_result.decision is Action.REVIEW
 assert repetition_result.processed_text == "repeat " * 64
-email_firewall = LLMFirewall(email_address_config=EmailAddressConfig())
+email_firewall = Firewall(email_address_config=EmailAddressConfig())
 assert email_firewall.capabilities().email_address.max_candidates == 128
 assert any(
     rule.rule_id == EmailAddressRule.RULE_ID
@@ -185,19 +198,19 @@ tool_batch = ToolResultBatch(
 )
 assert ToolResultRule().validate(tool_batch) == ()
 synthetic = "sk-" + "A" * 20
-result = Firewall().process(synthetic, scope=ScanScope.INPUT)
+result = RuleEngine().process(synthetic, scope=ScanScope.INPUT)
 assert result.decision is Action.REDACT
 assert result.processed_text == "[REDACTED]"
 assert synthetic not in result.processed_text
 assert len(result.findings) == 1
-invisible = Firewall().process("hello\u200bworld", scope=ScanScope.INPUT)
+invisible = RuleEngine().process("hello\u200bworld", scope=ScanScope.INPUT)
 assert invisible.decision is Action.REMOVE
 assert invisible.processed_text == "helloworld"
 tagged = "".join(chr(0xE0000 + ord(char)) for char in "hidden")
-tag_result = Firewall().process("visible" + tagged, scope=ScanScope.INPUT)
+tag_result = RuleEngine().process("visible" + tagged, scope=ScanScope.INPUT)
 assert tag_result.decision is Action.REMOVE
 assert tag_result.processed_text == "visible"
-payment = Firewall().process("Card 4242424242424242", scope=ScanScope.OUTPUT)
+payment = RuleEngine().process("Card 4242424242424242", scope=ScanScope.OUTPUT)
 assert payment.decision is Action.REDACT
 assert payment.processed_text == "Card [REDACTED]"
 private_key = (
@@ -205,7 +218,7 @@ private_key = (
     "QUJDREVGR0hJSktMTU5PUA==\\n"
     "-----END PRIVATE KEY-----"
 )
-key_result = Firewall().process(private_key, scope=ScanScope.OUTPUT)
+key_result = RuleEngine().process(private_key, scope=ScanScope.OUTPUT)
 assert key_result.decision is Action.REDACT
 assert key_result.processed_text == "[REDACTED]"
 assert private_key not in repr(key_result.findings)
@@ -214,12 +227,12 @@ jwt = (
     "eyJzdWIiOiJzeW50aGV0aWMtdXNlciJ9."
     "c2lnbmF0dXJl"
 )
-jwt_result = Firewall().process(jwt, scope=ScanScope.INPUT)
+jwt_result = RuleEngine().process(jwt, scope=ScanScope.INPUT)
 assert jwt_result.decision is Action.REDACT
 assert jwt_result.processed_text == "[REDACTED]"
 assert jwt not in repr(jwt_result.findings)
-streaming_firewall = Firewall(
-    scanner=Scanner(rules=(SecretsRule(), PaymentCardRule()))
+streaming_firewall = RuleEngine(
+    scanner=RuleScanner(rules=(SecretsRule(), PaymentCardRule()))
 )
 streaming_text = "Card 4242424242424242 and sk-" + "A" * 20
 streaming_oracle = streaming_firewall.process(

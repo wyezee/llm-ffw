@@ -5,7 +5,7 @@ import math
 
 from .authorization_header import AuthorizationHeaderConfig
 from .banned_substring_catalog import BannedSubstringCatalog
-from .config import ScannerConfig
+from .config import RuleScannerConfig
 from .email_address import EmailAddressConfig
 from .iban import IBANConfig
 from .ip_address import IPAddressConfig
@@ -25,7 +25,7 @@ from .unsafe_url import UnsafeURLConfig
 class FirewallConfig:
     """One validated configuration shared by every high-level facade."""
 
-    scanner_config: ScannerConfig = field(default_factory=ScannerConfig)
+    scanner_config: RuleScannerConfig = field(default_factory=RuleScannerConfig)
     pool_config: ProcessScannerPoolConfig = field(
         default_factory=ProcessScannerPoolConfig
     )
@@ -57,7 +57,7 @@ class FirewallConfig:
 
     def __post_init__(self) -> None:
         required = (
-            ("scanner_config", self.scanner_config, ScannerConfig),
+            ("scanner_config", self.scanner_config, RuleScannerConfig),
             ("pool_config", self.pool_config, ProcessScannerPoolConfig),
             ("policy", self.policy, FirewallPolicy),
         )
@@ -120,7 +120,7 @@ class FirewallConfig:
 
     @classmethod
     def default(cls) -> "FirewallConfig":
-        """Return the secure baseline used by ``LLMFirewall()``."""
+        """Return the secure baseline used by ``Firewall()``."""
 
         return cls()
 

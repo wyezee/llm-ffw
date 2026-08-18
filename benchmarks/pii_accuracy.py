@@ -17,7 +17,7 @@ from llm_ffw import (
     IBANConfig,
     IBANRule,
     ScanScope,
-    Scanner,
+    RuleScanner,
 )
 from llm_ffw.iban import IBAN_LENGTHS
 
@@ -796,15 +796,15 @@ def _expected_redaction(scenario: PIIAccuracyScenario) -> str:
 def evaluate_corpus(
     corpus: PIIAccuracyCorpus,
     *,
-    scanner: Scanner | None = None,
+    scanner: RuleScanner | None = None,
 ) -> PIIAccuracyReport:
     """Evaluate exact rule, span, and redaction behavior."""
 
     if not isinstance(corpus, PIIAccuracyCorpus):
         raise TypeError("corpus must be a PIIAccuracyCorpus")
-    if scanner is not None and not isinstance(scanner, Scanner):
-        raise TypeError("scanner must be a Scanner or None")
-    active_scanner = scanner or Scanner(
+    if scanner is not None and not isinstance(scanner, RuleScanner):
+        raise TypeError("scanner must be a RuleScanner or None")
+    active_scanner = scanner or RuleScanner(
         rules=(
             EmailAddressRule(),
             IPAddressRule(),

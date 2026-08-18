@@ -24,7 +24,7 @@ from .capabilities import (
     RepetitionCapability,
 )
 from .banned_substring_catalog import BannedSubstringCatalog
-from .config import ScannerConfig
+from .config import RuleScannerConfig
 from .findings import Action, Finding
 from .inspection import ScanScope
 from .json_output import JSONOutputConfig
@@ -129,13 +129,13 @@ def _validate_request_timeout(value: object) -> float:
     return float(value)
 
 
-class LLMFirewall:
+class Firewall:
     """Sanitize text through one lifecycle-managed process scanner pool."""
 
     def __init__(
         self,
         *,
-        scanner_config: ScannerConfig | None = None,
+        scanner_config: RuleScannerConfig | None = None,
         pool_config: ProcessScannerPoolConfig | None = None,
         additional_secret_catalog: SecretCatalog | None = None,
         replacement_secret_catalog: SecretCatalog | None = None,
@@ -458,7 +458,7 @@ class LLMFirewall:
         )
 
     @classmethod
-    def from_config(cls, config: FirewallConfig) -> "LLMFirewall":
+    def from_config(cls, config: FirewallConfig) -> "Firewall":
         """Build the facade from one validated immutable configuration."""
 
         if not isinstance(config, FirewallConfig):
@@ -476,7 +476,7 @@ class LLMFirewall:
 
         return self._capabilities
 
-    def start(self) -> "LLMFirewall":
+    def start(self) -> "Firewall":
         """Start workers once during application startup."""
 
         failure: FirewallUnavailableError | None = None
@@ -643,7 +643,7 @@ class LLMFirewall:
             cause_type = "InternalInspectionError"
         return FirewallUnavailableError(cause_type)
 
-    def __enter__(self) -> "LLMFirewall":
+    def __enter__(self) -> "Firewall":
         return self.start()
 
     def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
@@ -654,9 +654,14 @@ class LLMFirewall:
                 raise
 
 
+# Compatibility alias retained through the pre-1.0 migration window.
+LLMFirewall = Firewall
+
+
 __all__ = [
     "ContentBlockedError",
     "FirewallUnavailableError",
+    "Firewall",
     "LLMFirewall",
     "SanitizationResult",
 ]

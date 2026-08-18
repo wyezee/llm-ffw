@@ -11,18 +11,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from benchmarks.synthetic_data import build_dataset
 from llm_ffw import (
     BALANCED_POLICY,
-    Firewall,
+    RuleEngine,
     FirewallStream,
     ScanScope,
-    Scanner,
-    ScannerConfig,
+    RuleScanner,
+    RuleScannerConfig,
     StreamMode,
 )
 from llm_ffw.rules import PaymentCardRule, SecretsRule
 
 
 def _stream_once(
-    firewall: Firewall,
+    firewall: RuleEngine,
     text: str,
     chunk_size: int,
 ) -> tuple[str, FirewallStream]:
@@ -51,10 +51,10 @@ def main() -> None:
         parser.error("--max-overhead-percent must not be negative")
 
     text = build_dataset(args.size).text
-    firewall = Firewall(
-        scanner=Scanner(
+    firewall = RuleEngine(
+        scanner=RuleScanner(
             rules=(SecretsRule(), PaymentCardRule()),
-            config=ScannerConfig(max_input_chars=len(text)),
+            config=RuleScannerConfig(max_input_chars=len(text)),
         ),
         policy=BALANCED_POLICY,
     )

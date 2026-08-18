@@ -6,16 +6,16 @@ from llm_ffw import (
     AUDIT_POLICY,
     STRICT_POLICY,
     Action,
-    AsyncLLMFirewall,
+    AsyncFirewall,
     ContentBlockedError,
-    Firewall,
+    RuleEngine,
     IBANConfig,
     IBANRule,
-    LLMFirewall,
-    LLMFirewallManager,
+    Firewall,
+    FirewallManager,
     ProcessScannerPoolConfig,
     ScanScope,
-    Scanner,
+    RuleScanner,
 )
 from llm_ffw.iban import (
     IBAN_LENGTHS,
@@ -24,8 +24,8 @@ from llm_ffw.iban import (
 )
 
 
-def _scanner(config: IBANConfig | None = None) -> Scanner:
-    return Scanner(rules=(IBANRule(config),))
+def _scanner(config: IBANConfig | None = None) -> RuleScanner:
+    return RuleScanner(rules=(IBANRule(config),))
 
 
 def _single_worker_config() -> ProcessScannerPoolConfig:
@@ -145,23 +145,23 @@ class IBANRuleTests(unittest.TestCase):
         self.assertEqual(finding.redacted_preview, "[REDACTED:iban]")
         self.assertNotIn(iban, finding.message)
         self.assertNotIn(iban, repr(finding))
-        result = Firewall(scanner=_scanner()).process(iban)
+        result = RuleEngine(scanner=_scanner()).process(iban)
         self.assertEqual(result.processed_text, "[REDACTED]")
 
     def test_builtin_policies_redact_block_and_review(self) -> None:
         iban = "DE89370400440532013000"
         self.assertEqual(
-            Firewall(scanner=_scanner()).process(iban).decision,
+            RuleEngine(scanner=_scanner()).process(iban).decision,
             Action.REDACT,
         )
         self.assertEqual(
-            Firewall(scanner=_scanner(), policy=AUDIT_POLICY)
+            RuleEngine(scanner=_scanner(), policy=AUDIT_POLICY)
             .process(iban)
             .decision,
             Action.REVIEW,
         )
         self.assertEqual(
-            Firewall(scanner=_scanner(), policy=STRICT_POLICY)
+            RuleEngine(scanner=_scanner(), policy=STRICT_POLICY)
             .process(iban)
             .decision,
             Action.BLOCK,
@@ -178,7 +178,7 @@ class IBANRuleTests(unittest.TestCase):
 
     def test_rule_is_opt_in_and_input_only_by_default(self) -> None:
         iban = "DE89370400440532013000"
-        self.assertEqual(Scanner().scan(iban), ())
+        self.assertEqual(RuleScanner().scan(iban), ())
         self.assertEqual(len(_scanner().scan(iban, scope=ScanScope.INPUT)), 1)
         self.assertEqual(_scanner().scan(iban, scope=ScanScope.OUTPUT), ())
 
@@ -206,7 +206,7 @@ class IBANFacadeTests(unittest.TestCase):
             max_candidates=7,
             scopes=(ScanScope.INPUT, ScanScope.OUTPUT),
         )
-        firewall = LLMFirewall(
+        firewall = Firewall(
             pool_config=_single_worker_config(),
             iban_config=config,
         )
@@ -225,7 +225,7 @@ class IBANFacadeTests(unittest.TestCase):
             )
 
     def test_manager_and_async_facade_preserve_configuration(self) -> None:
-        manager = LLMFirewallManager(
+        manager = FirewallManager(
             pool_config=_single_worker_config(),
             iban_config=IBANConfig(),
         )
@@ -236,7 +236,7 @@ class IBANFacadeTests(unittest.TestCase):
                 "[REDACTED]",
             )
 
-        asynchronous = AsyncLLMFirewall(
+        asynchronous = AsyncFirewall(
             pool_config=_single_worker_config(),
             iban_config=IBANConfig(),
         )
@@ -253,14 +253,14 @@ class IBANFacadeTests(unittest.TestCase):
         asyncio.run(exercise())
 
     def test_strict_facade_blocks_and_invalid_config_type_is_rejected(self) -> None:
-        with LLMFirewall(
+        with Firewall(
             pool_config=_single_worker_config(),
             iban_config=IBANConfig(),
             policy=STRICT_POLICY,
         ) as firewall, self.assertRaises(ContentBlockedError):
             firewall.sanitize_input("DE89370400440532013000")
         with self.assertRaises(TypeError):
-            LLMFirewall(iban_config=object())
+            Firewall(iban_config=object())
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
-"""Scanner orchestration and safe redaction."""
+"""Detection-only rule scanner orchestration and safe redaction."""
 
 from collections.abc import Iterable
 
-from .config import ScannerConfig
+from .config import RuleScannerConfig
 from .findings import Finding
 from .inspection import InspectionFeature, ScanScope, build_inspection
 from .redaction import sanitize_findings
@@ -24,17 +24,17 @@ from .rules.unsafe_url import UnsafeURLRule
 from .rules.repetition import RepetitionRule
 
 
-class Scanner:
+class RuleScanner:
     """Run deterministic rules and return findings in a stable order."""
 
     def __init__(
         self,
         rules: Iterable[Rule] | None = None,
-        config: ScannerConfig | None = None,
+        config: RuleScannerConfig | None = None,
     ) -> None:
-        self._config = config if config is not None else ScannerConfig()
-        if not isinstance(self._config, ScannerConfig):
-            raise TypeError("config must be a ScannerConfig")
+        self._config = config if config is not None else RuleScannerConfig()
+        if not isinstance(self._config, RuleScannerConfig):
+            raise TypeError("config must be a RuleScannerConfig")
 
         if rules is None:
             defaults: list[Rule] = [SecretsRule()]
@@ -120,7 +120,7 @@ class Scanner:
         )
 
     @property
-    def config(self) -> ScannerConfig:
+    def config(self) -> RuleScannerConfig:
         return self._config
 
     @property
@@ -275,3 +275,10 @@ class Scanner:
             and len(prompt_context) > self._config.max_input_chars
         ):
             raise ValueError("prompt_context exceeds max_input_chars")
+
+
+# Compatibility alias retained through the pre-1.0 migration window.
+Scanner = RuleScanner
+
+
+__all__ = ["RuleScanner", "Scanner"]

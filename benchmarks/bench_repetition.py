@@ -16,8 +16,8 @@ from llm_ffw import (
     ProcessScannerPoolConfig,
     RepetitionConfig,
     RepetitionRule,
-    Scanner,
-    ScannerConfig,
+    RuleScanner,
+    RuleScannerConfig,
     ScanScope,
 )
 
@@ -30,7 +30,7 @@ def benchmark(
     concurrency: int,
     process_requests: int,
 ) -> dict[str, float]:
-    scanner = Scanner(rules=(RepetitionRule(),))
+    scanner = RuleScanner(rules=(RepetitionRule(),))
     workloads = {
         "clean": ("ab" * ((size + 1) // 2))[:size],
         "separator_dense": ("- " * ((size + 1) // 2))[:size],
@@ -57,7 +57,7 @@ def benchmark(
     _, peak_bytes = tracemalloc.get_traced_memory()
     tracemalloc.stop()
     pool = ProcessScannerPool(
-        scanner_config=ScannerConfig(max_input_chars=size),
+        scanner_config=RuleScannerConfig(max_input_chars=size),
         pool_config=ProcessScannerPoolConfig(
             max_workers=workers,
             max_in_flight=max(workers, concurrency),

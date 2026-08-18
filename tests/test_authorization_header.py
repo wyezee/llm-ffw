@@ -6,17 +6,17 @@ from llm_ffw import (
     AUDIT_POLICY,
     STRICT_POLICY,
     Action,
-    AsyncLLMFirewall,
+    AsyncFirewall,
     AuthorizationHeaderConfig,
     AuthorizationHeaderCapability,
     AuthorizationHeaderRule,
     ContentBlockedError,
+    RuleEngine,
     Firewall,
-    LLMFirewall,
-    LLMFirewallManager,
+    FirewallManager,
     ProcessScannerPoolConfig,
     ScanScope,
-    Scanner,
+    RuleScanner,
 )
 
 
@@ -24,8 +24,8 @@ _BEARER = "synthetic_bearer_token_123456"
 _BASIC = "dXNlcjpwYXNzd29yZA=="  # synthetic "user:password"
 
 
-def _scanner(config: AuthorizationHeaderConfig | None = None) -> Scanner:
-    return Scanner(rules=(AuthorizationHeaderRule(config),))
+def _scanner(config: AuthorizationHeaderConfig | None = None) -> RuleScanner:
+    return RuleScanner(rules=(AuthorizationHeaderRule(config),))
 
 
 def _single_worker_config() -> ProcessScannerPoolConfig:
@@ -74,7 +74,7 @@ class AuthorizationHeaderConfigTests(unittest.TestCase):
 class AuthorizationHeaderRuleTests(unittest.TestCase):
     def test_is_opt_in_and_scans_input_and_output_by_default(self) -> None:
         text = f"Authorization: Bearer {_BEARER}"
-        self.assertEqual(Scanner().scan(text), ())
+        self.assertEqual(RuleScanner().scan(text), ())
         self.assertEqual(len(_scanner().scan(text, scope=ScanScope.INPUT)), 1)
         self.assertEqual(len(_scanner().scan(text, scope=ScanScope.OUTPUT)), 1)
 
@@ -131,7 +131,7 @@ class AuthorizationHeaderRuleTests(unittest.TestCase):
         for credential, finding in zip((_BEARER, _BASIC), findings):
             self.assertNotIn(credential, finding.message)
             self.assertNotIn(credential, repr(finding))
-        result = Firewall(scanner=_scanner()).process(text)
+        result = RuleEngine(scanner=_scanner()).process(text)
         self.assertEqual(
             result.processed_text,
             "Authorization: Bearer [REDACTED]\n"
@@ -160,12 +160,12 @@ class AuthorizationHeaderRuleTests(unittest.TestCase):
 
     def test_builtin_policies_redact_block_and_review(self) -> None:
         text = f"Authorization: Bearer {_BEARER}"
-        self.assertEqual(Firewall(scanner=_scanner()).process(text).decision, Action.REDACT)
-        audit = Firewall(scanner=_scanner(), policy=AUDIT_POLICY).process(text)
+        self.assertEqual(RuleEngine(scanner=_scanner()).process(text).decision, Action.REDACT)
+        audit = RuleEngine(scanner=_scanner(), policy=AUDIT_POLICY).process(text)
         self.assertEqual(audit.decision, Action.REVIEW)
         self.assertEqual(audit.processed_text, text)
         self.assertEqual(
-            Firewall(scanner=_scanner(), policy=STRICT_POLICY).process(text).decision,
+            RuleEngine(scanner=_scanner(), policy=STRICT_POLICY).process(text).decision,
             Action.BLOCK,
         )
 
@@ -197,7 +197,7 @@ class AuthorizationHeaderFacadeTests(unittest.TestCase):
             max_candidates=7,
             max_credential_chars=512,
         )
-        firewall = LLMFirewall(
+        firewall = Firewall(
             pool_config=_single_worker_config(),
             authorization_header_config=config,
         )
@@ -215,7 +215,7 @@ class AuthorizationHeaderFacadeTests(unittest.TestCase):
             )
 
     def test_manager_and_async_facade_preserve_configuration(self) -> None:
-        manager = LLMFirewallManager(
+        manager = FirewallManager(
             pool_config=_single_worker_config(),
             authorization_header_config=AuthorizationHeaderConfig(),
         )
@@ -226,7 +226,7 @@ class AuthorizationHeaderFacadeTests(unittest.TestCase):
                 "Authorization: Basic [REDACTED]",
             )
 
-        asynchronous = AsyncLLMFirewall(
+        asynchronous = AsyncFirewall(
             pool_config=_single_worker_config(),
             authorization_header_config=AuthorizationHeaderConfig(),
         )
@@ -244,7 +244,7 @@ class AuthorizationHeaderFacadeTests(unittest.TestCase):
 
     def test_rejects_non_config_value(self) -> None:
         with self.assertRaises(TypeError):
-            LLMFirewall(authorization_header_config=object())
+            Firewall(authorization_header_config=object())
 
 
 if __name__ == "__main__":

@@ -9,12 +9,12 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from benchmarks.synthetic_data import build_dataset
-from llm_ffw import Action, Firewall, Scanner, ScannerConfig
+from llm_ffw import Action, RuleEngine, RuleScanner, RuleScannerConfig
 
 
 def benchmark(size: int, rounds: int) -> tuple[float, float, int]:
     dataset = build_dataset(size)
-    firewall = Firewall(scanner=Scanner(config=ScannerConfig(max_input_chars=size)))
+    firewall = RuleEngine(scanner=RuleScanner(config=RuleScannerConfig(max_input_chars=size)))
     durations: list[float] = []
     finding_count = 0
     for _ in range(rounds):

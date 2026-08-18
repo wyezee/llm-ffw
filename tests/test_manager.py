@@ -15,7 +15,7 @@ from llm_ffw import (
     FirewallManagerState,
     FirewallReloadError,
     FirewallUnavailableError,
-    LLMFirewallManager,
+    FirewallManager,
     ProcessScannerPoolConfig,
     SecretCatalog,
     SecretSignature,
@@ -70,7 +70,7 @@ class _VanishedProcPath:
 class LLMFirewallManagerTests(unittest.TestCase):
     def test_structured_results_match_direct_facade_contract(self) -> None:
         secret = "sk-" + "A" * 20
-        manager = LLMFirewallManager(pool_config=_pool_config()).start()
+        manager = FirewallManager(pool_config=_pool_config()).start()
         try:
             input_result = manager.sanitize_input_result(
                 f"credential={secret}"
@@ -122,7 +122,7 @@ class LLMFirewallManagerTests(unittest.TestCase):
         self.assertGreater(result.peak_tree_rss_mib, 0)
 
     def test_context_manages_initial_generation(self) -> None:
-        manager = LLMFirewallManager(pool_config=_pool_config())
+        manager = FirewallManager(pool_config=_pool_config())
         value = "sk-" + "A" * 20
 
         self.assertEqual(manager.state, FirewallManagerState.NEW)
@@ -139,7 +139,7 @@ class LLMFirewallManagerTests(unittest.TestCase):
     def test_reload_extension_and_return_to_builtins(self) -> None:
         custom = "acme_live_" + "A" * 12
         builtin = "sk-" + "A" * 20
-        manager = LLMFirewallManager(pool_config=_pool_config()).start()
+        manager = FirewallManager(pool_config=_pool_config()).start()
         try:
             capabilities = manager.reload(
                 additional_secret_catalog=_additional_catalog()
@@ -170,7 +170,7 @@ class LLMFirewallManagerTests(unittest.TestCase):
             manager.close()
 
     def test_restart_replaces_broken_generation_with_same_catalog(self) -> None:
-        manager = LLMFirewallManager(pool_config=_pool_config()).start()
+        manager = FirewallManager(pool_config=_pool_config()).start()
         previous = manager._active.firewall
         executor = previous._pool._executor
         self.assertIsNotNone(executor)
@@ -194,7 +194,7 @@ class LLMFirewallManagerTests(unittest.TestCase):
     def test_explicit_replacement_removes_builtins(self) -> None:
         custom = "acme_live_" + "A" * 12
         builtin = "sk-" + "A" * 20
-        manager = LLMFirewallManager(pool_config=_pool_config()).start()
+        manager = FirewallManager(pool_config=_pool_config()).start()
         try:
             capabilities = manager.reload(
                 replacement_secret_catalog=_additional_catalog()
@@ -225,7 +225,7 @@ class LLMFirewallManagerTests(unittest.TestCase):
             ),
         )
         builtin = "sk-" + "A" * 20
-        manager = LLMFirewallManager(pool_config=_pool_config()).start()
+        manager = FirewallManager(pool_config=_pool_config()).start()
         try:
             with self.assertRaises(FirewallReloadError) as raised:
                 manager.reload(additional_secret_catalog=nested)
@@ -241,7 +241,7 @@ class LLMFirewallManagerTests(unittest.TestCase):
             manager.close()
 
     def test_reload_requires_snapshot_and_running_manager(self) -> None:
-        manager = LLMFirewallManager(pool_config=_pool_config())
+        manager = FirewallManager(pool_config=_pool_config())
         with self.assertRaises(ValueError):
             manager.reload()
         with self.assertRaises(FirewallReloadError) as raised:
@@ -254,7 +254,7 @@ class LLMFirewallManagerTests(unittest.TestCase):
         manager.close()
 
     def test_cleanup_failure_reports_activation_and_blocks_reload(self) -> None:
-        manager = LLMFirewallManager(pool_config=_pool_config()).start()
+        manager = FirewallManager(pool_config=_pool_config()).start()
         previous = manager._active.firewall
         original_close = previous.close
 
@@ -289,7 +289,7 @@ class LLMFirewallManagerTests(unittest.TestCase):
             manager.close()
 
     def test_reload_switches_new_requests_before_draining_old(self) -> None:
-        manager = LLMFirewallManager(pool_config=_pool_config()).start()
+        manager = FirewallManager(pool_config=_pool_config()).start()
         previous = manager._active.firewall
         entered = Event()
         release = Event()

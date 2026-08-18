@@ -6,12 +6,12 @@ from llm_ffw import (
     BannedSubstring,
     BannedSubstringCatalog,
     BannedSubstringsRule,
+    RuleEngine,
     Firewall,
-    LLMFirewall,
-    LLMFirewallManager,
+    FirewallManager,
     LiteralMatchMode,
     ScanScope,
-    Scanner,
+    RuleScanner,
     ProcessScannerPoolConfig,
 )
 
@@ -28,8 +28,8 @@ class BannedSubstringsRuleTests(unittest.TestCase):
     def test_redacts_substring_and_reports_only_safe_metadata(self) -> None:
         value = "internal project falcon"
         catalog = _catalog(BannedSubstring("project.falcon", value))
-        firewall = Firewall(
-            scanner=Scanner(rules=(BannedSubstringsRule(catalog),))
+        firewall = RuleEngine(
+            scanner=RuleScanner(rules=(BannedSubstringsRule(catalog),))
         )
 
         result = firewall.process(f"Discuss {value} today")
@@ -55,14 +55,14 @@ class BannedSubstringsRuleTests(unittest.TestCase):
             ),
             scopes=(ScanScope.OUTPUT,),
         )
-        scanner = Scanner(rules=(BannedSubstringsRule(catalog),))
+        scanner = RuleScanner(rules=(BannedSubstringsRule(catalog),))
 
         self.assertEqual(scanner.scan("xalpha", scope=ScanScope.OUTPUT), ())
         self.assertEqual(len(scanner.scan(" ALPHA ", scope=ScanScope.OUTPUT)), 1)
         self.assertEqual(scanner.scan(" ALPHA ", scope=ScanScope.INPUT), ())
 
     def test_more_than_64_results_returns_one_block_recommendation(self) -> None:
-        scanner = Scanner(
+        scanner = RuleScanner(
             rules=(
                 BannedSubstringsRule(
                     _catalog(BannedSubstring("repeat", "abc"))
@@ -101,7 +101,7 @@ class BannedSubstringsRuleTests(unittest.TestCase):
             )
             for index in range(1_000)
         )
-        scanner = Scanner(
+        scanner = RuleScanner(
             rules=(BannedSubstringsRule(_catalog(*patterns)),)
         )
         text = ("shared-prefix-zzzz" * 450_000)[:8_000_000]
@@ -116,7 +116,7 @@ class BannedSubstringsRuleTests(unittest.TestCase):
     def test_facade_propagates_catalog_through_recycled_workers(self) -> None:
         value = "internal project falcon"
         catalog = _catalog(BannedSubstring("project.falcon", value))
-        firewall = LLMFirewall(
+        firewall = Firewall(
             banned_substring_catalog=catalog,
             pool_config=ProcessScannerPoolConfig(
                 max_workers=1,
@@ -145,7 +145,7 @@ class BannedSubstringsRuleTests(unittest.TestCase):
 
     def test_manager_created_generation_preserves_literal_catalog(self) -> None:
         value = "internal project falcon"
-        manager = LLMFirewallManager(
+        manager = FirewallManager(
             banned_substring_catalog=_catalog(
                 BannedSubstring("project.falcon", value)
             ),

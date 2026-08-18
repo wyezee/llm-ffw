@@ -5,15 +5,15 @@ from llm_ffw import (
     STRICT_POLICY,
     Action,
     ContentBlockedError,
+    RuleEngine,
     Firewall,
-    LLMFirewall,
-    LLMFirewallManager,
+    FirewallManager,
     PrivateKeyConfig,
     PrivateKeyRule,
     ProcessScannerPoolConfig,
     ScanScope,
-    Scanner,
-    ScannerConfig,
+    RuleScanner,
+    RuleScannerConfig,
 )
 
 
@@ -21,8 +21,8 @@ def _block(label: str, body: str = "QUJDREVGR0hJSktMTU5PUA==") -> str:
     return f"-----BEGIN {label}-----\n{body}\n-----END {label}-----"
 
 
-def _scanner(config: PrivateKeyConfig | None = None) -> Scanner:
-    return Scanner(rules=(PrivateKeyRule(config),))
+def _scanner(config: PrivateKeyConfig | None = None) -> RuleScanner:
+    return RuleScanner(rules=(PrivateKeyRule(config),))
 
 
 def _single_worker_config() -> ProcessScannerPoolConfig:
@@ -83,7 +83,7 @@ class PrivateKeyRuleTests(unittest.TestCase):
         text = f"before {value} after"
         for scope in (ScanScope.INPUT, ScanScope.OUTPUT):
             with self.subTest(scope=scope):
-                result = Firewall(scanner=_scanner()).process(text, scope=scope)
+                result = RuleEngine(scanner=_scanner()).process(text, scope=scope)
                 self.assertEqual(result.processed_text, "before [REDACTED] after")
 
     def test_ignores_public_certificates_unknown_labels_and_lookalikes(self) -> None:
@@ -104,7 +104,7 @@ class PrivateKeyRuleTests(unittest.TestCase):
         self.assertIs(finding.action, Action.BLOCK)
         self.assertEqual(finding.metadata["reason"], "missing_end_marker")
         self.assertEqual(finding.span.end, len(text))
-        result = Firewall(scanner=_scanner()).process(text)
+        result = RuleEngine(scanner=_scanner()).process(text)
         self.assertEqual(result.processed_text, "prefix [REDACTED]")
 
     def test_oversized_block_and_candidate_overflow_fail_closed(self) -> None:
@@ -114,7 +114,7 @@ class PrivateKeyRuleTests(unittest.TestCase):
         self.assertEqual(finding.metadata["reason"], "block_size_exceeded")
         self.assertEqual(finding.span.end, len(oversized))
         self.assertEqual(
-            Firewall(
+            RuleEngine(
                 scanner=_scanner(PrivateKeyConfig(max_block_chars=64))
             ).process(oversized).processed_text,
             "[REDACTED]",
@@ -153,11 +153,11 @@ class PrivateKeyRuleTests(unittest.TestCase):
         value = _block("OPENSSH PRIVATE KEY")
         for scope in (ScanScope.INPUT, ScanScope.OUTPUT):
             with self.subTest(scope=scope):
-                balanced = Firewall(scanner=_scanner()).process(value, scope=scope)
-                strict = Firewall(
+                balanced = RuleEngine(scanner=_scanner()).process(value, scope=scope)
+                strict = RuleEngine(
                     scanner=_scanner(), policy=STRICT_POLICY
                 ).process(value, scope=scope)
-                audit = Firewall(
+                audit = RuleEngine(
                     scanner=_scanner(), policy=AUDIT_POLICY
                 ).process(value, scope=scope)
                 self.assertEqual(balanced.processed_text, "[REDACTED]")
@@ -168,12 +168,12 @@ class PrivateKeyRuleTests(unittest.TestCase):
 
 class PrivateKeyFacadeTests(unittest.TestCase):
     def test_is_default_opt_out_and_advertises_bounded_configuration(self) -> None:
-        enabled = LLMFirewall(pool_config=_single_worker_config())
-        disabled = LLMFirewall(
-            scanner_config=ScannerConfig(enable_private_keys=False),
+        enabled = Firewall(pool_config=_single_worker_config())
+        disabled = Firewall(
+            scanner_config=RuleScannerConfig(enable_private_keys=False),
             pool_config=_single_worker_config(),
         )
-        customized = LLMFirewall(
+        customized = Firewall(
             pool_config=_single_worker_config(),
             private_key_config=PrivateKeyConfig(
                 max_candidates=8,
@@ -201,18 +201,18 @@ class PrivateKeyFacadeTests(unittest.TestCase):
 
     def test_rejects_config_when_rule_is_disabled(self) -> None:
         with self.assertRaisesRegex(ValueError, "enable_private_keys"):
-            LLMFirewall(
-                scanner_config=ScannerConfig(enable_private_keys=False),
+            Firewall(
+                scanner_config=RuleScannerConfig(enable_private_keys=False),
                 private_key_config=PrivateKeyConfig(),
             )
 
     def test_rejects_non_config_value(self) -> None:
         with self.assertRaises(TypeError):
-            LLMFirewall(private_key_config=True)  # type: ignore[arg-type]
+            Firewall(private_key_config=True)  # type: ignore[arg-type]
 
     def test_worker_redacts_and_manager_propagates_configuration(self) -> None:
         value = _block("PRIVATE KEY")
-        manager = LLMFirewallManager(
+        manager = FirewallManager(
             pool_config=_single_worker_config(),
             private_key_config=PrivateKeyConfig(max_candidates=8),
         ).start()
@@ -224,7 +224,7 @@ class PrivateKeyFacadeTests(unittest.TestCase):
 
     def test_strict_process_policy_blocks_without_disclosure(self) -> None:
         value = _block("PRIVATE KEY", "UNIQUE_PRIVATE_VALUE")
-        firewall = LLMFirewall(
+        firewall = Firewall(
             pool_config=_single_worker_config(),
             policy=STRICT_POLICY,
         )

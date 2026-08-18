@@ -21,7 +21,7 @@ from llm_ffw import (
     IBANRule,
     IPAddressRule,
     MACAddressRule,
-    Scanner,
+    RuleScanner,
 )
 from tools import pii_accuracy_gate
 
@@ -273,7 +273,7 @@ class PIIAccuracyEvaluationTests(unittest.TestCase):
             )
         )
 
-        report = evaluate_corpus(corpus, scanner=Scanner(rules=()))
+        report = evaluate_corpus(corpus, scanner=RuleScanner(rules=()))
 
         self.assertEqual(report.false_positives, 0)
         self.assertEqual(report.false_negatives, 1)

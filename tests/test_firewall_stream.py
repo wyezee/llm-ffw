@@ -10,15 +10,15 @@ from llm_ffw import (
     BALANCED_POLICY,
     BUILTIN_SECRET_CATALOG,
     ContentBlockedError,
-    Firewall,
+    RuleEngine,
     FirewallResult,
     FirewallStream,
     FirewallStreamState,
     IncrementalStreamingUnavailableError,
     PaymentCardConfig,
     ScanScope,
-    Scanner,
-    ScannerConfig,
+    RuleScanner,
+    RuleScannerConfig,
     SecretCatalog,
     SecretSignature,
     Severity,
@@ -67,10 +67,10 @@ def _secret_scanner(
     *,
     catalog: SecretCatalog = BUILTIN_SECRET_CATALOG,
     redaction_text: str = "[REDACTED]",
-) -> Scanner:
-    return Scanner(
+) -> RuleScanner:
+    return RuleScanner(
         rules=(SecretsRule(catalog),),
-        config=ScannerConfig(
+        config=RuleScannerConfig(
             max_input_chars=max_input_chars,
             redaction_text=redaction_text,
         ),
@@ -83,7 +83,7 @@ def _oracle(
     catalog: SecretCatalog = BUILTIN_SECRET_CATALOG,
     policy=BALANCED_POLICY,
 ):
-    return Firewall(
+    return RuleEngine(
         scanner=_secret_scanner(max(1, len(text)), catalog=catalog),
         policy=policy,
     ).process(text, scope=ScanScope.INPUT)
@@ -115,10 +115,10 @@ def _rule_scanner(
     text_length: int,
     *rules,
     redaction_text: str = "[REDACTED]",
-) -> Scanner:
-    return Scanner(
+) -> RuleScanner:
+    return RuleScanner(
         rules=rules,
-        config=ScannerConfig(
+        config=RuleScannerConfig(
             max_input_chars=max(1, text_length),
             redaction_text=redaction_text,
         ),
@@ -131,7 +131,7 @@ def _run_rule_stream(
     *rules,
     policy=BALANCED_POLICY,
 ) -> tuple[FirewallResult, str, FirewallStream]:
-    firewall = Firewall(
+    firewall = RuleEngine(
         scanner=_rule_scanner(len(text), *rules),
         policy=policy,
     )
@@ -148,7 +148,7 @@ class FirewallStreamContractTests(unittest.TestCase):
 
     def test_default_auto_preserves_all_rules_by_buffering(self) -> None:
         text = "before sk-" + "A" * 20 + " after"
-        firewall = Firewall()
+        firewall = RuleEngine()
         oracle = firewall.process(text, scope=ScanScope.INPUT)
         stream = FirewallStream()
 
@@ -194,16 +194,16 @@ class FirewallStreamContractTests(unittest.TestCase):
 
     def test_firewall_factory_uses_existing_scanner_and_policy(self) -> None:
         scanner = _secret_scanner(128)
-        firewall = Firewall(scanner=scanner, policy=BALANCED_POLICY)
+        firewall = RuleEngine(scanner=scanner, policy=BALANCED_POLICY)
         stream = firewall.stream(mode=StreamMode.INCREMENTAL)
         self.assertEqual(stream.execution_mode, StreamMode.INCREMENTAL)
         output = stream.feed("sk-" + "A" * 20) + stream.finish()
         self.assertEqual(output, "[REDACTED]")
 
     def test_rules_inactive_for_scope_do_not_prevent_incremental_mode(self) -> None:
-        scanner = Scanner(
+        scanner = RuleScanner(
             rules=(SecretsRule(), InvisibleCharactersRule()),
-            config=ScannerConfig(max_input_chars=128),
+            config=RuleScannerConfig(max_input_chars=128),
         )
         stream = FirewallStream(
             scanner=scanner,
@@ -222,7 +222,7 @@ class FirewallStreamContractTests(unittest.TestCase):
         text = "sk-" + "A" * 20
         context = "private prompt context"
         scanner = _secret_scanner(128)
-        oracle = Firewall(scanner=scanner).process(
+        oracle = RuleEngine(scanner=scanner).process(
             text,
             scope=ScanScope.OUTPUT,
             prompt_context=context,
@@ -240,7 +240,7 @@ class FirewallStreamContractTests(unittest.TestCase):
 
     def test_no_active_rules_emit_unchanged_chunks_incrementally(self) -> None:
         stream = FirewallStream(
-            scanner=Scanner(rules=()),
+            scanner=RuleScanner(rules=()),
             mode=StreamMode.INCREMENTAL,
         )
         self.assertEqual(stream.feed("safe"), "safe")
@@ -249,7 +249,7 @@ class FirewallStreamContractTests(unittest.TestCase):
         self.assertEqual(stream.findings, ())
 
     def test_custom_scanner_implementations_require_buffered_execution(self) -> None:
-        class CustomScanner(Scanner):
+        class CustomScanner(RuleScanner):
             pass
 
         scanner = CustomScanner(rules=())
@@ -326,7 +326,7 @@ class FirewallStreamContractTests(unittest.TestCase):
     def test_explicit_buffered_mode_never_emits_early(self) -> None:
         text = "safe text"
         stream = FirewallStream(
-            scanner=Scanner(rules=()),
+            scanner=RuleScanner(rules=()),
             mode=StreamMode.BUFFERED,
         )
         self.assertEqual(stream.feed(text), "")
@@ -335,7 +335,7 @@ class FirewallStreamContractTests(unittest.TestCase):
     def test_buffered_output_preserves_prompt_context_contract(self) -> None:
         text = "safe output"
         context = "private prompt context"
-        firewall = Firewall()
+        firewall = RuleEngine()
         oracle = firewall.process(
             text,
             scope=ScanScope.OUTPUT,
@@ -377,7 +377,7 @@ class FirewallStreamParityTests(unittest.TestCase):
         text = "model returned 4111-1111-1111-1111"
         context = "disclosure-safe context"
         scanner = _rule_scanner(len(text), PaymentCardRule())
-        firewall = Firewall(scanner=scanner)
+        firewall = RuleEngine(scanner=scanner)
         oracle = firewall.process(
             text,
             scope=ScanScope.OUTPUT,
@@ -564,7 +564,7 @@ class FirewallStreamLifecycleTests(unittest.TestCase):
         emitted = stream.feed(text)
         self.assertTrue(emitted.startswith("[REDACTED]"))
         self.assertLessEqual(stream.buffered_chars, 100)
-        oracle = Firewall(scanner=scanner).process(text)
+        oracle = RuleEngine(scanner=scanner).process(text)
         self.assertEqual(emitted + stream.finish(), oracle.processed_text)
 
     def test_payment_card_adversarial_numeric_input_has_bounded_memory(self) -> None:
@@ -643,9 +643,9 @@ class FirewallStreamLifecycleTests(unittest.TestCase):
         self.assertEqual(stream.buffered_chars, 0)
 
         buffered = FirewallStream(
-            scanner=Scanner(
+            scanner=RuleScanner(
                 rules=(),
-                config=ScannerConfig(max_input_chars=8),
+                config=RuleScannerConfig(max_input_chars=8),
             ),
             mode=StreamMode.BUFFERED,
         )
@@ -655,7 +655,7 @@ class FirewallStreamLifecycleTests(unittest.TestCase):
         self.assertEqual(buffered.buffered_chars, 0)
 
     def test_cancel_and_finish_are_terminal(self) -> None:
-        cancelled = FirewallStream(scanner=Scanner(rules=()))
+        cancelled = FirewallStream(scanner=RuleScanner(rules=()))
         cancelled.feed("safe")
         cancelled.cancel()
         cancelled.cancel()
@@ -664,7 +664,7 @@ class FirewallStreamLifecycleTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "not open"):
             cancelled.finish()
 
-        finished = FirewallStream(scanner=Scanner(rules=()))
+        finished = FirewallStream(scanner=RuleScanner(rules=()))
         finished.finish()
         with self.assertRaisesRegex(RuntimeError, "not open"):
             finished.feed("again")
@@ -754,7 +754,7 @@ class FirewallStreamConfigurationTests(unittest.TestCase):
                 prompt_context=object(),
             )
 
-        stream = FirewallStream(scanner=Scanner(rules=()))
+        stream = FirewallStream(scanner=RuleScanner(rules=()))
         with self.assertRaises(TypeError):
             stream.feed(object())
         with self.assertRaises(ValueError):

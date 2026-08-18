@@ -39,7 +39,7 @@ from llm_ffw import (
     ProcessScannerPoolConfig,
     RepetitionConfig,
     ScanScope,
-    ScannerConfig,
+    RuleScannerConfig,
     UnsafeURLConfig,
 )
 
@@ -151,7 +151,7 @@ def _pool(
     if rule_set not in _RULE_SETS:
         raise ValueError("rule_set must be 'default' or 'all'")
     common = {
-        "scanner_config": ScannerConfig(max_input_chars=size),
+        "scanner_config": RuleScannerConfig(max_input_chars=size),
         "pool_config": ProcessScannerPoolConfig(
             max_workers=workers,
             max_in_flight=concurrency,

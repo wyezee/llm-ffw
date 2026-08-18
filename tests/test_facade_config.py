@@ -2,13 +2,13 @@ from dataclasses import FrozenInstanceError
 import unittest
 
 from llm_ffw import (
-    AsyncLLMFirewall,
-    AsyncLLMFirewallManager,
+    AsyncFirewall,
+    AsyncFirewallManager,
     BannedSubstring,
     BannedSubstringCatalog,
     FirewallConfig,
-    LLMFirewall,
-    LLMFirewallManager,
+    Firewall,
+    FirewallManager,
     ProcessScannerPoolConfig,
 )
 
@@ -23,8 +23,8 @@ def _catalog() -> BannedSubstringCatalog:
 
 class FirewallConfigTests(unittest.TestCase):
     def test_default_matches_direct_facade_capabilities(self) -> None:
-        direct = LLMFirewall(pool_config=ProcessScannerPoolConfig(max_workers=1))
-        configured = LLMFirewall.from_config(
+        direct = Firewall(pool_config=ProcessScannerPoolConfig(max_workers=1))
+        configured = Firewall.from_config(
             FirewallConfig(
                 pool_config=ProcessScannerPoolConfig(max_workers=1)
             )
@@ -36,12 +36,12 @@ class FirewallConfigTests(unittest.TestCase):
             configured.close()
 
     def test_presets_have_explicit_composable_scope(self) -> None:
-        privacy = LLMFirewall.from_config(FirewallConfig.privacy_input())
-        json_api = LLMFirewall.from_config(FirewallConfig.json_api())
+        privacy = Firewall.from_config(FirewallConfig.privacy_input())
+        json_api = Firewall.from_config(FirewallConfig.json_api())
         all_rules_config = FirewallConfig.all_text_rules(
             banned_substring_catalog=_catalog()
         )
-        all_rules = LLMFirewall.from_config(all_rules_config)
+        all_rules = Firewall.from_config(all_rules_config)
         try:
             privacy_rule_ids = {
                 item.rule_id for item in privacy.capabilities().rules
@@ -83,10 +83,10 @@ class FirewallConfigTests(unittest.TestCase):
 
     def test_all_facades_reject_non_configuration_values(self) -> None:
         factories = (
-            LLMFirewall.from_config,
-            LLMFirewallManager.from_config,
-            AsyncLLMFirewall.from_config,
-            AsyncLLMFirewallManager.from_config,
+            Firewall.from_config,
+            FirewallManager.from_config,
+            AsyncFirewall.from_config,
+            AsyncFirewallManager.from_config,
         )
         for factory in factories:
             with self.subTest(factory=factory.__qualname__):

@@ -22,11 +22,12 @@ from .banned_substring_catalog import (
     BannedSubstringCatalog,
     LiteralMatchMode,
 )
-from .config import ScannerConfig
-from .engine import Scanner
+from .config import RuleScannerConfig, ScannerConfig
+from .engine import RuleScanner, Scanner
 from .findings import Action, Finding, Severity, Span
 from .facade import (
     ContentBlockedError,
+    Firewall,
     FirewallUnavailableError,
     LLMFirewall,
     SanitizationResult,
@@ -50,19 +51,25 @@ from .private_key import PrivateKeyConfig
 from .jwt_token import JWTTokenConfig
 from .repetition import RepetitionConfig
 from .manager import (
+    FirewallManager,
     FirewallManagerState,
     FirewallReloadError,
     LLMFirewallManager,
 )
-from .async_facade import AsyncLLMFirewall, AsyncLLMFirewallManager
+from .async_facade import (
+    AsyncFirewall,
+    AsyncFirewallManager,
+    AsyncLLMFirewall,
+    AsyncLLMFirewallManager,
+)
 from .policy import (
     AUDIT_POLICY,
     BALANCED_POLICY,
     STRICT_POLICY,
-    Firewall,
     FirewallPolicy,
     FirewallResult,
     PolicyOverride,
+    RuleEngine,
 )
 from .process_pool import (
     ProcessPoolNotRunningError,
@@ -107,6 +114,8 @@ from .rules.tool_result import ToolResultBlockedError, ToolResultRule
 __all__ = [
     "Action",
     "AUDIT_POLICY",
+    "AsyncFirewall",
+    "AsyncFirewallManager",
     "AsyncLLMFirewall",
     "AsyncLLMFirewallManager",
     "BALANCED_POLICY",
@@ -123,6 +132,7 @@ __all__ = [
     "Firewall",
     "FirewallCapabilities",
     "FirewallConfig",
+    "FirewallManager",
     "FirewallManagerState",
     "FirewallReloadError",
     "FirewallUnavailableError",
@@ -170,6 +180,9 @@ __all__ = [
     "RepetitionConfig",
     "RepetitionCapability",
     "RepetitionRule",
+    "RuleEngine",
+    "RuleScanner",
+    "RuleScannerConfig",
     "Scanner",
     "ScannerConfig",
     "ScanScope",

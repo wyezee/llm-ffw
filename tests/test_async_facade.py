@@ -5,8 +5,8 @@ import unittest
 
 from llm_ffw import (
     Action,
-    AsyncLLMFirewall,
-    AsyncLLMFirewallManager,
+    AsyncFirewall,
+    AsyncFirewallManager,
     ContentBlockedError,
     FirewallManagerState,
     FirewallUnavailableError,
@@ -53,7 +53,7 @@ def _additional_catalog() -> SecretCatalog:
 class AsyncLLMFirewallTests(unittest.IsolatedAsyncioTestCase):
     async def test_context_sanitizes_with_structured_sync_parity(self) -> None:
         secret = "sk-" + "A" * 20
-        firewall = AsyncLLMFirewall(pool_config=_pool_config())
+        firewall = AsyncFirewall(pool_config=_pool_config())
 
         self.assertEqual(firewall.state, ProcessPoolState.NEW)
         async with firewall:
@@ -77,7 +77,7 @@ class AsyncLLMFirewallTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_strict_block_does_not_stop_async_firewall(self) -> None:
         secret = "sk-" + "B" * 20
-        async with AsyncLLMFirewall(
+        async with AsyncFirewall(
             pool_config=_pool_config(),
             policy=STRICT_POLICY,
         ) as firewall:
@@ -95,7 +95,7 @@ class AsyncLLMFirewallTests(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         started = Event()
         release = Event()
-        firewall = AsyncLLMFirewall(
+        firewall = AsyncFirewall(
             pool_config=_pool_config(max_in_flight=1),
         )
 
@@ -127,7 +127,7 @@ class AsyncLLMFirewallTests(unittest.IsolatedAsyncioTestCase):
     async def test_positive_admission_timeout_is_non_blocking(self) -> None:
         started = Event()
         release = Event()
-        firewall = AsyncLLMFirewall(
+        firewall = AsyncFirewall(
             pool_config=_pool_config(
                 max_in_flight=1,
                 admission_timeout_seconds=0.02,
@@ -161,7 +161,7 @@ class AsyncLLMFirewallTests(unittest.IsolatedAsyncioTestCase):
         started = Event()
         release = Event()
         completed = Event()
-        firewall = AsyncLLMFirewall(pool_config=_pool_config())
+        firewall = AsyncFirewall(pool_config=_pool_config())
 
         def blocking_start() -> object:
             started.set()
@@ -186,7 +186,7 @@ class AsyncLLMFirewallTests(unittest.IsolatedAsyncioTestCase):
     async def test_close_stops_admission_and_drains_running_requests(self) -> None:
         started = Event()
         release = Event()
-        firewall = AsyncLLMFirewall(
+        firewall = AsyncFirewall(
             pool_config=_pool_config(max_in_flight=1),
         )
 
@@ -211,7 +211,7 @@ class AsyncLLMFirewallTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(firewall._requests._closed)
 
     async def test_request_timeout_preserves_broken_pool_semantics(self) -> None:
-        firewall = AsyncLLMFirewall(
+        firewall = AsyncFirewall(
             pool_config=_pool_config(),
             request_timeout_seconds=0,
         )
@@ -224,7 +224,7 @@ class AsyncLLMFirewallTests(unittest.IsolatedAsyncioTestCase):
         await firewall.close()
 
     async def test_rejects_cross_event_loop_reuse(self) -> None:
-        firewall = AsyncLLMFirewall(pool_config=_pool_config())
+        firewall = AsyncFirewall(pool_config=_pool_config())
         self.assertEqual(
             await firewall._requests.run(lambda: "ok"),
             "ok",
@@ -244,7 +244,7 @@ class AsyncLLMFirewallTests(unittest.IsolatedAsyncioTestCase):
 class AsyncLLMFirewallManagerTests(unittest.IsolatedAsyncioTestCase):
     async def test_structured_results_match_async_facade_contract(self) -> None:
         secret = "sk-" + "D" * 20
-        manager = AsyncLLMFirewallManager(pool_config=_pool_config())
+        manager = AsyncFirewallManager(pool_config=_pool_config())
 
         async with manager:
             input_result = await manager.sanitize_input_result(secret)
@@ -259,7 +259,7 @@ class AsyncLLMFirewallManagerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_reload_and_restart_preserve_async_service(self) -> None:
         custom = "acme_async_" + "C" * 16
-        manager = AsyncLLMFirewallManager(pool_config=_pool_config())
+        manager = AsyncFirewallManager(pool_config=_pool_config())
 
         async with manager:
             self.assertEqual(manager.state, FirewallManagerState.RUNNING)

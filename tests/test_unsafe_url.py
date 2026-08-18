@@ -6,19 +6,19 @@ from llm_ffw import (
     STRICT_POLICY,
     Action,
     ContentBlockedError,
+    RuleEngine,
     Firewall,
-    LLMFirewall,
-    LLMFirewallManager,
+    FirewallManager,
     ProcessScannerPoolConfig,
     ScanScope,
-    Scanner,
+    RuleScanner,
     UnsafeURLConfig,
     UnsafeURLRule,
 )
 
 
-def _scanner(config: UnsafeURLConfig | None = None) -> Scanner:
-    return Scanner(rules=(UnsafeURLRule(config),))
+def _scanner(config: UnsafeURLConfig | None = None) -> RuleScanner:
+    return RuleScanner(rules=(UnsafeURLRule(config),))
 
 
 def _single_worker_config() -> ProcessScannerPoolConfig:
@@ -192,7 +192,7 @@ class UnsafeURLRuleTests(unittest.TestCase):
         finding = _scanner().scan(text, scope=ScanScope.OUTPUT)[0]
 
         self.assertEqual(text[finding.span.start : finding.span.end], "javascript:alert(1)")
-        result = Firewall(scanner=_scanner()).process(
+        result = RuleEngine(scanner=_scanner()).process(
             text,
             scope=ScanScope.OUTPUT,
         )
@@ -211,7 +211,7 @@ class UnsafeURLRuleTests(unittest.TestCase):
         self.assertEqual(finding.metadata["reason"], "candidate_limit_exceeded")
         self.assertEqual(finding.metadata["limit"], "1")
         self.assertEqual(finding.span.end, len(text))
-        balanced = Firewall(scanner=scanner).process(
+        balanced = RuleEngine(scanner=scanner).process(
             text,
             scope=ScanScope.OUTPUT,
         )
@@ -220,7 +220,7 @@ class UnsafeURLRuleTests(unittest.TestCase):
     def test_candidate_overflow_also_redacts_earlier_unsafe_candidates(self) -> None:
         config = UnsafeURLConfig(max_candidates=1)
         text = "javascript:alert(1) https://example.org trailing"
-        result = Firewall(scanner=_scanner(config)).process(
+        result = RuleEngine(scanner=_scanner(config)).process(
             text,
             scope=ScanScope.OUTPUT,
         )
@@ -262,11 +262,11 @@ class UnsafeURLRuleTests(unittest.TestCase):
         text = "Open javascript:alert(1)"
         for scope in (ScanScope.INPUT, ScanScope.OUTPUT):
             with self.subTest(scope=scope):
-                balanced = Firewall(scanner=_scanner()).process(text, scope=scope)
-                strict = Firewall(
+                balanced = RuleEngine(scanner=_scanner()).process(text, scope=scope)
+                strict = RuleEngine(
                     scanner=_scanner(), policy=STRICT_POLICY
                 ).process(text, scope=scope)
-                audit = Firewall(
+                audit = RuleEngine(
                     scanner=_scanner(), policy=AUDIT_POLICY
                 ).process(text, scope=scope)
 
@@ -278,8 +278,8 @@ class UnsafeURLRuleTests(unittest.TestCase):
 
 class UnsafeURLFacadeTests(unittest.TestCase):
     def test_is_opt_in_and_advertises_bounded_configuration(self) -> None:
-        disabled = LLMFirewall(pool_config=_single_worker_config())
-        enabled = LLMFirewall(
+        disabled = Firewall(pool_config=_single_worker_config())
+        enabled = Firewall(
             pool_config=_single_worker_config(),
             unsafe_url_config=UnsafeURLConfig(
                 max_candidates=32,
@@ -310,7 +310,7 @@ class UnsafeURLFacadeTests(unittest.TestCase):
         enabled.close()
 
     def test_worker_redacts_unsafe_input_and_output(self) -> None:
-        firewall = LLMFirewall(
+        firewall = Firewall(
             pool_config=_single_worker_config(),
             unsafe_url_config=UnsafeURLConfig(),
         )
@@ -326,7 +326,7 @@ class UnsafeURLFacadeTests(unittest.TestCase):
             )
 
     def test_worker_strict_policy_blocks_unsafe_output(self) -> None:
-        firewall = LLMFirewall(
+        firewall = Firewall(
             pool_config=_single_worker_config(),
             unsafe_url_config=UnsafeURLConfig(),
             policy=STRICT_POLICY,
@@ -339,10 +339,10 @@ class UnsafeURLFacadeTests(unittest.TestCase):
 
     def test_rejects_non_config_value(self) -> None:
         with self.assertRaises(TypeError):
-            LLMFirewall(unsafe_url_config=True)  # type: ignore[arg-type]
+            Firewall(unsafe_url_config=True)  # type: ignore[arg-type]
 
     def test_manager_propagates_rule_configuration(self) -> None:
-        manager = LLMFirewallManager(
+        manager = FirewallManager(
             pool_config=_single_worker_config(),
             unsafe_url_config=UnsafeURLConfig(),
         ).start()

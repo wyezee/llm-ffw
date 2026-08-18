@@ -14,7 +14,7 @@ from llm_ffw import (
     ProcessPoolState,
     ProcessScannerPool,
     ProcessScannerPoolConfig,
-    ScannerConfig,
+    RuleScannerConfig,
 )
 
 
@@ -29,7 +29,7 @@ def run_soak(
     dataset = build_dataset(size)
     expected_findings = len(dataset.expected_findings)
     pool = ProcessScannerPool(
-        scanner_config=ScannerConfig(max_input_chars=size),
+        scanner_config=RuleScannerConfig(max_input_chars=size),
         pool_config=ProcessScannerPoolConfig(
             max_workers=workers,
             max_in_flight=max(concurrency, workers),

@@ -3,19 +3,19 @@ import unittest
 
 from llm_ffw import (
     Action,
-    AsyncLLMFirewall,
-    LLMFirewall,
-    LLMFirewallManager,
+    AsyncFirewall,
+    Firewall,
+    FirewallManager,
     ProcessScannerPoolConfig,
     RepetitionConfig,
     RepetitionRule,
     ScanScope,
-    Scanner,
+    RuleScanner,
 )
 
 
-def _scanner(config: RepetitionConfig | None = None) -> Scanner:
-    return Scanner(rules=(RepetitionRule(config),))
+def _scanner(config: RepetitionConfig | None = None) -> RuleScanner:
+    return RuleScanner(rules=(RepetitionRule(config),))
 
 
 class RepetitionConfigTests(unittest.TestCase):
@@ -49,7 +49,7 @@ class RepetitionConfigTests(unittest.TestCase):
 class RepetitionRuleTests(unittest.TestCase):
     def test_is_opt_in_and_supports_both_scopes(self) -> None:
         text = "x" * 256
-        self.assertEqual(Scanner().scan(text), ())
+        self.assertEqual(RuleScanner().scan(text), ())
         scanner = _scanner()
         self.assertEqual(len(scanner.scan(text, scope=ScanScope.INPUT)), 1)
         self.assertEqual(len(scanner.scan(text, scope=ScanScope.OUTPUT)), 1)
@@ -137,7 +137,7 @@ class RepetitionFacadeTests(unittest.TestCase):
             line_repeat_threshold=40,
             max_findings=12,
         )
-        firewall = LLMFirewall(
+        firewall = Firewall(
             pool_config=ProcessScannerPoolConfig(
                 max_workers=1, max_in_flight=1, max_tasks_per_child=10
             ),
@@ -157,12 +157,12 @@ class RepetitionFacadeTests(unittest.TestCase):
 
     def test_rejects_invalid_facade_configuration(self) -> None:
         with self.assertRaises(TypeError):
-            LLMFirewall(repetition_config=object())  # type: ignore[arg-type]
+            Firewall(repetition_config=object())  # type: ignore[arg-type]
 
     def test_manager_and_async_facade_preserve_configuration(self) -> None:
         config = RepetitionConfig(max_findings=7)
-        manager = LLMFirewallManager(repetition_config=config)
-        asynchronous = AsyncLLMFirewall(repetition_config=config)
+        manager = FirewallManager(repetition_config=config)
+        asynchronous = AsyncFirewall(repetition_config=config)
         self.assertEqual(manager.capabilities().repetition.max_findings, 7)  # type: ignore[union-attr]
         self.assertEqual(
             asynchronous.capabilities().repetition.max_findings, 7  # type: ignore[union-attr]

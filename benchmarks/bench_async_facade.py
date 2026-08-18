@@ -1,4 +1,4 @@
-"""Benchmark bounded concurrent requests through AsyncLLMFirewall."""
+"""Benchmark bounded concurrent requests through AsyncFirewall."""
 
 import argparse
 import asyncio
@@ -12,9 +12,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from benchmarks.synthetic_data import build_dataset
 from llm_ffw import (
     Action,
-    AsyncLLMFirewall,
+    AsyncFirewall,
     ProcessScannerPoolConfig,
-    ScannerConfig,
+    RuleScannerConfig,
 )
 
 
@@ -43,8 +43,8 @@ async def benchmark_async_facade(
         raise ValueError("concurrency must be at least workers")
     dataset = build_dataset(size)
     expected_findings = len(dataset.expected_findings)
-    firewall = AsyncLLMFirewall(
-        scanner_config=ScannerConfig(max_input_chars=size),
+    firewall = AsyncFirewall(
+        scanner_config=RuleScannerConfig(max_input_chars=size),
         pool_config=ProcessScannerPoolConfig(
             max_workers=workers,
             max_in_flight=concurrency,

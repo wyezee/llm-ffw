@@ -9,13 +9,13 @@ from llm_ffw import (
     BALANCED_POLICY,
     STRICT_POLICY,
     Action,
-    Firewall,
+    RuleEngine,
     FirewallPolicy,
     FirewallResult,
     InvisibleCharactersRule,
     PolicyOverride,
     ScanScope,
-    Scanner,
+    RuleScanner,
     Severity,
     Span,
 )
@@ -56,11 +56,11 @@ class _UnicodeOnlyBlockRule(Rule):
 
 class FirewallPolicyTests(unittest.TestCase):
     def test_custom_rule_uses_full_original_scan_before_removal(self) -> None:
-        scanner = Scanner(
+        scanner = RuleScanner(
             rules=(InvisibleCharactersRule(), _UnicodeOnlyBlockRule())
         )
 
-        result = Firewall(scanner=scanner).process("a\u200bb")
+        result = RuleEngine(scanner=scanner).process("a\u200bb")
 
         self.assertTrue(result.blocked)
         self.assertEqual(
@@ -80,7 +80,7 @@ class FirewallPolicyTests(unittest.TestCase):
         )
         for policy, text in cases:
             with self.subTest(policy=policy.policy_id, marker=text[-1]):
-                reference_scanner = Scanner()
+                reference_scanner = RuleScanner()
                 initial = reference_scanner.scan(text)
                 expected = policy.apply_with_rescan(
                     text,
@@ -90,12 +90,12 @@ class FirewallPolicyTests(unittest.TestCase):
                     rescan=reference_scanner.scan,
                 )
 
-                actual = Firewall(scanner=Scanner(), policy=policy).process(text)
+                actual = RuleEngine(scanner=RuleScanner(), policy=policy).process(text)
 
                 self.assertEqual(actual, expected)
 
     def test_remove_path_skips_remaining_original_scan(self) -> None:
-        scanner = Scanner()
+        scanner = RuleScanner()
         hidden_secret = "sk-\u200b" + "F" * 20
 
         with (
@@ -106,7 +106,7 @@ class FirewallPolicyTests(unittest.TestCase):
             ) as remaining,
             patch.object(scanner, "scan", wraps=scanner.scan) as full_scan,
         ):
-            result = Firewall(scanner=scanner).process(hidden_secret)
+            result = RuleEngine(scanner=scanner).process(hidden_secret)
 
         self.assertEqual(remaining.call_count, 0)
         self.assertEqual(full_scan.call_count, 1)
@@ -122,7 +122,7 @@ class FirewallPolicyTests(unittest.TestCase):
             (STRICT_POLICY, "sk-\u200b" + "G" * 20),
         )
         for policy, text in cases:
-            scanner = Scanner()
+            scanner = RuleScanner()
             with (
                 self.subTest(policy=policy.policy_id),
                 patch.object(
@@ -132,14 +132,14 @@ class FirewallPolicyTests(unittest.TestCase):
                 ) as remaining,
                 patch.object(scanner, "scan", wraps=scanner.scan) as full_scan,
             ):
-                Firewall(scanner=scanner, policy=policy).process(text)
+                RuleEngine(scanner=scanner, policy=policy).process(text)
 
             self.assertEqual(remaining.call_count, 1)
             self.assertEqual(full_scan.call_count, 0)
 
     def test_balanced_policy_redacts_input_and_output_by_default(self) -> None:
         secret = _secret()
-        firewall = Firewall()
+        firewall = RuleEngine()
 
         for scope in (ScanScope.INPUT, ScanScope.OUTPUT):
             with self.subTest(scope=scope):
@@ -158,7 +158,7 @@ class FirewallPolicyTests(unittest.TestCase):
 
     def test_strict_policy_blocks_only_input_request(self) -> None:
         secret = _secret("B")
-        firewall = Firewall(policy=STRICT_POLICY)
+        firewall = RuleEngine(policy=STRICT_POLICY)
 
         blocked = firewall.process(secret, scope=ScanScope.INPUT)
         output = firewall.process(secret, scope=ScanScope.OUTPUT)
@@ -176,14 +176,14 @@ class FirewallPolicyTests(unittest.TestCase):
     def test_audit_policy_reports_without_modifying_text(self) -> None:
         secret = _secret("C")
 
-        result = Firewall(policy=AUDIT_POLICY).process(secret)
+        result = RuleEngine(policy=AUDIT_POLICY).process(secret)
 
         self.assertEqual(result.decision, Action.REVIEW)
         self.assertEqual(result.processed_text, secret)
         self.assertEqual(result.findings[0].action, Action.REVIEW)
 
     def test_no_findings_allow_original_text(self) -> None:
-        result = Firewall().process("safe")
+        result = RuleEngine().process("safe")
 
         self.assertEqual(result.decision, Action.ALLOW)
         self.assertEqual(result.processed_text, "safe")
@@ -213,10 +213,10 @@ class FirewallPolicyTests(unittest.TestCase):
             ),
         )
         with self.assertRaisesRegex(ValueError, "unknown rule_id"):
-            Firewall(policy=unknown)
+            RuleEngine(policy=unknown)
 
     def test_result_rejects_decision_weaker_than_effective_findings(self) -> None:
-        finding = Firewall(policy=STRICT_POLICY).process(_secret("D")).findings[0]
+        finding = RuleEngine(policy=STRICT_POLICY).process(_secret("D")).findings[0]
 
         with self.assertRaisesRegex(ValueError, "strongest"):
             FirewallResult(
@@ -232,7 +232,7 @@ class FirewallPolicyTests(unittest.TestCase):
         dataset = build_dataset(8_000_000)
 
         started = time.perf_counter()
-        result = Firewall().process(dataset.text)
+        result = RuleEngine().process(dataset.text)
         elapsed = time.perf_counter() - started
 
         self.assertEqual(result.decision, Action.REDACT)

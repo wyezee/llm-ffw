@@ -2,12 +2,12 @@ import time
 import unittest
 
 from benchmarks.synthetic_data import synthetic_token
-from llm_ffw import BUILTIN_SECRET_CATALOG, Scanner
+from llm_ffw import BUILTIN_SECRET_CATALOG, RuleScanner
 
 
 class ProviderCatalogTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.scanner = Scanner()
+        self.scanner = RuleScanner()
 
     def test_every_provider_prefix_matches_its_declared_signature(self) -> None:
         for signature in BUILTIN_SECRET_CATALOG.signatures:

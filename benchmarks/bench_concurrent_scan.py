@@ -14,8 +14,8 @@ from benchmarks.synthetic_data import build_dataset
 from llm_ffw import (
     ProcessScannerPool,
     ProcessScannerPoolConfig,
-    Scanner,
-    ScannerConfig,
+    RuleScanner,
+    RuleScannerConfig,
 )
 
 
@@ -31,7 +31,7 @@ class BenchmarkResult:
     aggregate_mib_per_second: float
 
 
-def _scan(scanner: Scanner, text: str) -> int:
+def _scan(scanner: RuleScanner, text: str) -> int:
     return len(scanner.scan(text))
 
 
@@ -50,7 +50,7 @@ def benchmark_concurrency(
         raise ValueError("executor must be serial, thread, or process")
     if workers <= 0 or requests <= 0 or rounds <= 0:
         raise ValueError("workers, requests, and rounds must be positive")
-    scanner = Scanner(config=ScannerConfig(max_input_chars=len(text)))
+    scanner = RuleScanner(config=RuleScannerConfig(max_input_chars=len(text)))
     durations: list[float] = []
     count_batches: list[list[int]] = []
 
@@ -76,7 +76,7 @@ def benchmark_concurrency(
             max_in_flight=max(workers, requests),
         )
         with ProcessScannerPool(
-            scanner_config=ScannerConfig(max_input_chars=len(text)),
+            scanner_config=RuleScannerConfig(max_input_chars=len(text)),
             pool_config=pool_config,
         ) as pool:
             warm_futures = [pool.submit(text) for _ in range(workers)]

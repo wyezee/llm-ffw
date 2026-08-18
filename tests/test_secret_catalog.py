@@ -4,7 +4,7 @@ import unittest
 from llm_ffw import (
     BUILTIN_SECRET_CATALOG,
     Action,
-    Scanner,
+    RuleScanner,
     SecretCatalog,
     SecretSignature,
     SignatureStatus,
@@ -61,7 +61,7 @@ class SecretCatalogTests(unittest.TestCase):
             "twilio",
             {signature.provider for signature in BUILTIN_SECRET_CATALOG.signatures},
         )
-        self.assertEqual(Scanner().scan(api_key_sid), ())
+        self.assertEqual(RuleScanner().scan(api_key_sid), ())
 
     def test_custom_catalog_matches_without_file_or_network_loading(self) -> None:
         signature = _signature()
@@ -72,7 +72,7 @@ class SecretCatalogTests(unittest.TestCase):
         )
         token = "ex_" + "A1b2" * 3
 
-        findings = Scanner(rules=(SecretsRule(catalog),)).scan("token=" + token)
+        findings = RuleScanner(rules=(SecretsRule(catalog),)).scan("token=" + token)
 
         self.assertEqual(len(findings), 1)
         finding = findings[0]
@@ -100,7 +100,7 @@ class SecretCatalogTests(unittest.TestCase):
         )
         catalog = SecretCatalog("acme.legacy", "2", (signature,))
 
-        finding = Scanner(rules=(SecretsRule(catalog),)).scan("old_A1b2C3d4")[0]
+        finding = RuleScanner(rules=(SecretsRule(catalog),)).scan("old_A1b2C3d4")[0]
 
         self.assertEqual(finding.metadata["signature_status"], "legacy")
 
@@ -119,7 +119,7 @@ class SecretCatalogTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            Scanner(rules=(SecretsRule(catalog),)).scan("tok_live_" + "A" * 11),
+            RuleScanner(rules=(SecretsRule(catalog),)).scan("tok_live_" + "A" * 11),
             (),
         )
 
@@ -149,7 +149,7 @@ class SecretCatalogTests(unittest.TestCase):
             action=Action.REVIEW,
             suffix_ending="ZZ",
         )
-        scanner = Scanner(
+        scanner = RuleScanner(
             rules=(SecretsRule(SecretCatalog("acme.review", "1", (signature,))),)
         )
 
@@ -220,11 +220,11 @@ class SecretCatalogTests(unittest.TestCase):
     def test_longest_prefix_controls_suffix_length(self) -> None:
         value = "sk-proj-" + "A" * 19
 
-        self.assertEqual(Scanner().scan(value), ())
+        self.assertEqual(RuleScanner().scan(value), ())
 
     def test_custom_signature_enforces_boundaries_and_maximum_length(self) -> None:
         catalog = SecretCatalog("acme.catalog", "1", (_signature(maximum=8),))
-        scanner = Scanner(rules=(SecretsRule(catalog),))
+        scanner = RuleScanner(rules=(SecretsRule(catalog),))
 
         for value in (
             "aex_A1b2C3d4",
@@ -241,7 +241,7 @@ class SecretCatalogTests(unittest.TestCase):
             _signature(signature_id=f"example.token_{index}", prefix=f"P{index:03d}_")
             for index in range(100)
         )
-        scanner = Scanner(
+        scanner = RuleScanner(
             rules=(SecretsRule(SecretCatalog("acme.large", "1", signatures)),)
         )
         text = ("P000_" + "!" * 10) * 66_666

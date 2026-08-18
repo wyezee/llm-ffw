@@ -8,15 +8,15 @@ from llm_ffw import (
     BUILTIN_SECRET_CATALOG,
     STRICT_POLICY,
     Action,
-    Firewall,
+    RuleEngine,
     ProcessPoolNotRunningError,
     ProcessPoolSaturatedError,
     ProcessPoolState,
     ProcessScannerPool,
     ProcessScannerPoolConfig,
     ScanScope,
-    Scanner,
-    ScannerConfig,
+    RuleScanner,
+    RuleScannerConfig,
 )
 
 
@@ -83,7 +83,7 @@ class ProcessScannerPoolTests(unittest.TestCase):
         with pool:
             self.assertEqual(pool.state, ProcessPoolState.RUNNING)
             findings = pool.scan(text, timeout=10)
-            self.assertEqual(findings, Scanner().scan(text))
+            self.assertEqual(findings, RuleScanner().scan(text))
             self.assertNotIn(text, findings[0].message)
             self.assertNotIn(text, tuple(findings[0].metadata.values()))
 
@@ -93,7 +93,7 @@ class ProcessScannerPoolTests(unittest.TestCase):
             pool.submit(text)
 
     def test_bounded_admission_timeout_and_parent_input_limit(self) -> None:
-        scanner_config = ScannerConfig(max_input_chars=8_000_000)
+        scanner_config = RuleScannerConfig(max_input_chars=8_000_000)
         pool = ProcessScannerPool(
             scanner_config=scanner_config,
             pool_config=ProcessScannerPoolConfig(
@@ -164,7 +164,7 @@ class ProcessScannerPoolTests(unittest.TestCase):
 
     def test_process_canonicalization_matches_direct_findings_and_spans(self) -> None:
         text = "prefix sk-\u200b" + "H" * 20 + " suffix"
-        expected = Firewall().process(text)
+        expected = RuleEngine().process(text)
         pool = ProcessScannerPool(
             pool_config=ProcessScannerPoolConfig(
                 max_workers=1,

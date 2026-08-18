@@ -14,11 +14,11 @@ from llm_ffw import (
     Action,
     EmailAddressConfig,
     EmailAddressRule,
-    Firewall,
+    RuleEngine,
     ProcessScannerPool,
     ProcessScannerPoolConfig,
-    Scanner,
-    ScannerConfig,
+    RuleScanner,
+    RuleScannerConfig,
     ScanScope,
 )
 from llm_ffw.rules.secrets import SecretsRule
@@ -40,9 +40,9 @@ def benchmark(
     process_requests: int,
 ) -> dict[str, float]:
     address_config = EmailAddressConfig()
-    scanner_config = ScannerConfig(max_input_chars=size)
-    firewall = Firewall(
-        scanner=Scanner(
+    scanner_config = RuleScannerConfig(max_input_chars=size)
+    firewall = RuleEngine(
+        scanner=RuleScanner(
             rules=(SecretsRule(), EmailAddressRule(address_config)),
             config=scanner_config,
         )

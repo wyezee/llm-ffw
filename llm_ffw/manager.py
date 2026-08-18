@@ -6,10 +6,10 @@ from threading import Condition, Lock
 
 from .capabilities import FirewallCapabilities
 from .banned_substring_catalog import BannedSubstringCatalog
-from .config import ScannerConfig
+from .config import RuleScannerConfig
 from .facade import (
+    Firewall,
     FirewallUnavailableError,
-    LLMFirewall,
     SanitizationResult,
 )
 from .facade_config import FirewallConfig
@@ -56,17 +56,17 @@ class FirewallReloadError(RuntimeError):
 
 @dataclass(slots=True)
 class _Generation:
-    firewall: LLMFirewall
+    firewall: Firewall
     in_flight: int = 0
 
 
-class LLMFirewallManager:
+class FirewallManager:
     """Hot-swap immutable firewall generations and drain previous requests."""
 
     def __init__(
         self,
         *,
-        scanner_config: ScannerConfig | None = None,
+        scanner_config: RuleScannerConfig | None = None,
         pool_config: ProcessScannerPoolConfig | None = None,
         additional_secret_catalog: SecretCatalog | None = None,
         replacement_secret_catalog: SecretCatalog | None = None,
@@ -113,7 +113,7 @@ class LLMFirewallManager:
         self._retired: list[_Generation] = []
 
     @classmethod
-    def from_config(cls, config: FirewallConfig) -> "LLMFirewallManager":
+    def from_config(cls, config: FirewallConfig) -> "FirewallManager":
         """Build the manager from one validated immutable configuration."""
 
         if not isinstance(config, FirewallConfig):
@@ -125,8 +125,8 @@ class LLMFirewallManager:
         *,
         additional_secret_catalog: SecretCatalog | None,
         replacement_secret_catalog: SecretCatalog | None,
-    ) -> LLMFirewall:
-        return LLMFirewall(
+    ) -> Firewall:
+        return Firewall(
             scanner_config=self._scanner_config,
             pool_config=self._pool_config,
             additional_secret_catalog=additional_secret_catalog,
@@ -158,7 +158,7 @@ class LLMFirewallManager:
         with self._condition:
             return self._active.firewall.capabilities()
 
-    def start(self) -> "LLMFirewallManager":
+    def start(self) -> "FirewallManager":
         """Start the initial generation during application startup."""
 
         with self._lifecycle_lock:
@@ -262,7 +262,7 @@ class LLMFirewallManager:
                     cause_type="CatalogCoordinateUnchangedError",
                 )
             self._state = FirewallManagerState.RELOADING
-        candidate: LLMFirewall | None = None
+        candidate: Firewall | None = None
         cause_type: str | None = None
         try:
             candidate = self._build_firewall(
@@ -292,7 +292,7 @@ class LLMFirewallManager:
 
     def _activate_and_drain(
         self,
-        candidate: LLMFirewall,
+        candidate: Firewall,
     ) -> FirewallCapabilities:
         interrupted_state: FirewallManagerState | None = None
         with self._condition:
@@ -462,7 +462,7 @@ class LLMFirewallManager:
         return "InternalReloadError"
 
     @staticmethod
-    def _discard_candidate(candidate: LLMFirewall) -> None:
+    def _discard_candidate(candidate: Firewall) -> None:
         try:
             candidate.close()
         except FirewallUnavailableError:
@@ -471,7 +471,7 @@ class LLMFirewallManager:
             except FirewallUnavailableError:
                 pass
 
-    def __enter__(self) -> "LLMFirewallManager":
+    def __enter__(self) -> "FirewallManager":
         return self.start()
 
     def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
@@ -482,7 +482,12 @@ class LLMFirewallManager:
                 raise
 
 
+# Compatibility alias retained through the pre-1.0 migration window.
+LLMFirewallManager = FirewallManager
+
+
 __all__ = [
+    "FirewallManager",
     "FirewallManagerState",
     "FirewallReloadError",
     "LLMFirewallManager",

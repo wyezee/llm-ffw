@@ -12,13 +12,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from llm_ffw import (
     Action,
-    Firewall,
+    RuleEngine,
     JWTTokenConfig,
     JWTTokenRule,
     ProcessScannerPool,
     ProcessScannerPoolConfig,
-    Scanner,
-    ScannerConfig,
+    RuleScanner,
+    RuleScannerConfig,
     ScanScope,
 )
 from llm_ffw.rules.secrets import SecretsRule
@@ -43,9 +43,9 @@ def benchmark(
     process_requests: int,
 ) -> dict[str, float]:
     rule_config = JWTTokenConfig()
-    scanner_config = ScannerConfig(max_input_chars=size)
-    firewall = Firewall(
-        scanner=Scanner(
+    scanner_config = RuleScannerConfig(max_input_chars=size)
+    firewall = RuleEngine(
+        scanner=RuleScanner(
             rules=(SecretsRule(), JWTTokenRule(rule_config)),
             config=scanner_config,
         )

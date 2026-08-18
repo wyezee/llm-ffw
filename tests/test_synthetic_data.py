@@ -8,7 +8,7 @@ import unittest
 from benchmarks.bench_concurrent_scan import benchmark_concurrency
 from benchmarks.generate_synthetic_dataset import write_dataset
 from benchmarks.synthetic_data import build_dataset
-from llm_ffw import Scanner, ScannerConfig
+from llm_ffw import RuleScanner, RuleScannerConfig
 
 
 class SyntheticDataTests(unittest.TestCase):
@@ -26,7 +26,7 @@ class SyntheticDataTests(unittest.TestCase):
 
     def test_scanner_results_equal_independent_expected_spans(self) -> None:
         dataset = build_dataset(100_000)
-        scanner = Scanner(config=ScannerConfig(max_input_chars=len(dataset.text)))
+        scanner = RuleScanner(config=RuleScannerConfig(max_input_chars=len(dataset.text)))
 
         actual = scanner.scan(dataset.text)
 

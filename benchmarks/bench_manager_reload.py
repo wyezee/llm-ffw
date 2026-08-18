@@ -17,9 +17,9 @@ from benchmarks.synthetic_data import build_dataset
 from llm_ffw import (
     FirewallManagerState,
     FirewallReloadError,
-    LLMFirewallManager,
+    FirewallManager,
     ProcessScannerPoolConfig,
-    ScannerConfig,
+    RuleScannerConfig,
     SecretCatalog,
     SecretSignature,
 )
@@ -344,8 +344,8 @@ def _run_shutdown_probe(
     max_tasks_per_child: int,
     timeout: float,
 ) -> None:
-    manager = LLMFirewallManager(
-        scanner_config=ScannerConfig(max_input_chars=len(text)),
+    manager = FirewallManager(
+        scanner_config=RuleScannerConfig(max_input_chars=len(text)),
         pool_config=_pool_config(workers, concurrency, max_tasks_per_child),
         request_timeout_seconds=timeout,
     ).start()
@@ -446,8 +446,8 @@ def run_manager_reload_gate(
     }
     sampler = _MemorySampler(sample_interval_seconds)
     sampler.start()
-    manager = LLMFirewallManager(
-        scanner_config=ScannerConfig(max_input_chars=size),
+    manager = FirewallManager(
+        scanner_config=RuleScannerConfig(max_input_chars=size),
         pool_config=_pool_config(workers, concurrency, max_tasks_per_child),
         request_timeout_seconds=timeout,
     )

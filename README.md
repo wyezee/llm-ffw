@@ -68,13 +68,19 @@ installation has no runtime dependencies outside the Python standard library.
 python -m pip install llm-ffw==0.9.0
 ```
 
+The canonical API names documented below are currently available on the
+unreleased `master` branch and will ship in the next minor release. Published
+0.9.0 applications should continue to use `LLMFirewall`, `AsyncLLMFirewall`,
+`LLMFirewallManager`, and `AsyncLLMFirewallManager`; those names remain
+compatible aliases after the migration.
+
 Create one facade during application startup and reuse it for every request:
 
 ```python
-from llm_ffw import LLMFirewall
+from llm_ffw import Firewall
 
 def main() -> None:
-    with LLMFirewall() as firewall:
+    with Firewall() as firewall:
         safe_prompt = firewall.sanitize_input(prompt)
         model_output = call_model(safe_prompt)
         safe_output = firewall.sanitize_output(model_output)
@@ -121,18 +127,34 @@ Choose the highest-level API that fits the integration:
 
 | API | Use it for |
 | --- | --- |
-| `LLMFirewall` | Recommended production input/output sanitization and lifecycle |
-| `AsyncLLMFirewall` | The same production contract for asyncio applications |
-| `LLMFirewallManager` | The same facade with zero-downtime secret-catalog reloads |
-| `AsyncLLMFirewallManager` | Asyncio sanitization plus asynchronous catalog lifecycle |
+| `Firewall` | Recommended production input/output sanitization and lifecycle |
+| `AsyncFirewall` | The same production contract for asyncio applications |
+| `FirewallManager` | The same facade with zero-downtime secret-catalog reloads |
+| `AsyncFirewallManager` | Asyncio sanitization plus asynchronous catalog lifecycle |
 | `FirewallStream` | Chunked input with explicit incremental or buffered enforcement |
-| `Firewall` | Same-process scanning plus policy application |
-| `Scanner` | Same-process detection when the host applies findings itself |
+| `RuleEngine` | Same-process scanning plus policy application |
+| `RuleScanner` | Same-process detection when the host applies findings itself |
 | `ProcessScannerPool` | Advanced process orchestration and explicit overload control |
 | `ToolCallRule` | Provider-neutral allowlist and typed argument validation before tool execution |
 | `ToolResultRule` | Provider-neutral linkage and bounded-content validation before model consumption |
 
-Production integrations should normally begin with the `LLMFirewall` quick
+### Pre-1.0 naming migration
+
+The canonical facade names are `Firewall`, `AsyncFirewall`,
+`FirewallManager`, and `AsyncFirewallManager`. The former `LLMFirewall`,
+`AsyncLLMFirewall`, `LLMFirewallManager`, and `AsyncLLMFirewallManager` names
+remain identity-preserving compatibility aliases during the pre-1.0 migration
+window. `Scanner` and `ScannerConfig` likewise remain aliases of `RuleScanner`
+and `RuleScannerConfig`.
+
+One collision cannot retain its old package-root meaning: before this change,
+`Firewall` named the in-process scan-and-policy class. That class is now
+`RuleEngine`; migrate `Firewall(scanner=..., policy=...)` to
+`RuleEngine(scanner=..., policy=...)`. Direct `llm_ffw.policy.Firewall` imports
+remain compatible temporarily, but new code should import `RuleEngine` from
+`llm_ffw`.
+
+Production integrations should normally begin with the `Firewall` quick
 start above. The remaining APIs expose async lifecycle, streaming, hot reload,
 or lower-level control when those capabilities are specifically required.
 
@@ -144,10 +166,10 @@ when every active rule and effective action can safely do so; otherwise it
 buffers the request and applies the normal firewall at `finish()`:
 
 ```python
-from llm_ffw import Firewall
+from llm_ffw import RuleEngine
 
-firewall = Firewall()
-stream = firewall.stream()
+engine = RuleEngine()
+stream = engine.stream()
 try:
     for chunk in incoming_chunks:
         safe_chunk = stream.feed(chunk)
@@ -173,13 +195,13 @@ fails with `IncrementalStreamingUnavailableError` if any active rule, catalog
 shape, or policy action cannot preserve semantics:
 
 ```python
-from llm_ffw import Firewall, Scanner, StreamMode
+from llm_ffw import RuleEngine, RuleScanner, StreamMode
 from llm_ffw.rules import PaymentCardRule, SecretsRule
 
-firewall = Firewall(
-    scanner=Scanner(rules=(SecretsRule(), PaymentCardRule()))
+engine = RuleEngine(
+    scanner=RuleScanner(rules=(SecretsRule(), PaymentCardRule()))
 )
-stream = firewall.stream(mode=StreamMode.INCREMENTAL)
+stream = engine.stream(mode=StreamMode.INCREMENTAL)
 ```
 
 The current release has fused incremental implementations for `SecretsRule`
@@ -202,13 +224,13 @@ to one request and must not be shared between concurrent callers.
 
 ### Async usage
 
-Asyncio applications should use `AsyncLLMFirewall` directly instead of wrapping
+Asyncio applications should use `AsyncFirewall` directly instead of wrapping
 the synchronous facade with `asyncio.to_thread()`:
 
 ```python
-from llm_ffw import AsyncLLMFirewall
+from llm_ffw import AsyncFirewall
 
-async def handle_request(firewall: AsyncLLMFirewall, prompt: str) -> str:
+async def handle_request(firewall: AsyncFirewall, prompt: str) -> str:
     safe_prompt = await firewall.sanitize_input(prompt)
     model_output = await call_model_async(safe_prompt)
     return await firewall.sanitize_output(
@@ -217,7 +239,7 @@ async def handle_request(firewall: AsyncLLMFirewall, prompt: str) -> str:
     )
 
 async def main(prompt: str) -> None:
-    async with AsyncLLMFirewall() as firewall:
+    async with AsyncFirewall() as firewall:
         response = await handle_request(firewall, prompt)
 ```
 
@@ -228,7 +250,7 @@ structured-result methods. `capabilities()` and `state` remain synchronous
 because they return in-memory metadata without blocking.
 
 The async facade uses the same process scanner, policies, configuration,
-timeouts, and exceptions as `LLMFirewall`. Its private request executor and
+timeouts, and exceptions as `Firewall`. Its private request executor and
 async admission gate are both bounded by `ProcessScannerPoolConfig`; it never
 blocks the event loop while waiting for CPU workers. One instance belongs to
 one event loop. Canceling an await does not abandon its running scan: the scan
@@ -297,13 +319,13 @@ the submitted text. `FirewallUnavailableError.cause_type` is a bounded category
 such as `TimeoutError` or `ProcessPoolSaturatedError`; the original exception
 and submitted text are not retained.
 
-`Firewall`, `ProcessScannerPool`, and `Scanner` remain lower-level APIs for
+`RuleEngine`, `ProcessScannerPool`, and `RuleScanner` are lower-level APIs for
 custom policy results, process orchestration, and detection-only evaluation.
 
 ```python
-from llm_ffw import ScanScope, Scanner
+from llm_ffw import RuleScanner, ScanScope
 
-scanner = Scanner()
+scanner = RuleScanner()
 text = get_llm_input()  # Your application supplies the text.
 
 findings = scanner.scan(text, scope=ScanScope.INPUT)
@@ -326,19 +348,19 @@ findings = scanner.scan(
 ```
 
 Omitting `scope` preserves the input-scan default. The text and optional prompt
-context are each bounded by `ScannerConfig.max_input_chars`.
+context are each bounded by `RuleScannerConfig.max_input_chars`.
 
 Do not log `text` or slice a finding's span for diagnostics. Findings contain a
 category-only `redacted_preview` suitable for reporting.
 
-The default `ScannerConfig.max_input_chars` is 8,000,000 characters, providing
+The default `RuleScannerConfig.max_input_chars` is 8,000,000 characters, providing
 headroom for a typical one-million-token text context. Token-to-character ratios
 vary by model, language, and content; callers should still set an explicit limit
 appropriate to their deployment and memory budget.
 
 ## Facade configuration
 
-`LLMFirewall` and `AsyncLLMFirewall` accept the same immutable startup
+`Firewall` and `AsyncFirewall` accept the same immutable startup
 configuration. Create and validate one facade, then reuse it rather than
 rebuilding it per request.
 
@@ -348,14 +370,14 @@ be universally "secure" or "enterprise":
 
 ```python
 from dataclasses import replace
-from llm_ffw import FirewallConfig, LLMFirewall
+from llm_ffw import FirewallConfig, Firewall
 
 config = replace(
     FirewallConfig.privacy_input(),
     request_timeout_seconds=10.0,
 )
 
-with LLMFirewall.from_config(config) as firewall:
+with Firewall.from_config(config) as firewall:
     safe_prompt = firewall.sanitize_input(prompt)
 ```
 
@@ -395,7 +417,7 @@ the opt-in banned-substring, JSON, unsafe-URL, IP-address, MAC-address, IBAN,
 Authorization-header, email-address, and repetition configurations leaves each corresponding
 rule disabled. Payment-card,
 private-key, JWT,
-invisible-character, and Unicode tag rules are enabled by `ScannerConfig`
+invisible-character, and Unicode tag rules are enabled by `RuleScannerConfig`
 defaults; their dedicated config objects customize bounds and scopes rather
 than enabling them.
 
@@ -412,14 +434,14 @@ findings to `REVIEW` and returns the original text, so use it only when another
 trusted enforcement layer consumes the findings.
 
 Select a complete built-in policy directly, for example
-`LLMFirewall(policy=STRICT_POLICY)`. Use a custom policy only when a deployment
+`Firewall(policy=STRICT_POLICY)`. Use a custom policy only when a deployment
 needs an explicit rule-and-scope exception:
 
 ```python
 from llm_ffw import (
     Action,
     FirewallPolicy,
-    LLMFirewall,
+    Firewall,
     PolicyOverride,
     ScanScope,
     UnsafeURLConfig,
@@ -436,7 +458,7 @@ policy = FirewallPolicy(
         ),
     ),
 )
-firewall = LLMFirewall(
+firewall = Firewall(
     unsafe_url_config=UnsafeURLConfig(),
     policy=policy,
 )
@@ -456,8 +478,8 @@ Strict and audit policies can change the effective action.
 | Rule ID | Default | Scope | Balanced behavior | Configuration |
 | --- | --- | --- | --- | --- |
 | `secrets.detected` | Enabled | Input/output | Redact | Secret catalog |
-| `unicode.invisible_characters` | Enabled | Input | Remove; block bounded overflow | `ScannerConfig` |
-| `unicode.tag_smuggling` | Enabled | Input | Remove; block bounded overflow | `ScannerConfig` |
+| `unicode.invisible_characters` | Enabled | Input | Remove; block bounded overflow | `RuleScannerConfig` |
+| `unicode.tag_smuggling` | Enabled | Input | Remove; block bounded overflow | `RuleScannerConfig` |
 | `pii.payment_card` | Enabled | Input/output | Redact | `PaymentCardConfig` |
 | `secrets.private_key` | Enabled | Input/output | Redact complete blocks; block unsafe malformed cases | `PrivateKeyConfig` |
 | `secrets.jwt_token` | Enabled | Input/output | Redact | `JWTTokenConfig` |
@@ -579,10 +601,10 @@ cleaned input through every enabled rule. Clean ASCII requests retain a single
 scan. The rule is input-only and enabled by default. Applications can opt out:
 
 ```python
-from llm_ffw import LLMFirewall, ScannerConfig
+from llm_ffw import Firewall, RuleScannerConfig
 
-firewall = LLMFirewall(
-    scanner_config=ScannerConfig(enable_invisible_characters=False),
+firewall = Firewall(
+    scanner_config=RuleScannerConfig(enable_invisible_characters=False),
 )
 ```
 
@@ -597,7 +619,7 @@ characters are not removed.
 rescans the cleaned text. It preserves the three RGI subdivision-flag tag
 sequences pinned by Unicode Emoji 17.0 and treats malformed, extended, or other
 tag runs as findings. Applications can independently opt out with
-`ScannerConfig(enable_unicode_tag_smuggling=False)`. More than 64 relevant runs
+`RuleScannerConfig(enable_unicode_tag_smuggling=False)`. More than 64 relevant runs
 fails closed.
 
 ### Deployment-defined banned substrings
@@ -611,7 +633,7 @@ from llm_ffw import (
     Action,
     BannedSubstring,
     BannedSubstringCatalog,
-    LLMFirewall,
+    Firewall,
     LiteralMatchMode,
     ScanScope,
 )
@@ -630,7 +652,7 @@ content_catalog = BannedSubstringCatalog(
         ),
     ),
 )
-firewall = LLMFirewall(banned_substring_catalog=content_catalog)
+firewall = Firewall(banned_substring_catalog=content_catalog)
 ```
 
 Catalogs accept 1–1,024 unique literals. Each value must contain 3–64 printable
@@ -646,9 +668,9 @@ Applications that require a complete JSON response can enable the bounded,
 output-only `JSONOutputRule`:
 
 ```python
-from llm_ffw import JSONOutputConfig, LLMFirewall
+from llm_ffw import JSONOutputConfig, Firewall
 
-firewall = LLMFirewall(json_output_config=JSONOutputConfig())
+firewall = Firewall(json_output_config=JSONOutputConfig())
 ```
 
 Malformed syntax, duplicate keys, non-standard non-finite constants, and
@@ -661,9 +683,9 @@ Applications that pass model-produced URLs to users or downstream tools can
 enable bounded structural URL inspection:
 
 ```python
-from llm_ffw import LLMFirewall, UnsafeURLConfig
+from llm_ffw import Firewall, UnsafeURLConfig
 
-firewall = LLMFirewall(unsafe_url_config=UnsafeURLConfig())
+firewall = Firewall(unsafe_url_config=UnsafeURLConfig())
 ```
 
 `UnsafeURLRule` redacts dangerous schemes, embedded URL user-info, local or
@@ -678,9 +700,9 @@ Applications that treat IP addresses as personal or infrastructure-sensitive
 data can enable deterministic inspection:
 
 ```python
-from llm_ffw import IPAddressConfig, LLMFirewall, ScanScope
+from llm_ffw import IPAddressConfig, Firewall, ScanScope
 
-firewall = LLMFirewall(
+firewall = Firewall(
     ip_address_config=IPAddressConfig(
         scopes=(ScanScope.INPUT, ScanScope.OUTPUT),
     )
@@ -700,9 +722,9 @@ Applications that treat hardware interface identifiers as personal or
 infrastructure-sensitive data can enable deterministic inspection:
 
 ```python
-from llm_ffw import LLMFirewall, MACAddressConfig, ScanScope
+from llm_ffw import Firewall, MACAddressConfig, ScanScope
 
-firewall = LLMFirewall(
+firewall = Firewall(
     mac_address_config=MACAddressConfig(
         scopes=(ScanScope.INPUT, ScanScope.OUTPUT),
     )
@@ -722,9 +744,9 @@ Applications that treat bank-account identifiers as sensitive can enable
 deterministic IBAN inspection:
 
 ```python
-from llm_ffw import IBANConfig, LLMFirewall, ScanScope
+from llm_ffw import IBANConfig, Firewall, ScanScope
 
-firewall = LLMFirewall(
+firewall = Firewall(
     iban_config=IBANConfig(
         scopes=(ScanScope.INPUT, ScanScope.OUTPUT),
     )
@@ -753,9 +775,9 @@ through a model can redact Basic and Bearer credentials while preserving the
 header structure:
 
 ```python
-from llm_ffw import AuthorizationHeaderConfig, LLMFirewall
+from llm_ffw import AuthorizationHeaderConfig, Firewall
 
-firewall = LLMFirewall(
+firewall = Firewall(
     authorization_header_config=AuthorizationHeaderConfig(),
 )
 ```
@@ -780,9 +802,9 @@ Applications that treat email addresses as personal data can enable bounded,
 deterministic inspection:
 
 ```python
-from llm_ffw import EmailAddressConfig, LLMFirewall, ScanScope
+from llm_ffw import EmailAddressConfig, Firewall, ScanScope
 
-firewall = LLMFirewall(
+firewall = Firewall(
     email_address_config=EmailAddressConfig(
         scopes=(ScanScope.INPUT, ScanScope.OUTPUT),
     )
@@ -803,9 +825,9 @@ Applications that want a deterministic signal for degenerate prompts or model
 outputs can enable exact repetition inspection:
 
 ```python
-from llm_ffw import LLMFirewall, RepetitionConfig
+from llm_ffw import Firewall, RepetitionConfig
 
-firewall = LLMFirewall(repetition_config=RepetitionConfig())
+firewall = Firewall(repetition_config=RepetitionConfig())
 ```
 
 `RepetitionRule` reports non-whitespace character runs of 256 characters,
@@ -823,15 +845,15 @@ Bounded Luhn-based payment-card inspection is enabled in both directions by
 default. Applications can customize its limits and scopes:
 
 ```python
-from llm_ffw import LLMFirewall, PaymentCardConfig
+from llm_ffw import Firewall, PaymentCardConfig
 
-firewall = LLMFirewall(payment_card_config=PaymentCardConfig())
+firewall = Firewall(payment_card_config=PaymentCardConfig())
 ```
 
 `PaymentCardRule` redacts structurally plausible 13–19 digit ASCII candidates
 under balanced policy. Luhn is a checksum, not proof that a card exists or is
 active. Applications that intentionally pass checksum-valid identifiers or test
-cards can opt out with `ScannerConfig(enable_payment_cards=False)`.
+cards can opt out with `RuleScannerConfig(enable_payment_cards=False)`.
 
 ### Supported secret signatures
 
@@ -839,14 +861,14 @@ Armored private-key inspection is independently enabled by default for input
 and output. Balanced policy redacts complete blocks and safely contains
 malformed or oversized blocks. Applications can customize bounded limits with
 `PrivateKeyConfig` or explicitly opt out with
-`ScannerConfig(enable_private_keys=False)`.
+`RuleScannerConfig(enable_private_keys=False)`.
 
 Compact JWT inspection is also enabled by default. It validates canonical
 Base64URL, unique-member JSON header/payload objects, algorithm/signature
 consistency, and JWT-specific type or registered-claim evidence before
 redaction. It does not verify signatures or trust claims. Applications can
 customize bounded limits with `JWTTokenConfig` or opt out with
-`ScannerConfig(enable_jwt_tokens=False)`.
+`RuleScannerConfig(enable_jwt_tokens=False)`.
 
 Built-in catalog `3.0.0` has 28 constrained signatures and 47 prefixes for
 OpenAI, GitHub, AWS, Anthropic, GitLab, Slack, Stripe, Hugging Face, Google,
@@ -868,7 +890,7 @@ contain executable callbacks or arbitrary regular expressions.
 ```python
 import string
 
-from llm_ffw import LLMFirewall, SecretCatalog, SecretSignature
+from llm_ffw import Firewall, SecretCatalog, SecretSignature
 
 internal = SecretSignature(
     signature_id="acme.service_token",
@@ -887,7 +909,7 @@ additional_catalog = SecretCatalog(
     version="3.0.0+acme.1",
     signatures=(internal,),
 )
-firewall = LLMFirewall(additional_secret_catalog=additional_catalog)
+firewall = Firewall(additional_secret_catalog=additional_catalog)
 ```
 
 The signature fields describe a constrained token shape:
@@ -923,7 +945,7 @@ prefix overlaps are rejected instead of weakening built-in coverage.
 An advanced deployment that deliberately wants no built-ins must say so:
 
 ```python
-firewall = LLMFirewall(replacement_secret_catalog=complete_catalog)
+firewall = Firewall(replacement_secret_catalog=complete_catalog)
 ```
 
 The extension and replacement options are mutually exclusive. The earlier
@@ -949,12 +971,12 @@ Catalog creation is trusted startup configuration, not a per-request API.
 ## Runtime catalog updates
 
 Services that need zero-downtime catalog changes should keep one
-`LLMFirewallManager` and route scans through it:
+`FirewallManager` and route scans through it:
 
 ```python
-from llm_ffw import LLMFirewallManager
+from llm_ffw import FirewallManager
 
-manager = LLMFirewallManager()
+manager = FirewallManager()
 manager.start()
 
 # This is the complete desired application-extension snapshot, not a delta.
@@ -973,10 +995,10 @@ matching awaitable result methods.
 Asyncio services use the matching manager contract:
 
 ```python
-from llm_ffw import AsyncLLMFirewallManager
+from llm_ffw import AsyncFirewallManager
 
 async def update_catalog(prompt: str) -> str:
-    async with AsyncLLMFirewallManager() as manager:
+    async with AsyncFirewallManager() as manager:
         capabilities = await manager.reload(
             additional_secret_catalog=updated_additional_catalog,
         )

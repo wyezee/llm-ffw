@@ -7,20 +7,20 @@ from llm_ffw import (
     BannedSubstringCatalog,
     BannedSubstringsRule,
     ContentBlockedError,
-    Firewall,
+    RuleEngine,
     JSONOutputConfig,
     JSONOutputRule,
-    LLMFirewall,
+    Firewall,
     FirewallPolicy,
     PolicyOverride,
     ProcessScannerPoolConfig,
     ScanScope,
-    Scanner,
+    RuleScanner,
 )
 
 
-def _scanner(config: JSONOutputConfig | None = None) -> Scanner:
-    return Scanner(rules=(JSONOutputRule(config),))
+def _scanner(config: JSONOutputConfig | None = None) -> RuleScanner:
+    return RuleScanner(rules=(JSONOutputRule(config),))
 
 
 def _single_worker_config() -> ProcessScannerPoolConfig:
@@ -186,11 +186,11 @@ class JSONOutputRuleTests(unittest.TestCase):
 
     def test_default_policy_blocks_and_audit_policy_reports(self) -> None:
         scanner = _scanner()
-        blocked = Firewall(scanner=scanner).process(
+        blocked = RuleEngine(scanner=scanner).process(
             "not-json",
             scope=ScanScope.OUTPUT,
         )
-        audited = Firewall(scanner=scanner, policy=AUDIT_POLICY).process(
+        audited = RuleEngine(scanner=scanner, policy=AUDIT_POLICY).process(
             "not-json",
             scope=ScanScope.OUTPUT,
         )
@@ -217,7 +217,7 @@ class JSONOutputRuleTests(unittest.TestCase):
                 ValueError,
                 "BLOCK or REVIEW",
             ):
-                Firewall(scanner=_scanner(), policy=policy)
+                RuleEngine(scanner=_scanner(), policy=policy)
 
     def test_post_policy_validation_blocks_structure_breaking_redaction(self) -> None:
         catalog = BannedSubstringCatalog(
@@ -228,8 +228,8 @@ class JSONOutputRuleTests(unittest.TestCase):
             ),
             scopes=(ScanScope.OUTPUT,),
         )
-        firewall = Firewall(
-            scanner=Scanner(
+        firewall = RuleEngine(
+            scanner=RuleScanner(
                 rules=(JSONOutputRule(), BannedSubstringsRule(catalog)),
             )
         )
@@ -262,8 +262,8 @@ class JSONOutputRuleTests(unittest.TestCase):
             (BannedSubstring("value", "secret"),),
             scopes=(ScanScope.OUTPUT,),
         )
-        firewall = Firewall(
-            scanner=Scanner(
+        firewall = RuleEngine(
+            scanner=RuleScanner(
                 rules=(JSONOutputRule(), BannedSubstringsRule(catalog)),
             )
         )
@@ -279,8 +279,8 @@ class JSONOutputRuleTests(unittest.TestCase):
 
 class JSONOutputFacadeTests(unittest.TestCase):
     def test_is_opt_in_and_advertised_when_enabled(self) -> None:
-        disabled = LLMFirewall(pool_config=_single_worker_config())
-        enabled = LLMFirewall(
+        disabled = Firewall(pool_config=_single_worker_config())
+        enabled = Firewall(
             pool_config=_single_worker_config(),
             json_output_config=JSONOutputConfig(),
         )
@@ -307,7 +307,7 @@ class JSONOutputFacadeTests(unittest.TestCase):
         enabled.close()
 
     def test_worker_accepts_valid_output_and_blocks_invalid_output(self) -> None:
-        firewall = LLMFirewall(
+        firewall = Firewall(
             pool_config=_single_worker_config(),
             json_output_config=JSONOutputConfig(),
         )
@@ -325,7 +325,7 @@ class JSONOutputFacadeTests(unittest.TestCase):
 
     def test_rejects_non_config_value(self) -> None:
         with self.assertRaises(TypeError):
-            LLMFirewall(json_output_config=True)  # type: ignore[arg-type]
+            Firewall(json_output_config=True)  # type: ignore[arg-type]
 
     def test_worker_blocks_when_redaction_breaks_json_structure(self) -> None:
         catalog = BannedSubstringCatalog(
@@ -334,7 +334,7 @@ class JSONOutputFacadeTests(unittest.TestCase):
             (BannedSubstring("quoted.value", '"secret"'),),
             scopes=(ScanScope.OUTPUT,),
         )
-        firewall = LLMFirewall(
+        firewall = Firewall(
             pool_config=_single_worker_config(),
             banned_substring_catalog=catalog,
             json_output_config=JSONOutputConfig(),

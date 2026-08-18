@@ -7,15 +7,15 @@ from llm_ffw import (
     STRICT_POLICY,
     Action,
     ContentBlockedError,
-    Firewall,
+    RuleEngine,
     JWTTokenConfig,
     JWTTokenRule,
-    LLMFirewall,
-    LLMFirewallManager,
+    Firewall,
+    FirewallManager,
     ProcessScannerPoolConfig,
     ScanScope,
-    Scanner,
-    ScannerConfig,
+    RuleScanner,
+    RuleScannerConfig,
 )
 
 
@@ -39,8 +39,8 @@ def _token(
     return f"{_encode(header)}.{_encode(payload)}.{signature}"
 
 
-def _scanner(config: JWTTokenConfig | None = None) -> Scanner:
-    return Scanner(rules=(JWTTokenRule(config),))
+def _scanner(config: JWTTokenConfig | None = None) -> RuleScanner:
+    return RuleScanner(rules=(JWTTokenRule(config),))
 
 
 def _single_worker_config() -> ProcessScannerPoolConfig:
@@ -165,7 +165,7 @@ class JWTTokenRuleTests(unittest.TestCase):
         text = f"before {value} after"
         for scope in (ScanScope.INPUT, ScanScope.OUTPUT):
             with self.subTest(scope=scope):
-                result = Firewall(scanner=_scanner()).process(text, scope=scope)
+                result = RuleEngine(scanner=_scanner()).process(text, scope=scope)
                 self.assertEqual(result.processed_text, "before [REDACTED] after")
 
     def test_candidate_and_size_limits_contain_uninspected_remainder(self) -> None:
@@ -185,7 +185,7 @@ class JWTTokenRuleTests(unittest.TestCase):
         self.assertEqual(size_finding.metadata["reason"], "token_size_exceeded")
         self.assertEqual(size_finding.span.end, len(oversized))
         self.assertEqual(
-            Firewall(
+            RuleEngine(
                 scanner=_scanner(JWTTokenConfig(max_token_chars=32))
             ).process(oversized).processed_text,
             "[REDACTED]",
@@ -201,7 +201,7 @@ class JWTTokenRuleTests(unittest.TestCase):
         self.assertIs(finding.action, Action.BLOCK)
         self.assertEqual(finding.metadata["reason"], "json_limit_exceeded")
         self.assertEqual(finding.span.end, len(text))
-        self.assertEqual(Firewall(scanner=_scanner()).process(text).processed_text, "[REDACTED]")
+        self.assertEqual(RuleEngine(scanner=_scanner()).process(text).processed_text, "[REDACTED]")
 
     def test_finding_does_not_disclose_token_header_or_claims(self) -> None:
         value = _token(
@@ -241,11 +241,11 @@ class JWTTokenRuleTests(unittest.TestCase):
         value = _token()
         for scope in (ScanScope.INPUT, ScanScope.OUTPUT):
             with self.subTest(scope=scope):
-                balanced = Firewall(scanner=_scanner()).process(value, scope=scope)
-                strict = Firewall(
+                balanced = RuleEngine(scanner=_scanner()).process(value, scope=scope)
+                strict = RuleEngine(
                     scanner=_scanner(), policy=STRICT_POLICY
                 ).process(value, scope=scope)
-                audit = Firewall(
+                audit = RuleEngine(
                     scanner=_scanner(), policy=AUDIT_POLICY
                 ).process(value, scope=scope)
                 self.assertEqual(balanced.processed_text, "[REDACTED]")
@@ -256,12 +256,12 @@ class JWTTokenRuleTests(unittest.TestCase):
 
 class JWTTokenFacadeTests(unittest.TestCase):
     def test_is_default_opt_out_and_advertises_bounded_configuration(self) -> None:
-        enabled = LLMFirewall(pool_config=_single_worker_config())
-        disabled = LLMFirewall(
-            scanner_config=ScannerConfig(enable_jwt_tokens=False),
+        enabled = Firewall(pool_config=_single_worker_config())
+        disabled = Firewall(
+            scanner_config=RuleScannerConfig(enable_jwt_tokens=False),
             pool_config=_single_worker_config(),
         )
-        customized = LLMFirewall(
+        customized = Firewall(
             pool_config=_single_worker_config(),
             jwt_token_config=JWTTokenConfig(
                 max_candidates=16,
@@ -292,16 +292,16 @@ class JWTTokenFacadeTests(unittest.TestCase):
 
     def test_rejects_invalid_or_disabled_configuration(self) -> None:
         with self.assertRaises(TypeError):
-            LLMFirewall(jwt_token_config=True)  # type: ignore[arg-type]
+            Firewall(jwt_token_config=True)  # type: ignore[arg-type]
         with self.assertRaisesRegex(ValueError, "enable_jwt_tokens"):
-            LLMFirewall(
-                scanner_config=ScannerConfig(enable_jwt_tokens=False),
+            Firewall(
+                scanner_config=RuleScannerConfig(enable_jwt_tokens=False),
                 jwt_token_config=JWTTokenConfig(),
             )
 
     def test_worker_redacts_and_manager_propagates_configuration(self) -> None:
         value = _token()
-        manager = LLMFirewallManager(
+        manager = FirewallManager(
             pool_config=_single_worker_config(),
             jwt_token_config=JWTTokenConfig(max_candidates=16),
         ).start()
@@ -313,7 +313,7 @@ class JWTTokenFacadeTests(unittest.TestCase):
 
     def test_strict_process_policy_blocks_without_disclosure(self) -> None:
         value = _token(payload={"sub": "UNIQUE_PRIVATE_SUBJECT"})
-        firewall = LLMFirewall(
+        firewall = Firewall(
             pool_config=_single_worker_config(),
             policy=STRICT_POLICY,
         )

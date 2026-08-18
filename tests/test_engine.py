@@ -1,7 +1,7 @@
 from dataclasses import replace
 import unittest
 
-from llm_ffw import Action, Finding, Scanner, ScannerConfig, ScanScope, Span
+from llm_ffw import Action, Finding, RuleScanner, RuleScannerConfig, ScanScope, Span
 from llm_ffw.rules import SecretsRule
 
 
@@ -11,15 +11,15 @@ def _key(marker: str) -> str:
 
 class ScannerTests(unittest.TestCase):
     def test_default_limit_supports_large_contexts(self) -> None:
-        self.assertEqual(ScannerConfig().max_input_chars, 8_000_000)
-        self.assertTrue(ScannerConfig().enable_invisible_characters)
-        self.assertTrue(ScannerConfig().enable_unicode_tag_smuggling)
-        self.assertTrue(ScannerConfig().enable_payment_cards)
-        self.assertTrue(ScannerConfig().enable_private_keys)
-        self.assertTrue(ScannerConfig().enable_jwt_tokens)
+        self.assertEqual(RuleScannerConfig().max_input_chars, 8_000_000)
+        self.assertTrue(RuleScannerConfig().enable_invisible_characters)
+        self.assertTrue(RuleScannerConfig().enable_unicode_tag_smuggling)
+        self.assertTrue(RuleScannerConfig().enable_payment_cards)
+        self.assertTrue(RuleScannerConfig().enable_private_keys)
+        self.assertTrue(RuleScannerConfig().enable_jwt_tokens)
 
     def test_default_scanner_has_secure_baseline_rules(self) -> None:
-        scanner = Scanner()
+        scanner = RuleScanner()
 
         self.assertEqual(
             tuple(rule.rule_id for rule in scanner.rules),
@@ -42,8 +42,8 @@ class ScannerTests(unittest.TestCase):
         )
 
     def test_secure_baseline_rules_can_be_explicitly_disabled(self) -> None:
-        scanner = Scanner(
-            config=ScannerConfig(
+        scanner = RuleScanner(
+            config=RuleScannerConfig(
                 enable_invisible_characters=False,
                 enable_unicode_tag_smuggling=False,
                 enable_payment_cards=False,
@@ -59,7 +59,7 @@ class ScannerTests(unittest.TestCase):
 
     def test_secrets_rule_scans_input_and_output(self) -> None:
         value = _key("S")
-        scanner = Scanner()
+        scanner = RuleScanner()
 
         self.assertEqual(len(scanner.scan(value, scope=ScanScope.INPUT)), 1)
         self.assertEqual(len(scanner.scan(value, scope=ScanScope.OUTPUT)), 1)
@@ -69,7 +69,7 @@ class ScannerTests(unittest.TestCase):
         second = "ghp_" + "b" * 36
         text = second + " then " + first
 
-        findings = Scanner().scan(text)
+        findings = RuleScanner().scan(text)
 
         self.assertEqual(len(findings), 2)
         self.assertLess(findings[0].span.start, findings[1].span.start)
@@ -77,7 +77,7 @@ class ScannerTests(unittest.TestCase):
     def test_redacts_without_changing_unmatched_text(self) -> None:
         value = _key("C")
         text = "before " + value + " after"
-        scanner = Scanner()
+        scanner = RuleScanner()
 
         redacted = scanner.redact(text)
 
@@ -85,8 +85,8 @@ class ScannerTests(unittest.TestCase):
         self.assertNotIn(value, redacted)
 
     def test_redaction_merges_overlapping_spans(self) -> None:
-        scanner = Scanner(rules=())
-        template = Scanner(rules=(SecretsRule(),)).scan(_key("D"))[0]
+        scanner = RuleScanner(rules=())
+        template = RuleScanner(rules=(SecretsRule(),)).scan(_key("D"))[0]
         text = "abcdefghij"
         first = Finding(
             rule_id=template.rule_id,
@@ -107,27 +107,27 @@ class ScannerTests(unittest.TestCase):
 
     def test_redaction_ignores_findings_without_redact_action(self) -> None:
         value = _key("F")
-        finding = Scanner().scan(value)[0]
+        finding = RuleScanner().scan(value)[0]
         review_finding = replace(finding, action=Action.REVIEW)
 
-        self.assertEqual(Scanner().redact(value, (review_finding,)), value)
+        self.assertEqual(RuleScanner().redact(value, (review_finding,)), value)
 
     def test_rejects_oversized_input(self) -> None:
-        scanner = Scanner(config=ScannerConfig(max_input_chars=5))
+        scanner = RuleScanner(config=RuleScannerConfig(max_input_chars=5))
 
         with self.assertRaisesRegex(ValueError, "max_input_chars"):
             scanner.scan("123456")
 
     def test_rejects_duplicate_rule_ids(self) -> None:
         with self.assertRaisesRegex(ValueError, "duplicate rule_id"):
-            Scanner(rules=(SecretsRule(), SecretsRule()))
+            RuleScanner(rules=(SecretsRule(), SecretsRule()))
 
     def test_empty_rule_set_is_supported(self) -> None:
-        self.assertEqual(Scanner(rules=()).scan(_key("E")), ())
+        self.assertEqual(RuleScanner(rules=()).scan(_key("E")), ())
 
     def test_rejects_non_string_input(self) -> None:
         with self.assertRaises(TypeError):
-            Scanner().scan(None)  # type: ignore[arg-type]
+            RuleScanner().scan(None)  # type: ignore[arg-type]
 
     def test_rejects_non_boolean_rule_activation_configuration(self) -> None:
         for field_name in (
@@ -138,4 +138,4 @@ class ScannerTests(unittest.TestCase):
             "enable_jwt_tokens",
         ):
             with self.subTest(field_name=field_name), self.assertRaises(TypeError):
-                ScannerConfig(**{field_name: 1})  # type: ignore[arg-type]
+                RuleScannerConfig(**{field_name: 1})  # type: ignore[arg-type]

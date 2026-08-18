@@ -9,7 +9,7 @@ import time
 # Make the documented direct invocation work from a source checkout.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from llm_ffw import Scanner, ScannerConfig
+from llm_ffw import RuleScanner, RuleScannerConfig
 
 
 def benchmark(size: int, rounds: int) -> tuple[float, float, int]:
@@ -20,7 +20,7 @@ def benchmark(size: int, rounds: int) -> tuple[float, float, int]:
         text = "x" * (size - len(marker) - 1) + " " + marker
     else:
         text = "x" * size
-    scanner = Scanner(config=ScannerConfig(max_input_chars=len(text)))
+    scanner = RuleScanner(config=RuleScannerConfig(max_input_chars=len(text)))
 
     durations: list[float] = []
     finding_count = 0

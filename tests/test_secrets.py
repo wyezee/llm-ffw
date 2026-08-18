@@ -1,7 +1,7 @@
 import time
 import unittest
 
-from llm_ffw import Action, Scanner, Severity
+from llm_ffw import Action, RuleScanner, Severity
 from llm_ffw.rules import SecretsRule
 
 
@@ -19,7 +19,7 @@ def _aws_access_key_id() -> str:
 
 class SecretsRuleTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.scanner = Scanner(rules=(SecretsRule(),))
+        self.scanner = RuleScanner(rules=(SecretsRule(),))
 
     def test_matches_each_documented_secret_type(self) -> None:
         cases = (

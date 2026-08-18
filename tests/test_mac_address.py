@@ -6,23 +6,23 @@ from llm_ffw import (
     AUDIT_POLICY,
     STRICT_POLICY,
     Action,
-    AsyncLLMFirewall,
+    AsyncFirewall,
     ContentBlockedError,
+    RuleEngine,
     Firewall,
-    LLMFirewall,
-    LLMFirewallManager,
+    FirewallManager,
     MACAddressConfig,
     MACAddressRule,
     ProcessScannerPoolConfig,
     ScanScope,
-    Scanner,
+    RuleScanner,
     StreamMode,
     StreamingSupport,
 )
 
 
-def _scanner(config: MACAddressConfig | None = None) -> Scanner:
-    return Scanner(rules=(MACAddressRule(config),))
+def _scanner(config: MACAddressConfig | None = None) -> RuleScanner:
+    return RuleScanner(rules=(MACAddressRule(config),))
 
 
 def _single_worker_config() -> ProcessScannerPoolConfig:
@@ -56,7 +56,7 @@ class MACAddressConfigTests(unittest.TestCase):
 class MACAddressRuleTests(unittest.TestCase):
     def test_is_opt_in_and_input_only_by_default(self) -> None:
         text = "adapter 02:1A:2B:3C:4D:5E"
-        self.assertEqual(Scanner().scan(text, scope=ScanScope.INPUT), ())
+        self.assertEqual(RuleScanner().scan(text, scope=ScanScope.INPUT), ())
         self.assertEqual(len(_scanner().scan(text, scope=ScanScope.INPUT)), 1)
         self.assertEqual(_scanner().scan(text, scope=ScanScope.OUTPUT), ())
 
@@ -121,7 +121,7 @@ class MACAddressRuleTests(unittest.TestCase):
         self.assertEqual(finding.redacted_preview, "[REDACTED:mac_address]")
         self.assertNotIn(address, finding.message)
         self.assertNotIn(address, repr(finding))
-        result = Firewall(scanner=_scanner()).process(
+        result = RuleEngine(scanner=_scanner()).process(
             text, scope=ScanScope.INPUT
         )
         self.assertEqual(result.processed_text, "adapter [REDACTED]")
@@ -139,17 +139,17 @@ class MACAddressRuleTests(unittest.TestCase):
 
     def test_builtin_policies_redact_block_and_review(self) -> None:
         text = "adapter 02:1A:2B:3C:4D:5E"
-        balanced = Firewall(scanner=_scanner()).process(
+        balanced = RuleEngine(scanner=_scanner()).process(
             text, scope=ScanScope.INPUT
         )
         self.assertEqual(balanced.decision, Action.REDACT)
-        audit = Firewall(scanner=_scanner(), policy=AUDIT_POLICY).process(
+        audit = RuleEngine(scanner=_scanner(), policy=AUDIT_POLICY).process(
             text, scope=ScanScope.INPUT
         )
         self.assertEqual(audit.decision, Action.REVIEW)
         self.assertEqual(audit.processed_text, text)
         with self.assertRaises(ContentBlockedError):
-            firewall = LLMFirewall(
+            firewall = Firewall(
                 pool_config=_single_worker_config(),
                 mac_address_config=MACAddressConfig(),
                 policy=STRICT_POLICY,
@@ -177,7 +177,7 @@ class MACAddressFacadeTests(unittest.TestCase):
             max_candidates=7,
             scopes=(ScanScope.INPUT, ScanScope.OUTPUT),
         )
-        firewall = LLMFirewall(
+        firewall = Firewall(
             pool_config=_single_worker_config(),
             mac_address_config=config,
         )
@@ -188,7 +188,7 @@ class MACAddressFacadeTests(unittest.TestCase):
             MACAddressRule.RULE_ID,
             tuple(rule.rule_id for rule in capabilities.rules),
         )
-        stream = Firewall(scanner=_scanner()).stream()
+        stream = RuleEngine(scanner=_scanner()).stream()
         capability = next(
             item
             for item in stream.rule_capabilities
@@ -203,7 +203,7 @@ class MACAddressFacadeTests(unittest.TestCase):
             )
 
     def test_manager_and_async_facade_preserve_opt_in_configuration(self) -> None:
-        manager = LLMFirewallManager(
+        manager = FirewallManager(
             pool_config=_single_worker_config(),
             mac_address_config=MACAddressConfig(),
         )
@@ -214,7 +214,7 @@ class MACAddressFacadeTests(unittest.TestCase):
                 "adapter [REDACTED]",
             )
 
-        asynchronous = AsyncLLMFirewall(
+        asynchronous = AsyncFirewall(
             pool_config=_single_worker_config(),
             mac_address_config=MACAddressConfig(),
         )
@@ -233,7 +233,7 @@ class MACAddressFacadeTests(unittest.TestCase):
 
     def test_rejects_non_config_value(self) -> None:
         with self.assertRaises(TypeError):
-            LLMFirewall(mac_address_config=object())
+            Firewall(mac_address_config=object())
 
 
 if __name__ == "__main__":

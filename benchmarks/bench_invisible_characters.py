@@ -12,21 +12,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from llm_ffw import (
     Action,
-    Firewall,
+    RuleEngine,
     ProcessScannerPool,
     ProcessScannerPoolConfig,
-    Scanner,
-    ScannerConfig,
+    RuleScanner,
+    RuleScannerConfig,
 )
 
 
 _ZWSP = "\u200b"
 
 
-def _firewall(size: int, *, enabled: bool) -> Firewall:
-    return Firewall(
-        scanner=Scanner(
-            config=ScannerConfig(
+def _firewall(size: int, *, enabled: bool) -> RuleEngine:
+    return RuleEngine(
+        scanner=RuleScanner(
+            config=RuleScannerConfig(
                 max_input_chars=size,
                 enable_invisible_characters=enabled,
             )
@@ -121,7 +121,7 @@ def benchmark(
     tracemalloc.stop()
 
     pool = ProcessScannerPool(
-        scanner_config=ScannerConfig(
+        scanner_config=RuleScannerConfig(
             max_input_chars=size,
             enable_invisible_characters=True,
         ),

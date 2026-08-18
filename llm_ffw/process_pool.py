@@ -12,9 +12,9 @@ from threading import BoundedSemaphore, Lock
 import time
 from typing import TypeAlias
 
-from .config import ScannerConfig
+from .config import RuleScannerConfig
 from .banned_substring_catalog import BannedSubstringCatalog
-from .engine import Scanner
+from .engine import RuleScanner
 from .findings import Action, Finding, Severity, Span
 from .inspection import ScanScope
 from .json_output import JSONOutputConfig
@@ -133,12 +133,12 @@ _SerializedFinding: TypeAlias = tuple[
     _SerializedMetadata,
 ]
 
-_WORKER_SCANNER: Scanner | None = None
+_WORKER_SCANNER: RuleScanner | None = None
 _WORKER_POLICY: FirewallPolicy | None = None
 
 
 def _initialize_worker(
-    scanner_config: ScannerConfig,
+    scanner_config: RuleScannerConfig,
     secret_catalog: SecretCatalog | None,
     banned_substring_catalog: BannedSubstringCatalog | None,
     json_output_config: JSONOutputConfig | None,
@@ -173,7 +173,7 @@ def _initialize_worker(
         and jwt_token_config is None
         and repetition_config is None
     ):
-        _WORKER_SCANNER = Scanner(config=scanner_config)
+        _WORKER_SCANNER = RuleScanner(config=scanner_config)
     else:
         rules = [SecretsRule(secret_catalog or BUILTIN_SECRET_CATALOG)]
         if scanner_config.enable_invisible_characters:
@@ -204,7 +204,7 @@ def _initialize_worker(
             rules.append(JWTTokenRule(jwt_token_config))
         if repetition_config is not None:
             rules.append(RepetitionRule(repetition_config))
-        _WORKER_SCANNER = Scanner(
+        _WORKER_SCANNER = RuleScanner(
             rules=rules,
             config=scanner_config,
         )
@@ -327,7 +327,7 @@ class ProcessScannerPool:
     def __init__(
         self,
         *,
-        scanner_config: ScannerConfig | None = None,
+        scanner_config: RuleScannerConfig | None = None,
         pool_config: ProcessScannerPoolConfig | None = None,
         secret_catalog: SecretCatalog | None = None,
         banned_substring_catalog: BannedSubstringCatalog | None = None,
@@ -344,8 +344,8 @@ class ProcessScannerPool:
         repetition_config: RepetitionConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
     ) -> None:
-        if scanner_config is not None and not isinstance(scanner_config, ScannerConfig):
-            raise TypeError("scanner_config must be a ScannerConfig or None")
+        if scanner_config is not None and not isinstance(scanner_config, RuleScannerConfig):
+            raise TypeError("scanner_config must be a RuleScannerConfig or None")
         if pool_config is not None and not isinstance(
             pool_config, ProcessScannerPoolConfig
         ):
@@ -426,7 +426,7 @@ class ProcessScannerPool:
             )
         if not isinstance(policy, FirewallPolicy):
             raise TypeError("policy must be a FirewallPolicy")
-        resolved_scanner_config = scanner_config or ScannerConfig()
+        resolved_scanner_config = scanner_config or RuleScannerConfig()
         if (
             not resolved_scanner_config.enable_payment_cards
             and payment_card_config is not None
@@ -593,7 +593,7 @@ class ProcessScannerPool:
         return self._pool_config
 
     @property
-    def scanner_config(self) -> ScannerConfig:
+    def scanner_config(self) -> RuleScannerConfig:
         return self._scanner_config
 
     @property

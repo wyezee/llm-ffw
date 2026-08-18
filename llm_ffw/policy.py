@@ -6,7 +6,7 @@ import re
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Callable, Mapping
 
-from .engine import Scanner
+from .engine import RuleScanner
 from .findings import Action, Finding, Span
 from .inspection import ScanScope
 from .rules.json_output import JSONOutputRule
@@ -667,20 +667,20 @@ AUDIT_POLICY = _builtin_policy(
 )
 
 
-class Firewall:
-    """One-call direct scanner and policy-enforcement facade."""
+class RuleEngine:
+    """In-process rule scanning and policy enforcement."""
 
     def __init__(
         self,
         *,
-        scanner: Scanner | None = None,
+        scanner: RuleScanner | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
     ) -> None:
-        if scanner is not None and not isinstance(scanner, Scanner):
-            raise TypeError("scanner must be a Scanner or None")
+        if scanner is not None and not isinstance(scanner, RuleScanner):
+            raise TypeError("scanner must be a RuleScanner or None")
         if not isinstance(policy, FirewallPolicy):
             raise TypeError("policy must be a FirewallPolicy")
-        self._scanner = scanner or Scanner()
+        self._scanner = scanner or RuleScanner()
         policy.validate_rule_ids(
             frozenset(rule.rule_id for rule in self._scanner.rules),
             supported_rule_ids=frozenset(
@@ -713,7 +713,7 @@ class Firewall:
         )
 
     @property
-    def scanner(self) -> Scanner:
+    def scanner(self) -> RuleScanner:
         return self._scanner
 
     @property
@@ -749,7 +749,7 @@ class Firewall:
         """Detect and enforce the configured action for each finding."""
 
         if (
-            type(self._scanner) is not Scanner
+            type(self._scanner) is not RuleScanner
             or not self._scanner._supports_staged_canonicalization
         ):
             findings = self._scanner.scan(
@@ -804,6 +804,11 @@ class Firewall:
         )
 
 
+# Direct module imports retain the old low-level name during migration. At the
+# package root, ``Firewall`` now identifies the production facade.
+Firewall = RuleEngine
+
+
 __all__ = [
     "AUDIT_POLICY",
     "BALANCED_POLICY",
@@ -811,5 +816,6 @@ __all__ = [
     "FirewallPolicy",
     "FirewallResult",
     "PolicyOverride",
+    "RuleEngine",
     "STRICT_POLICY",
 ]

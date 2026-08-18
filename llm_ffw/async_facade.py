@@ -8,10 +8,10 @@ from typing import TypeVar
 
 from .banned_substring_catalog import BannedSubstringCatalog
 from .capabilities import FirewallCapabilities
-from .config import ScannerConfig
+from .config import RuleScannerConfig
 from .facade import (
+    Firewall,
     FirewallUnavailableError,
-    LLMFirewall,
     SanitizationResult,
 )
 from .inspection import ScanScope
@@ -25,8 +25,8 @@ from .json_output import JSONOutputConfig
 from .jwt_token import JWTTokenConfig
 from .repetition import RepetitionConfig
 from .manager import (
+    FirewallManager,
     FirewallManagerState,
-    LLMFirewallManager,
 )
 from .payment_card import PaymentCardConfig
 from .policy import BALANCED_POLICY, FirewallPolicy
@@ -163,13 +163,13 @@ class _AsyncRequestRunner:
         )
 
 
-class AsyncLLMFirewall:
+class AsyncFirewall:
     """Asyncio facade with bounded admission and synchronous API parity."""
 
     def __init__(
         self,
         *,
-        scanner_config: ScannerConfig | None = None,
+        scanner_config: RuleScannerConfig | None = None,
         pool_config: ProcessScannerPoolConfig | None = None,
         additional_secret_catalog: SecretCatalog | None = None,
         replacement_secret_catalog: SecretCatalog | None = None,
@@ -193,7 +193,7 @@ class AsyncLLMFirewall:
             if pool_config is not None
             else ProcessScannerPoolConfig()
         )
-        self._firewall = LLMFirewall(
+        self._firewall = Firewall(
             scanner_config=scanner_config,
             pool_config=resolved_pool_config,
             additional_secret_catalog=additional_secret_catalog,
@@ -218,7 +218,7 @@ class AsyncLLMFirewall:
         self._closed = False
 
     @classmethod
-    def from_config(cls, config: FirewallConfig) -> "AsyncLLMFirewall":
+    def from_config(cls, config: FirewallConfig) -> "AsyncFirewall":
         """Build the async facade from one immutable configuration."""
 
         if not isinstance(config, FirewallConfig):
@@ -234,7 +234,7 @@ class AsyncLLMFirewall:
 
         return self._firewall.capabilities()
 
-    async def start(self) -> "AsyncLLMFirewall":
+    async def start(self) -> "AsyncFirewall":
         """Start and verify worker processes without blocking the event loop."""
 
         async with self._lifecycle_lock:
@@ -333,7 +333,7 @@ class AsyncLLMFirewall:
             drain_first=False,
         )
 
-    async def __aenter__(self) -> "AsyncLLMFirewall":
+    async def __aenter__(self) -> "AsyncFirewall":
         return await self.start()
 
     async def __aexit__(
@@ -349,13 +349,13 @@ class AsyncLLMFirewall:
                 raise
 
 
-class AsyncLLMFirewallManager:
+class AsyncFirewallManager:
     """Asyncio facade for atomic catalog reloads and draining generations."""
 
     def __init__(
         self,
         *,
-        scanner_config: ScannerConfig | None = None,
+        scanner_config: RuleScannerConfig | None = None,
         pool_config: ProcessScannerPoolConfig | None = None,
         additional_secret_catalog: SecretCatalog | None = None,
         replacement_secret_catalog: SecretCatalog | None = None,
@@ -379,7 +379,7 @@ class AsyncLLMFirewallManager:
             if pool_config is not None
             else ProcessScannerPoolConfig()
         )
-        self._manager = LLMFirewallManager(
+        self._manager = FirewallManager(
             scanner_config=scanner_config,
             pool_config=resolved_pool_config,
             additional_secret_catalog=additional_secret_catalog,
@@ -407,7 +407,7 @@ class AsyncLLMFirewallManager:
     def from_config(
         cls,
         config: FirewallConfig,
-    ) -> "AsyncLLMFirewallManager":
+    ) -> "AsyncFirewallManager":
         """Build the async manager from one immutable configuration."""
 
         if not isinstance(config, FirewallConfig):
@@ -421,7 +421,7 @@ class AsyncLLMFirewallManager:
     def capabilities(self) -> FirewallCapabilities:
         return self._manager.capabilities()
 
-    async def start(self) -> "AsyncLLMFirewallManager":
+    async def start(self) -> "AsyncFirewallManager":
         async with self._lifecycle_lock:
             if self._closed:
                 raise FirewallUnavailableError(
@@ -520,7 +520,7 @@ class AsyncLLMFirewallManager:
                 await cleanup
                 raise
 
-    async def __aenter__(self) -> "AsyncLLMFirewallManager":
+    async def __aenter__(self) -> "AsyncFirewallManager":
         return await self.start()
 
     async def __aexit__(
@@ -536,4 +536,14 @@ class AsyncLLMFirewallManager:
                 raise
 
 
-__all__ = ["AsyncLLMFirewall", "AsyncLLMFirewallManager"]
+# Compatibility aliases retained through the pre-1.0 migration window.
+AsyncLLMFirewall = AsyncFirewall
+AsyncLLMFirewallManager = AsyncFirewallManager
+
+
+__all__ = [
+    "AsyncFirewall",
+    "AsyncFirewallManager",
+    "AsyncLLMFirewall",
+    "AsyncLLMFirewallManager",
+]

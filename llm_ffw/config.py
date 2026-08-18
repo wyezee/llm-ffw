@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)
-class ScannerConfig:
+class RuleScannerConfig:
     """Resource and redaction limits with conservative defaults."""
 
     max_input_chars: int = 8_000_000
@@ -36,3 +36,10 @@ class ScannerConfig:
             raise TypeError("enable_private_keys must be a boolean")
         if not isinstance(self.enable_jwt_tokens, bool):
             raise TypeError("enable_jwt_tokens must be a boolean")
+
+
+# Compatibility alias retained through the pre-1.0 migration window.
+ScannerConfig = RuleScannerConfig
+
+
+__all__ = ["RuleScannerConfig", "ScannerConfig"]

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import math
 from time import perf_counter
 
-from llm_ffw import LLMFirewall, ProcessScannerPoolConfig
+from llm_ffw import Firewall, ProcessScannerPoolConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,7 +174,7 @@ def _percentile(values: list[float], percentile: int) -> float:
     return ordered[rank - 1]
 
 
-def _sanitize(firewall: LLMFirewall, scenario: AcceptanceScenario) -> str:
+def _sanitize(firewall: Firewall, scenario: AcceptanceScenario) -> str:
     if scenario.scope == "input":
         result = firewall.sanitize_input_result(scenario.text)
     else:
@@ -186,7 +186,7 @@ def _sanitize(firewall: LLMFirewall, scenario: AcceptanceScenario) -> str:
 
 
 def _execute(
-    firewall: LLMFirewall,
+    firewall: Firewall,
     scenario: AcceptanceScenario,
 ) -> float:
     started = perf_counter()
@@ -230,7 +230,7 @@ def run_acceptance(
     scenarios = _default_scenarios()
     latencies: list[float] = []
     concurrent_requests = 0
-    firewall = LLMFirewall(
+    firewall = Firewall(
         pool_config=ProcessScannerPoolConfig(
             max_workers=workers,
             max_in_flight=concurrency,

@@ -2,11 +2,11 @@
 
 from typing import cast
 
-from .engine import Scanner
+from .engine import RuleScanner
 from .facade import ContentBlockedError
 from .findings import Action, Finding, Severity, Span
 from .inspection import ScanScope
-from .policy import BALANCED_POLICY, Firewall, FirewallPolicy
+from .policy import BALANCED_POLICY, FirewallPolicy, RuleEngine
 from .rules.payment_card import PaymentCardRule
 from .rules.secrets import SecretsRule
 from ._incremental_stream import _IncrementalRedactionEngine
@@ -26,7 +26,7 @@ class FirewallStream:
 
     ``AUTO`` selects incremental execution only when every active rule and
     effective action can safely emit early. Otherwise it buffers until
-    ``finish()`` and invokes the normal :class:`Firewall`. ``INCREMENTAL``
+    ``finish()`` and invokes the normal :class:`RuleEngine`. ``INCREMENTAL``
     rejects incompatible configurations instead of silently omitting rules.
     Instances are stateful and must not be shared by concurrent callers.
     """
@@ -52,15 +52,15 @@ class FirewallStream:
     def __init__(
         self,
         *,
-        scanner: Scanner | None = None,
+        scanner: RuleScanner | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
         scope: ScanScope = ScanScope.INPUT,
         mode: StreamMode = StreamMode.AUTO,
         prompt_context: str | None = None,
     ) -> None:
-        if scanner is not None and not isinstance(scanner, Scanner):
-            raise TypeError("scanner must be a Scanner or None")
-        selected_scanner = scanner or Scanner()
+        if scanner is not None and not isinstance(scanner, RuleScanner):
+            raise TypeError("scanner must be a RuleScanner or None")
+        selected_scanner = scanner or RuleScanner()
         if not isinstance(policy, FirewallPolicy):
             raise TypeError("policy must be a FirewallPolicy")
         if not isinstance(scope, ScanScope):
@@ -77,7 +77,7 @@ class FirewallStream:
         ):
             raise ValueError("prompt_context exceeds max_input_chars")
 
-        firewall = Firewall(scanner=selected_scanner, policy=policy)
+        firewall = RuleEngine(scanner=selected_scanner, policy=policy)
         active_rules = tuple(
             rule for rule in selected_scanner.rules if scope in rule.scopes
         )
@@ -129,7 +129,7 @@ class FirewallStream:
                 payment_card_rule.rule_id,
                 "effective policy action requires end-of-stream enforcement",
             )
-        if type(selected_scanner) is not Scanner:
+        if type(selected_scanner) is not RuleScanner:
             incompatible.add("scanner.custom")
             capabilities = [
                 StreamingRuleCapability(
