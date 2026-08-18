@@ -1,0 +1,50 @@
+name: Publication benchmark
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  all-rules:
+    name: 8M default and all rules / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Python 3.14.7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14.7"
+          check-latest: false
+
+      - name: Run publication-grade benchmark
+        run: >-
+          python benchmarks/bench_all_rules.py
+          --sizes 8000000
+          --profiles clean-input,clean-output-json
+          --workers 4
+          --rule-sets default,all
+          --rounds 3
+          --requests-per-worker 8
+          --concurrency-multiplier 2
+          --catalog-patterns 1
+          --max-tasks-per-child 1000
+          --timeout 240
+          --json-output benchmark-${{ runner.os }}.json
+
+      - name: Upload aggregate and per-round evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: publication-benchmark-${{ runner.os }}
+          path: benchmark-${{ runner.os }}.json
+          if-no-files-found: error
+          retention-days: 30

@@ -20,6 +20,7 @@ from .mac_address import MACAddressConfig
 from .iban import IBANConfig
 from .authorization_header import AuthorizationHeaderConfig
 from .email_address import EmailAddressConfig
+from .facade_config import FirewallConfig
 from .json_output import JSONOutputConfig
 from .jwt_token import JWTTokenConfig
 from .repetition import RepetitionConfig
@@ -216,6 +217,14 @@ class AsyncLLMFirewall:
         self._lifecycle_lock = asyncio.Lock()
         self._closed = False
 
+    @classmethod
+    def from_config(cls, config: FirewallConfig) -> "AsyncLLMFirewall":
+        """Build the async facade from one immutable configuration."""
+
+        if not isinstance(config, FirewallConfig):
+            raise TypeError("config must be a FirewallConfig")
+        return cls(**config._facade_kwargs())
+
     @property
     def state(self) -> ProcessPoolState:
         return self._firewall.state
@@ -394,6 +403,17 @@ class AsyncLLMFirewallManager:
         self._lifecycle_lock = asyncio.Lock()
         self._closed = False
 
+    @classmethod
+    def from_config(
+        cls,
+        config: FirewallConfig,
+    ) -> "AsyncLLMFirewallManager":
+        """Build the async manager from one immutable configuration."""
+
+        if not isinstance(config, FirewallConfig):
+            raise TypeError("config must be a FirewallConfig")
+        return cls(**config._facade_kwargs())
+
     @property
     def state(self) -> FirewallManagerState:
         return self._manager.state
@@ -413,6 +433,12 @@ class AsyncLLMFirewallManager:
     async def sanitize_input(self, text: str) -> str:
         return await self._requests.run(self._manager.sanitize_input, text)
 
+    async def sanitize_input_result(self, text: str) -> SanitizationResult:
+        return await self._requests.run(
+            self._manager.sanitize_input_result,
+            text,
+        )
+
     async def sanitize_output(
         self,
         text: str,
@@ -421,6 +447,18 @@ class AsyncLLMFirewallManager:
     ) -> str:
         return await self._requests.run(
             self._manager.sanitize_output,
+            text,
+            prompt_context=prompt_context,
+        )
+
+    async def sanitize_output_result(
+        self,
+        text: str,
+        *,
+        prompt_context: str | None = None,
+    ) -> SanitizationResult:
+        return await self._requests.run(
+            self._manager.sanitize_output_result,
             text,
             prompt_context=prompt_context,
         )

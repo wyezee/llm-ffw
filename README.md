@@ -21,6 +21,34 @@ before results return to the model. `AuthorizationHeaderRule` redacts exact
 Basic and Bearer credentials, while `RepetitionRule` reviews conservative exact
 character, token, and line runs.
 
+## Installation and quick start
+
+LLM FFW requires Python 3.14.7 or a newer Python 3.14 patch release. Its base
+installation has no runtime dependencies outside the Python standard library.
+
+```console
+python -m pip install llm-ffw==0.8.0
+```
+
+Create one facade during application startup and reuse it for every request:
+
+```python
+from llm_ffw import LLMFirewall
+
+def main() -> None:
+    with LLMFirewall() as firewall:
+        safe_prompt = firewall.sanitize_input(prompt)
+        model_output = call_model(safe_prompt)
+        safe_output = firewall.sanitize_output(model_output)
+
+if __name__ == "__main__":
+    main()
+```
+
+The entry-point guard is required because the facade uses worker processes.
+Long-lived services should call `start()` and `close()` from their lifecycle
+hooks instead of constructing a facade per request.
+
 ## Measured performance
 
 Release `0.2.0` was benchmarked on GitHub-hosted Ubuntu and Windows runners
@@ -43,19 +71,6 @@ enabled rules, policy, CPU, and concurrency. See the
 [exact release-gate run](https://github.com/wyezee/llm-ffw/actions/runs/31952014903)
 and the commands under [Development and validation](#development-and-validation).
 
-## Installation
-
-LLM FFW requires Python 3.14.7 or a newer Python 3.14 patch release. It has no
-runtime dependencies outside the Python standard library.
-
-```console
-python -m pip install llm-ffw
-```
-
-Pin the version in production dependency files. To use the complete synchronous
-and asynchronous API documented here, install `llm-ffw==0.8.0`. The performance
-table above remains explicitly attributed to release `0.2.0`.
-
 ## Usage
 
 Choose the highest-level API that fits the integration:
@@ -73,27 +88,9 @@ Choose the highest-level API that fits the integration:
 | `ToolCallRule` | Provider-neutral allowlist and typed argument validation before tool execution |
 | `ToolResultRule` | Provider-neutral linkage and bounded-content validation before model consumption |
 
-Production integrations should use `LLMFirewall`. Its balanced default redacts
-detected secrets in both directions while preserving flow:
-
-```python
-from llm_ffw import LLMFirewall
-
-def main() -> None:
-    with LLMFirewall() as firewall:
-        safe_prompt = firewall.sanitize_input(prompt)
-        model_output = call_model(safe_prompt)
-        safe_output = firewall.sanitize_output(model_output)
-
-if __name__ == "__main__":
-    main()
-```
-
-Create one facade during application startup and reuse it for every request.
-Call `start()` and `close()` from a long-lived application's lifecycle hooks;
-the context-manager form is convenient for scripts and batch jobs. Standalone
-programs must protect their entry point with `if __name__ == "__main__":`
-because the facade uses worker processes.
+Production integrations should normally begin with the `LLMFirewall` quick
+start above. The remaining APIs expose async lifecycle, streaming, hot reload,
+or lower-level control when those capabilities are specifically required.
 
 ### Unified streaming
 
@@ -300,6 +297,33 @@ appropriate to their deployment and memory budget.
 `LLMFirewall` and `AsyncLLMFirewall` accept the same immutable startup
 configuration. Create and validate one facade, then reuse it rather than
 rebuilding it per request.
+
+For common deployments, use one immutable `FirewallConfig` preset instead of a
+long constructor. Preset names describe their actual behavior; none claims to
+be universally "secure" or "enterprise":
+
+```python
+from dataclasses import replace
+from llm_ffw import FirewallConfig, LLMFirewall
+
+config = replace(
+    FirewallConfig.privacy_input(),
+    request_timeout_seconds=10.0,
+)
+
+with LLMFirewall.from_config(config) as firewall:
+    safe_prompt = firewall.sanitize_input(prompt)
+```
+
+`default()` selects the six-rule baseline, `privacy_input()` additionally
+enables conservative IP, MAC, IBAN, and email input rules, and `json_api()`
+adds strict JSON-output and unsafe-URL inspection. `all_text_rules()` enables
+all 15 text rules, requires an explicit deployment-owned
+`BannedSubstringCatalog`, and uses a 30-second request timeout suitable for
+initial large-payload testing. Deployments must still tune that deadline from
+their own payload and latency measurements. Direct constructor parameters
+remain available for precise configuration, and `from_config()` is supported
+by synchronous and asynchronous facades and managers.
 
 | Constructor parameter | Purpose |
 | --- | --- |
@@ -895,6 +919,12 @@ manager.reload(additional_secret_catalog=updated_additional_catalog)
 safe_prompt = manager.sanitize_input(prompt)
 safe_output = manager.sanitize_output(model_output)
 ```
+
+Managers also provide `sanitize_input_result()` and
+`sanitize_output_result()`. They return the same disclosure-safe
+`SanitizationResult` as the direct facade while holding one immutable
+generation lease for the complete request. The asynchronous manager exposes
+matching awaitable result methods.
 
 Asyncio services use the matching manager contract:
 

@@ -7,7 +7,12 @@ from threading import Condition, Lock
 from .capabilities import FirewallCapabilities
 from .banned_substring_catalog import BannedSubstringCatalog
 from .config import ScannerConfig
-from .facade import FirewallUnavailableError, LLMFirewall
+from .facade import (
+    FirewallUnavailableError,
+    LLMFirewall,
+    SanitizationResult,
+)
+from .facade_config import FirewallConfig
 from .json_output import JSONOutputConfig
 from .ip_address import IPAddressConfig
 from .mac_address import MACAddressConfig
@@ -106,6 +111,14 @@ class LLMFirewallManager:
         self._state = FirewallManagerState.NEW
         self._active = _Generation(initial)
         self._retired: list[_Generation] = []
+
+    @classmethod
+    def from_config(cls, config: FirewallConfig) -> "LLMFirewallManager":
+        """Build the manager from one validated immutable configuration."""
+
+        if not isinstance(config, FirewallConfig):
+            raise TypeError("config must be a FirewallConfig")
+        return cls(**config._facade_kwargs())
 
     def _build_firewall(
         self,
@@ -335,6 +348,15 @@ class LLMFirewallManager:
         finally:
             self._release_generation(generation)
 
+    def sanitize_input_result(self, text: str) -> SanitizationResult:
+        """Return sanitized input metadata from one leased generation."""
+
+        generation = self._acquire_generation()
+        try:
+            return generation.firewall.sanitize_input_result(text)
+        finally:
+            self._release_generation(generation)
+
     def sanitize_output(
         self,
         text: str,
@@ -346,6 +368,23 @@ class LLMFirewallManager:
         generation = self._acquire_generation()
         try:
             return generation.firewall.sanitize_output(
+                text,
+                prompt_context=prompt_context,
+            )
+        finally:
+            self._release_generation(generation)
+
+    def sanitize_output_result(
+        self,
+        text: str,
+        *,
+        prompt_context: str | None = None,
+    ) -> SanitizationResult:
+        """Return sanitized output metadata from one leased generation."""
+
+        generation = self._acquire_generation()
+        try:
+            return generation.firewall.sanitize_output_result(
                 text,
                 prompt_context=prompt_context,
             )

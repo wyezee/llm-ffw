@@ -31,6 +31,7 @@ from .facade import (
     LLMFirewall,
     SanitizationResult,
 )
+from .facade_config import FirewallConfig
 from .inspection import (
     Inspection,
     InspectionFeature,
@@ -121,6 +122,7 @@ __all__ = [
     "Finding",
     "Firewall",
     "FirewallCapabilities",
+    "FirewallConfig",
     "FirewallManagerState",
     "FirewallReloadError",
     "FirewallUnavailableError",

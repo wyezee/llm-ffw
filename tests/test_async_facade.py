@@ -242,6 +242,21 @@ class AsyncLLMFirewallTests(unittest.IsolatedAsyncioTestCase):
 
 
 class AsyncLLMFirewallManagerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_structured_results_match_async_facade_contract(self) -> None:
+        secret = "sk-" + "D" * 20
+        manager = AsyncLLMFirewallManager(pool_config=_pool_config())
+
+        async with manager:
+            input_result = await manager.sanitize_input_result(secret)
+            output_result = await manager.sanitize_output_result(
+                secret,
+                prompt_context="Return a status message.",
+            )
+
+            self.assertEqual(input_result.text, "[REDACTED]")
+            self.assertEqual(output_result.text, "[REDACTED]")
+            self.assertNotIn(secret, repr(input_result))
+
     async def test_reload_and_restart_preserve_async_service(self) -> None:
         custom = "acme_async_" + "C" * 16
         manager = AsyncLLMFirewallManager(pool_config=_pool_config())

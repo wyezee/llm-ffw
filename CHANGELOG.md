@@ -6,6 +6,12 @@ All notable changes are recorded here before a tagged release.
 
 ### Added
 
+- Immutable `FirewallConfig` presets shared by synchronous, asynchronous, and
+  hot-reload facades, plus structured sanitization-result parity for both
+  manager APIs.
+- Repeated default-versus-all-rules publication benchmarking with pooled
+  latency percentiles, safe environment provenance, and an on-demand Windows
+  and Ubuntu evidence workflow.
 - Deterministic all-rules benchmark corpora and a production-concurrency
   harness covering all 15 text rules plus structured tool fixtures, exact
   expectation checks, latency percentiles, queue/service timing, process-tree

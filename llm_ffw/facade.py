@@ -37,6 +37,7 @@ from .iban import (
 )
 from .authorization_header import AuthorizationHeaderConfig
 from .email_address import EmailAddressConfig
+from .facade_config import FirewallConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
 from .private_key import PrivateKeyConfig
@@ -455,6 +456,14 @@ class LLMFirewall:
                 else None
             ),
         )
+
+    @classmethod
+    def from_config(cls, config: FirewallConfig) -> "LLMFirewall":
+        """Build the facade from one validated immutable configuration."""
+
+        if not isinstance(config, FirewallConfig):
+            raise TypeError("config must be a FirewallConfig")
+        return cls(**config._facade_kwargs())
 
     @property
     def state(self) -> ProcessPoolState:

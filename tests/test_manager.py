@@ -68,6 +68,28 @@ class _VanishedProcPath:
 
 
 class LLMFirewallManagerTests(unittest.TestCase):
+    def test_structured_results_match_direct_facade_contract(self) -> None:
+        secret = "sk-" + "A" * 20
+        manager = LLMFirewallManager(pool_config=_pool_config()).start()
+        try:
+            input_result = manager.sanitize_input_result(
+                f"credential={secret}"
+            )
+            output_result = manager.sanitize_output_result(
+                f"credential={secret}",
+                prompt_context="Return a status message.",
+            )
+
+            self.assertEqual(input_result.text, "credential=[REDACTED]")
+            self.assertEqual(output_result.text, "credential=[REDACTED]")
+            self.assertEqual(
+                input_result.findings[0].rule_id,
+                "secrets.detected",
+            )
+            self.assertNotIn(secret, repr(input_result))
+        finally:
+            manager.close()
+
     def test_linux_memory_sampling_ignores_vanished_processes(self) -> None:
         with patch(
             "benchmarks.bench_manager_reload.Path",

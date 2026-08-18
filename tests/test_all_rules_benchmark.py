@@ -1,4 +1,5 @@
 import ast
+from dataclasses import replace
 import json
 from pathlib import Path
 import tempfile
@@ -11,7 +12,11 @@ from benchmarks.all_rules_data import (
     build_text_scenarios,
     manifest,
 )
-from benchmarks.bench_all_rules import run_benchmark
+from benchmarks.bench_all_rules import (
+    environment_metadata,
+    run_benchmark,
+    summarize_results,
+)
 from benchmarks.generate_all_rules_dataset import write_dataset
 from llm_ffw import ToolCallRule, ToolResultRule
 
@@ -84,7 +89,9 @@ class AllRulesDatasetTests(unittest.TestCase):
             "llm_ffw",
             "os",
             "pathlib",
+            "platform",
             "statistics",
+            "subprocess",
             "sys",
             "threading",
             "time",
@@ -127,6 +134,74 @@ class AllRulesBenchmarkTests(unittest.TestCase):
         self.assertEqual(set(result.finding_counts), {item.rule_id for item in sparse.expected})
         self.assertGreater(result.requests_per_second, 0)
         self.assertGreater(result.peak_tree_rss_mib, 0)
+
+    def test_default_rule_set_filters_opt_in_expectations(self) -> None:
+        sparse = next(
+            item
+            for item in build_text_scenarios(8_192)
+            if item.scenario_id == "sparse-input"
+        )
+        result = run_benchmark(
+            sparse,
+            workers=1,
+            concurrency=1,
+            requests=1,
+            max_tasks_per_child=10,
+            request_timeout=30,
+            rule_set="default",
+        )
+
+        self.assertEqual(result.enabled_text_rules, 6)
+        self.assertEqual(
+            set(result.finding_counts),
+            {
+                "secrets.detected",
+                "unicode.invisible_characters",
+                "unicode.tag_smuggling",
+                "pii.payment_card",
+                "secrets.private_key",
+                "secrets.jwt_token",
+            },
+        )
+
+    def test_repeated_rounds_produce_disclosure_safe_summary(self) -> None:
+        scenario = next(
+            item
+            for item in build_text_scenarios(8_192)
+            if item.scenario_id == "clean-input"
+        )
+        first = run_benchmark(
+            scenario,
+            workers=1,
+            concurrency=1,
+            requests=1,
+            max_tasks_per_child=10,
+            request_timeout=30,
+        )
+        second = replace(
+            first,
+            round_index=2,
+            requests_per_second=first.requests_per_second * 2,
+        )
+
+        summary = summarize_results([first, second])[0]
+
+        self.assertEqual(summary.rounds, 2)
+        self.assertEqual(summary.measured_requests, 2)
+        self.assertEqual(
+            summary.median_requests_per_second,
+            first.requests_per_second * 1.5,
+        )
+        self.assertGreater(summary.latency_p95_ms, 0)
+        self.assertFalse(hasattr(summary, "text"))
+
+    def test_environment_metadata_omits_host_and_user_identity(self) -> None:
+        metadata = environment_metadata()
+
+        self.assertEqual(metadata["python"], "3.14.7")
+        self.assertIn("commit", metadata)
+        self.assertNotIn("hostname", metadata)
+        self.assertNotIn("username", metadata)
 
     def test_process_harness_verifies_json_block_expectation(self) -> None:
         invalid = next(
