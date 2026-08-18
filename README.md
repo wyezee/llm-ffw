@@ -154,10 +154,10 @@ by model, tokenizer, language, and content.
 
 | Rules and payload | Ubuntu req/s / MiB/s / p95 | Windows req/s / MiB/s / p95 |
 | --- | ---: | ---: |
-| Default 6, clean input | 4.742 / 36.181 / 6.44 s | 3.333 / 25.426 / 9.57 s |
-| Default 6, valid JSON output | 5.131 / 39.144 / 6.04 s | 2.413 / 18.407 / 13.21 s |
-| All 15, clean input | 1.693 / 12.916 / 18.72 s | 1.151 / 8.783 / 27.74 s |
-| All 15, valid JSON output | 0.789 / 6.020 / 39.52 s | 0.482 / 3.681 / 66.27 s |
+| Default 6, clean input | 3.101 / 23.658 / 10.30 s | 3.692 / 28.167 / 8.65 s |
+| Default 6, valid JSON output | 3.337 / 25.461 / 9.41 s | 3.842 / 29.316 / 8.29 s |
+| All 15, clean input | 1.460 / 11.139 / 21.31 s | 1.473 / 11.240 / 21.61 s |
+| All 15, valid JSON output | 1.069 / 8.152 / 29.31 s | 1.031 / 7.867 / 30.96 s |
 
 Each row uses four workers, eight concurrent callers, and 32 requests per
 round for three rounds: 96 measured requests per row and 384 per operating
@@ -165,11 +165,11 @@ system. Throughput is the median of the three rounds. The pooled end-to-end
 p95 includes caller queueing from submitting 32 requests to eight caller
 slots; it is not single-request service time. All 768 measured requests across
 both operating systems completed with exact expected findings and no rejection,
-timeout, or failure. Peak process-tree RSS ranged from 206 to 613 MiB.
+timeout, or failure. Peak process-tree RSS ranged from 263 to 608 MiB.
 
 These are reproducible CI measurements, not universal latency guarantees;
 performance varies with input, enabled rules, policy, CPU, and concurrency.
-See the [exact publication run](https://github.com/wyezee/llm-ffw/actions/runs/32127412115)
+See the [exact publication run](https://github.com/wyezee/llm-ffw/actions/runs/32179652076)
 and the commands under [Development and validation](#development-and-validation).
 
 ## Usage
