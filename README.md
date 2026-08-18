@@ -1087,6 +1087,9 @@ with Python 3.14.7 using a local `.venv`:
 
 ```console
 py -3.14 -m venv .venv
+.venv\Scripts\python -m pip install ruff==0.16.3 mypy==2.3.0
+.venv\Scripts\python -m ruff check llm_ffw tests benchmarks tools typing_tests
+.venv\Scripts\python -m mypy
 .venv\Scripts\python -m unittest discover -s tests -v
 .venv\Scripts\python benchmarks/bench_scan.py --size 1000000 --rounds 5
 .venv\Scripts\python benchmarks/generate_synthetic_dataset.py --size 8000000
@@ -1108,6 +1111,10 @@ py -3.14 -m venv .venv
 .venv\Scripts\python benchmarks/bench_all_rules.py --sizes 8192,131072,1000000,8000000 --workers 1,2,4 --catalog-patterns 1,100,1000
 .venv\Scripts\python benchmarks/bench_all_rules.py --sizes 8000000 --profiles clean-input,clean-output-json --workers 4 --rule-sets default,all --rounds 3 --requests-per-worker 8 --concurrency-multiplier 2 --catalog-patterns 1 --max-tasks-per-child 1000 --timeout 240 --json-output benchmark.json
 ```
+
+Mypy runs in strict mode over the library and typed public-API examples. CI
+also checks the examples against the built wheel so the PEP 561 contract is
+validated from a consumer installation, not only from the source tree.
 
 The deterministic generator makes one match per catalog prefix plus near-miss
 cases without LLM, network, provider, or random calls. Its manifest contains

@@ -1,11 +1,11 @@
 """Provider-neutral, bounded tool-call data and schema configuration."""
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 import math
 import string
 from types import MappingProxyType
-from typing import TypeAlias
+from typing import cast, TypeAlias
 
 
 JSONScalar: TypeAlias = None | bool | int | float | str
@@ -70,14 +70,16 @@ def _freeze_json(value: object, *, field_name: str) -> FrozenJSON:
                 raise ValueError(f"{field_name} contains too much string data")
             return item
         if type(item) in (list, tuple):
-            if len(item) > _HARD_MAX_CONTAINER_ITEMS:
+            sequence = cast(list[object] | tuple[object, ...], item)
+            if len(sequence) > _HARD_MAX_CONTAINER_ITEMS:
                 raise ValueError(f"{field_name} contains an oversized array")
-            return tuple(freeze(child, depth + 1) for child in item)
+            return tuple(freeze(child, depth + 1) for child in sequence)
         if type(item) is dict:
-            if len(item) > _HARD_MAX_CONTAINER_ITEMS:
+            source = cast(dict[object, object], item)
+            if len(source) > _HARD_MAX_CONTAINER_ITEMS:
                 raise ValueError(f"{field_name} contains an oversized object")
             frozen: dict[str, FrozenJSON] = {}
-            for key, child in item.items():
+            for key, child in source.items():
                 if type(key) is not str:
                     raise TypeError(f"{field_name} object keys must be strings")
                 string_chars += len(key)
@@ -172,7 +174,9 @@ def _validate_definitions(
     if isinstance(definitions, (str, bytes)):
         raise TypeError("definitions must be an iterable of ToolDefinition values")
     try:
-        values = tuple(definitions)  # type: ignore[arg-type]
+        values: tuple[object, ...] = tuple(
+            cast(Iterable[object], definitions)
+        )
     except TypeError as exc:
         raise TypeError(
             "definitions must be an iterable of ToolDefinition values"
@@ -181,10 +185,11 @@ def _validate_definitions(
         raise ValueError("definitions must contain between 1 and 1024 tools")
     if any(not isinstance(item, ToolDefinition) for item in values):
         raise TypeError("definitions must contain ToolDefinition values")
-    names = tuple(item.name for item in values)
+    typed_values = cast(tuple[ToolDefinition, ...], values)
+    names = tuple(item.name for item in typed_values)
     if len(set(names)) != len(names):
         raise ValueError("tool names must be unique")
-    return tuple(sorted(values, key=lambda item: item.name))
+    return tuple(sorted(typed_values, key=lambda item: item.name))
 
 
 __all__ = [

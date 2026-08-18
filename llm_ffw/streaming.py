@@ -8,6 +8,7 @@ from .findings import Action, Finding, Severity, Span
 from .inspection import ScanScope
 from .policy import BALANCED_POLICY, FirewallPolicy, RuleEngine
 from .rules.payment_card import PaymentCardRule
+from .rules.base import Rule
 from .rules.secrets import SecretsRule
 from ._incremental_stream import _IncrementalRedactionEngine
 from ._payment_card_stream import _PaymentCardStreamDetector
@@ -171,11 +172,12 @@ class FirewallStream:
                     ),
                 )
             except ValueError:
-                incompatible_rule_id = (
-                    secret_rule.rule_id
-                    if secret_rule is not None
-                    else payment_card_rule.rule_id
-                )
+                if secret_rule is not None:
+                    incompatible_rule_id = secret_rule.rule_id
+                elif payment_card_rule is not None:
+                    incompatible_rule_id = payment_card_rule.rule_id
+                else:
+                    raise RuntimeError("incremental detector rule is missing")
                 if mode is StreamMode.INCREMENTAL:
                     raise IncrementalStreamingUnavailableError(
                         (incompatible_rule_id,)
@@ -368,10 +370,11 @@ class FirewallStream:
             raise RuntimeError("stream is not open")
 
     @staticmethod
-    def _capability_for(rule: object) -> StreamingRuleCapability:
+    def _capability_for(rule: Rule) -> StreamingRuleCapability:
         if type(rule) in (SecretsRule, PaymentCardRule):
+            incremental_rule = cast(SecretsRule | PaymentCardRule, rule)
             return StreamingRuleCapability(
-                rule_id=rule.rule_id,
+                rule_id=incremental_rule.rule_id,
                 support=StreamingSupport.INCREMENTAL,
                 reason="fused incremental detector available",
             )

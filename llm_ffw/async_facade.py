@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import TypeVar
+from typing import cast, TypeVar
 
 from .banned_substring_catalog import BannedSubstringCatalog
 from .capabilities import FirewallCapabilities
@@ -60,7 +60,10 @@ class _AsyncRequestRunner:
     """Run synchronous facade requests without blocking one event loop."""
 
     def __init__(self, pool_config: ProcessScannerPoolConfig) -> None:
-        self._max_in_flight = pool_config.max_in_flight
+        max_in_flight = pool_config.max_in_flight
+        if max_in_flight is None:
+            raise RuntimeError("max_in_flight was not initialized")
+        self._max_in_flight = max_in_flight
         self._admission_timeout = pool_config.admission_timeout_seconds
         self._executor = ThreadPoolExecutor(
             max_workers=pool_config.max_workers,
@@ -124,7 +127,9 @@ class _AsyncRequestRunner:
         except BaseException:
             capacity.release()
             raise
-        tracked = future  # Preserve one invariant for callbacks and draining.
+        tracked = cast(
+            asyncio.Future[object], future
+        )  # Preserve one invariant for callbacks and draining.
         self._pending.add(tracked)
 
         def completed(value: asyncio.Future[object]) -> None:

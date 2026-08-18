@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 import math
+from typing import TypedDict
 
 from .authorization_header import AuthorizationHeaderConfig
 from .banned_substring_catalog import BannedSubstringCatalog
@@ -19,6 +20,27 @@ from .process_pool import ProcessScannerPoolConfig
 from .repetition import RepetitionConfig
 from .secret_catalog import SecretCatalog
 from .unsafe_url import UnsafeURLConfig
+
+
+class _FacadeKwargs(TypedDict):
+    scanner_config: RuleScannerConfig
+    pool_config: ProcessScannerPoolConfig
+    additional_secret_catalog: SecretCatalog | None
+    replacement_secret_catalog: SecretCatalog | None
+    banned_substring_catalog: BannedSubstringCatalog | None
+    json_output_config: JSONOutputConfig | None
+    unsafe_url_config: UnsafeURLConfig | None
+    ip_address_config: IPAddressConfig | None
+    mac_address_config: MACAddressConfig | None
+    iban_config: IBANConfig | None
+    authorization_header_config: AuthorizationHeaderConfig | None
+    email_address_config: EmailAddressConfig | None
+    payment_card_config: PaymentCardConfig | None
+    private_key_config: PrivateKeyConfig | None
+    jwt_token_config: JWTTokenConfig | None
+    repetition_config: RepetitionConfig | None
+    policy: FirewallPolicy
+    request_timeout_seconds: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,7 +78,7 @@ class FirewallConfig:
     request_timeout_seconds: float = 5.0
 
     def __post_init__(self) -> None:
-        required = (
+        required: tuple[tuple[str, object, type[object]], ...] = (
             ("scanner_config", self.scanner_config, RuleScannerConfig),
             ("pool_config", self.pool_config, ProcessScannerPoolConfig),
             ("policy", self.policy, FirewallPolicy),
@@ -64,7 +86,7 @@ class FirewallConfig:
         for name, value, expected_type in required:
             if not isinstance(value, expected_type):
                 raise TypeError(f"{name} must be a {expected_type.__name__}")
-        optional = (
+        optional: tuple[tuple[str, object, type[object]], ...] = (
             (
                 "additional_secret_catalog",
                 self.additional_secret_catalog,
@@ -169,7 +191,7 @@ class FirewallConfig:
             request_timeout_seconds=30.0,
         )
 
-    def _facade_kwargs(self) -> dict[str, object]:
+    def _facade_kwargs(self) -> _FacadeKwargs:
         """Return constructor arguments without serialization or copying."""
 
         return {

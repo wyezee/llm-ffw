@@ -30,6 +30,7 @@ from .jwt_token import JWTTokenConfig
 from .repetition import RepetitionConfig
 from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult, PolicyOverride
 from .rules.secrets import SecretsRule
+from .rules.base import Rule
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
@@ -175,7 +176,9 @@ def _initialize_worker(
     ):
         _WORKER_SCANNER = RuleScanner(config=scanner_config)
     else:
-        rules = [SecretsRule(secret_catalog or BUILTIN_SECRET_CATALOG)]
+        rules: list[Rule] = [
+            SecretsRule(secret_catalog or BUILTIN_SECRET_CATALOG)
+        ]
         if scanner_config.enable_invisible_characters:
             rules.append(InvisibleCharactersRule())
         if scanner_config.enable_unicode_tag_smuggling:
@@ -580,7 +583,10 @@ class ProcessScannerPool:
         self._state = ProcessPoolState.NEW
         self._state_lock = Lock()
         self._lifecycle_lock = Lock()
-        self._capacity = BoundedSemaphore(self._pool_config.max_in_flight)
+        max_in_flight = self._pool_config.max_in_flight
+        if max_in_flight is None:
+            raise RuntimeError("max_in_flight was not initialized")
+        self._capacity = BoundedSemaphore(max_in_flight)
         self._executor: ProcessPoolExecutor | None = None
 
     @property

@@ -597,6 +597,9 @@ class _IncrementalRedactionEngine:
         start: int,
         end: int,
     ) -> Finding:
+        catalog = self._catalog
+        if catalog is None:
+            raise RuntimeError("secret catalog is missing")
         return Finding(
             rule_id=SecretsRule.RULE_ID,
             severity=signature.severity,
@@ -613,8 +616,8 @@ class _IncrementalRedactionEngine:
                 "provider": signature.provider,
                 "signature_id": signature.signature_id,
                 "signature_status": signature.status.value,
-                "catalog_id": self._catalog.catalog_id,
-                "catalog_version": self._catalog.version,
+                "catalog_id": catalog.catalog_id,
+                "catalog_version": catalog.version,
                 "detector": "well_known_prefix",
                 "span_basis": "characters",
             },

@@ -2,6 +2,7 @@
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from typing import cast
 
 from ..findings import Action, Finding, Severity, Span
 from ..inspection import ScanScope
@@ -239,7 +240,7 @@ class ToolCallRule(StructuredRule[ToolCall]):
         if call.arguments is None:
             return self._finding("arguments_required", "arguments")
 
-        error = self._validate_value(call.arguments, schema)
+        error = self._validate_value(cast(FrozenJSON, call.arguments), schema)
         if error is None:
             return ()
         return self._finding(error.reason, error.location)

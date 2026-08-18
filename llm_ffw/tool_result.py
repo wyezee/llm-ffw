@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import cast
 
 from .tool_call import (
     FrozenJSON,
@@ -80,7 +81,8 @@ def _bounded_tuple[ValueT](
 ) -> tuple[ValueT, ...]:
     if type(values) not in (list, tuple):
         raise TypeError(f"{field_name} must be a list or tuple")
-    result = tuple(values)
+    source = cast(list[object] | tuple[object, ...], values)
+    result: tuple[object, ...] = tuple(source)
     if not result or len(result) > _HARD_MAX_BATCH_ITEMS:
         raise ValueError(
             f"{field_name} must contain between 1 and {_HARD_MAX_BATCH_ITEMS} values"
@@ -89,7 +91,7 @@ def _bounded_tuple[ValueT](
         raise TypeError(
             f"{field_name} must contain {expected_type.__name__} values"
         )
-    return result
+    return cast(tuple[ValueT, ...], result)
 
 
 @dataclass(frozen=True, slots=True)
