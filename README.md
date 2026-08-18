@@ -957,6 +957,8 @@ py -3.14 -m venv .venv
 .venv\Scripts\python benchmarks/bench_tool_results.py
 .venv\Scripts\python tools/pii_accuracy_gate.py
 .venv\Scripts\python benchmarks/generate_pii_accuracy_dataset.py
+.venv\Scripts\python benchmarks/generate_all_rules_dataset.py --size 8000000
+.venv\Scripts\python benchmarks/bench_all_rules.py --sizes 8192,131072,1000000,8000000 --workers 1,2,4 --catalog-patterns 1,100,1000
 ```
 
 The deterministic generator makes one match per catalog prefix plus near-miss
@@ -976,6 +978,24 @@ corpus creation makes no LLM or network calls. The
 optional expanded JSONL corpus is written under the ignored
 `benchmarks/generated/` directory, while the compact seed, group counts, and
 expected digest remain version controlled.
+
+The all-rules harness enables all 15 text rules in every worker and exercises
+clean input, multilingual code/log-like input, valid JSON output, invalid JSON
+output, sparse positives for every rule, dense bounded matches, and adversarial
+near-misses. It verifies exact rule IDs, spans, and
+actions before recording measurements. Its deterministic generator also
+provides valid and invalid provider-neutral tool-call and tool-result fixtures.
+Generated corpora remain under ignored `benchmarks/generated/`; manifests
+contain only hashes, sizes, scopes, and expected metadata, never matched values.
+
+Each benchmark result is one JSON object containing requests/second, aggregate
+MiB/second, p50/p95/p99 end-to-end latency, p50 service time, p95 caller-queue
+wait, cold-start and warm-up time, whole-process-tree peak RSS, process count,
+and completion/rejection/timeout/failure counters. Use `--json-output` for a
+machine-readable local report. `--catalog-patterns` measures literal-catalog
+scaling separately from rule-count scaling. Large matrices are intentionally
+local release evidence rather than a fixed CI threshold because shared CI
+runner performance is not stable enough for absolute throughput gates.
 
 ## Production process concurrency
 

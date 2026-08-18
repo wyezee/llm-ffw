@@ -4,6 +4,13 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Added
+
+- Deterministic all-rules benchmark corpora and a production-concurrency
+  harness covering all 15 text rules plus structured tool fixtures, exact
+  expectation checks, latency percentiles, queue/service timing, process-tree
+  memory, lifecycle timing, saturation counters, and catalog-size scaling.
+
 ## 0.8.0 - 2026-08-18
 
 ### Added
