@@ -9,7 +9,7 @@ import venv
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "0.13.0"
+EXPECTED_VERSION = "0.14.0"
 SMOKE_CODE = """
 import llm_ffw
 import llm_ffw.async_facade as async_facade_module
@@ -63,7 +63,7 @@ from llm_ffw import (
 )
 from llm_ffw.rules import SecretsRule
 
-assert version("llm-ffw") == "0.13.0"
+assert version("llm-ffw") == "0.14.0"
 assert __version__ == version("llm-ffw")
 assert metadata("llm-ffw").get_all("Requires-Dist") is None
 assert metadata("llm-ffw")["License-Expression"] == "Apache-2.0"

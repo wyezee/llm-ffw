@@ -197,6 +197,18 @@ jobs:
           --max-peak-mib 128
           --min-process-requests-per-second 0.5
 
+      - name: Run connection-string production envelope
+        run: >-
+          python benchmarks/bench_connection_strings.py
+          --size 8000000
+          --rounds 3
+          --workers 2
+          --concurrency 4
+          --process-requests 8
+          --min-throughput-mib-s 3
+          --max-peak-mib 128
+          --min-process-requests-per-second 0.5
+
       - name: Run tool-call validation envelope
         run: python benchmarks/bench_tool_calls.py
 

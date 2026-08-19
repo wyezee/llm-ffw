@@ -391,21 +391,20 @@ class ConnectionStringRule(Rule):
             raise TypeError("inspection must be an Inspection")
         text = inspection.text
         collection_limit = self._config.max_candidates + 1
-        candidates = tuple(
-            sorted(
-                (
-                    *_uri_candidates(text, self._config, collection_limit),
-                    *_keyword_candidates(
-                        text,
-                        self._config,
-                        collection_limit,
-                    ),
-                ),
-                key=lambda candidate: (
-                    candidate.prefix_start,
-                    candidate.start,
-                    candidate.end,
-                ),
+        candidates: list[_CredentialCandidate] = []
+        if "://" in text:
+            candidates.extend(
+                _uri_candidates(text, self._config, collection_limit)
+            )
+        if ";" in text:
+            candidates.extend(
+                _keyword_candidates(text, self._config, collection_limit)
+            )
+        candidates.sort(
+            key=lambda candidate: (
+                candidate.prefix_start,
+                candidate.start,
+                candidate.end,
             )
         )
         matches: list[RuleMatch] = []

@@ -126,7 +126,7 @@ Examples using an `Unreleased` API require the source checkout until the next
 package release.
 
 ```console
-python -m pip install llm-ffw==0.13.0
+python -m pip install llm-ffw==0.14.0
 ```
 
 Create one facade during application startup and reuse it for every request:
@@ -205,7 +205,7 @@ reloads, and direct process-pool orchestration.
 
 ## Measured performance
 
-The table is the publication-grade benchmark of the current six-rule default
+The table is the publication-grade benchmark of the `0.13.0` six-rule default
 and 16-rule all-text configurations at commit `4f5941a`. Tests ran on
 GitHub-hosted Ubuntu and Windows runners with Python 3.14.7. Each request
 contains 8,000,000 synthetic ASCII characters (about 7.63 MiB), representative

@@ -1,6 +1,7 @@
 import asyncio
 import time
 import unittest
+from unittest.mock import patch
 
 from llm_ffw import (
     AUDIT_POLICY,
@@ -81,6 +82,19 @@ class ConnectionStringConfigTests(unittest.TestCase):
 
 
 class ConnectionStringRuleTests(unittest.TestCase):
+    def test_clean_text_skips_candidate_parsers_without_markers(self) -> None:
+        with (
+            patch(
+                "llm_ffw.rules.connection_string._uri_candidates"
+            ) as uri_candidates,
+            patch(
+                "llm_ffw.rules.connection_string._keyword_candidates"
+            ) as keyword_candidates,
+        ):
+            self.assertEqual(_scanner().scan("plain text with password=value"), ())
+        uri_candidates.assert_not_called()
+        keyword_candidates.assert_not_called()
+
     def test_is_opt_in_and_supports_both_text_scopes(self) -> None:
         text = f"postgres://user:{_PASSWORD}@db.example/prod"
         self.assertEqual(RuleScanner().scan(text), ())
