@@ -25,6 +25,7 @@ from benchmarks.all_rules_data import (
 from benchmarks.bench_manager_reload import _MemorySampler
 from llm_ffw import (
     AuthorizationHeaderConfig,
+    ConnectionStringConfig,
     BannedSubstring,
     BannedSubstringCatalog,
     EmailAddressConfig,
@@ -172,6 +173,7 @@ def _pool(
         mac_address_config=MACAddressConfig(scopes=both),
         iban_config=IBANConfig(scopes=both),
         authorization_header_config=AuthorizationHeaderConfig(scopes=both),
+        connection_string_config=ConnectionStringConfig(scopes=both),
         email_address_config=EmailAddressConfig(scopes=both),
         phone_number_config=PhoneNumberConfig(scopes=both),
         payment_card_config=PaymentCardConfig(scopes=both),

@@ -128,7 +128,7 @@ class AllRulesBenchmarkTests(unittest.TestCase):
             request_timeout=30,
         )
 
-        self.assertEqual(result.enabled_text_rules, 16)
+        self.assertEqual(result.enabled_text_rules, 17)
         self.assertEqual(result.completed, 1)
         self.assertEqual(result.rejected + result.timed_out + result.failed, 0)
         self.assertEqual(set(result.finding_counts), {item.rule_id for item in sparse.expected})

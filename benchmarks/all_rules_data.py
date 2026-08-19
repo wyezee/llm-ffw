@@ -28,6 +28,7 @@ ALL_TEXT_RULE_IDS = frozenset(
         "pii.mac_address",
         "pii.iban",
         "secrets.authorization_header",
+        "secrets.connection_string",
         "pii.email_address",
         "pii.phone_number",
         "text.excessive_repetition",
@@ -161,6 +162,14 @@ def _positive_input(size: int) -> TextScenario:
         "secrets.authorization_header",
         bearer,
         prefix="Authorization: Bearer ",
+    )
+    _append(
+        parts,
+        expected,
+        "secrets.connection_string",
+        "synthetic~db~password~",
+        prefix="postgres://benchmark.user:",
+        suffix="@db.example/prod\n",
     )
     _append(parts, expected, "pii.email_address", "benchmark.user@example.com", prefix="email=")
     _append(parts, expected, "pii.phone_number", "+999000000000001", prefix="phone=")

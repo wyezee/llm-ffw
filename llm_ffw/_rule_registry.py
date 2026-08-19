@@ -6,6 +6,7 @@ from types import MappingProxyType
 from typing import Protocol, cast
 
 from .authorization_header import AuthorizationHeaderConfig
+from .connection_string import ConnectionStringConfig
 from .banned_substring_catalog import BannedSubstringCatalog
 from .capabilities import RuleCapability
 from .email_address import EmailAddressConfig
@@ -20,6 +21,7 @@ from .phone_number import PhoneNumberConfig
 from .private_key import PrivateKeyConfig
 from .repetition import RepetitionConfig
 from .rules.authorization_header import AuthorizationHeaderRule
+from .rules.connection_string import ConnectionStringRule
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.base import Rule
 from .rules.email_address import EmailAddressRule
@@ -156,6 +158,14 @@ RULE_SPECS: tuple[RuleSpec, ...] = (
         AuthorizationHeaderRule.RULE_ID,
         AuthorizationHeaderRule.PURPOSE,
         AuthorizationHeaderRule.SCOPES,
+    ),
+    RuleSpec(
+        "connection_string_config",
+        ConnectionStringConfig,
+        ConnectionStringRule,
+        ConnectionStringRule.RULE_ID,
+        ConnectionStringRule.PURPOSE,
+        ConnectionStringRule.SCOPES,
     ),
     RuleSpec(
         "email_address_config",

@@ -9,6 +9,7 @@ from .ip_address import IPAddressRule
 from .mac_address import MACAddressRule
 from .iban import IBANRule
 from .authorization_header import AuthorizationHeaderRule
+from .connection_string import ConnectionStringRule
 from .email_address import EmailAddressRule
 from .phone_number import PhoneNumberRule
 from .payment_card import PaymentCardRule
@@ -29,6 +30,7 @@ __all__ = [
     "MACAddressRule",
     "IBANRule",
     "AuthorizationHeaderRule",
+    "ConnectionStringRule",
     "EmailAddressRule",
     "PhoneNumberRule",
     "PaymentCardRule",

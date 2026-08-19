@@ -5,6 +5,7 @@ import math
 from typing import TypedDict
 
 from .authorization_header import AuthorizationHeaderConfig
+from .connection_string import ConnectionStringConfig
 from .banned_substring_catalog import BannedSubstringCatalog
 from .config import RuleScannerConfig
 from .email_address import EmailAddressConfig
@@ -35,6 +36,7 @@ class _FacadeKwargs(TypedDict):
     mac_address_config: MACAddressConfig | None
     iban_config: IBANConfig | None
     authorization_header_config: AuthorizationHeaderConfig | None
+    connection_string_config: ConnectionStringConfig | None
     email_address_config: EmailAddressConfig | None
     phone_number_config: PhoneNumberConfig | None
     payment_card_config: PaymentCardConfig | None
@@ -71,6 +73,7 @@ class FirewallConfig:
     mac_address_config: MACAddressConfig | None = None
     iban_config: IBANConfig | None = None
     authorization_header_config: AuthorizationHeaderConfig | None = None
+    connection_string_config: ConnectionStringConfig | None = None
     email_address_config: EmailAddressConfig | None = None
     phone_number_config: PhoneNumberConfig | None = None
     payment_card_config: PaymentCardConfig | None = None
@@ -114,6 +117,11 @@ class FirewallConfig:
                 "authorization_header_config",
                 self.authorization_header_config,
                 AuthorizationHeaderConfig,
+            ),
+            (
+                "connection_string_config",
+                self.connection_string_config,
+                ConnectionStringConfig,
             ),
             ("email_address_config", self.email_address_config, EmailAddressConfig),
             ("phone_number_config", self.phone_number_config, PhoneNumberConfig),
@@ -214,6 +222,7 @@ class FirewallConfig:
             mac_address_config=MACAddressConfig(),
             iban_config=IBANConfig(),
             authorization_header_config=AuthorizationHeaderConfig(),
+            connection_string_config=ConnectionStringConfig(),
             email_address_config=EmailAddressConfig(),
             phone_number_config=PhoneNumberConfig(),
             repetition_config=RepetitionConfig(),
@@ -235,6 +244,7 @@ class FirewallConfig:
             "mac_address_config": self.mac_address_config,
             "iban_config": self.iban_config,
             "authorization_header_config": self.authorization_header_config,
+            "connection_string_config": self.connection_string_config,
             "email_address_config": self.email_address_config,
             "phone_number_config": self.phone_number_config,
             "payment_card_config": self.payment_card_config,

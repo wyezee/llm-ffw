@@ -10,6 +10,7 @@ from .capabilities import (
     MACAddressCapability,
     IBANCapability,
     AuthorizationHeaderCapability,
+    ConnectionStringCapability,
     RuleCapability,
     SecretCatalogCapability,
     UnsafeURLCapability,
@@ -44,6 +45,7 @@ from .ip_address import IPAddressConfig
 from .mac_address import MACAddressConfig
 from .iban import IBANConfig
 from .authorization_header import AuthorizationHeaderConfig
+from .connection_string import ConnectionStringConfig
 from .email_address import EmailAddressConfig
 from .phone_number import PhoneNumberConfig
 from .unsafe_url import UnsafeURLConfig
@@ -105,6 +107,7 @@ from .rules.ip_address import IPAddressRule
 from .rules.mac_address import MACAddressRule
 from .rules.iban import IBANRule
 from .rules.authorization_header import AuthorizationHeaderRule
+from .rules.connection_string import ConnectionStringRule
 from .rules.email_address import EmailAddressRule
 from .rules.phone_number import PhoneNumberRule
 from .rules.unsafe_url import UnsafeURLRule
@@ -161,6 +164,9 @@ __all__ = [
     "AuthorizationHeaderCapability",
     "AuthorizationHeaderConfig",
     "AuthorizationHeaderRule",
+    "ConnectionStringCapability",
+    "ConnectionStringConfig",
+    "ConnectionStringRule",
     "MACAddressConfig",
     "MACAddressRule",
     "LiteralMatchMode",

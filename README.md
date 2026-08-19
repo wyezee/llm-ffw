@@ -18,8 +18,9 @@ deterministic parsing, default to input-only redaction under the balanced
 policy, and remain disabled until configured. Provider-neutral `ToolCallRule`
 and `ToolResultRule` validate bounded typed tool traffic before execution and
 before results return to the model. `AuthorizationHeaderRule` redacts exact
-Basic and Bearer credentials, while `RepetitionRule` reviews conservative exact
-character, token, and line runs.
+Basic and Bearer credentials, `ConnectionStringRule` redacts credentials from
+explicit URI and ADO/ODBC connection-string forms, and `RepetitionRule` reviews
+conservative exact character, token, and line runs.
 
 ## Contents
 
@@ -45,7 +46,7 @@ character, token, and line runs.
 `BALANCED_POLICY` is the default. Scope below means the scope selected by the
 normal configuration or `FirewallConfig.all_text_rules()`; configurable rules
 can be narrowed, and the input-only PII defaults can explicitly enable output
-inspection. The library exposes 16 text rules plus two structured validators:
+inspection. The library exposes 17 text rules plus two structured validators:
 
 | Rule | Activation | Default scope | Balanced handling | Policy choices |
 | --- | --- | --- | --- | --- |
@@ -62,6 +63,7 @@ inspection. The library exposes 16 text rules plus two structured validators:
 | `MACAddressRule` | Opt-in | Input; output configurable | Redact | Standard¹ |
 | `IBANRule` | Opt-in | Input; output configurable | Redact | Standard¹ |
 | `AuthorizationHeaderRule` | Opt-in | Both | Redact | Standard¹ |
+| `ConnectionStringRule` | Opt-in | Both | Redact | Standard¹ |
 | `EmailAddressRule` | Opt-in | Input; output configurable | Redact | Standard¹ |
 | `PhoneNumberRule` | Opt-in | Input; output configurable | Redact | Standard¹ |
 | `RepetitionRule` | Opt-in | Both | Review² | Standard¹ |
@@ -576,7 +578,7 @@ with Firewall.from_config(config) as firewall:
 `default()` selects the six-rule baseline, `privacy_input()` additionally
 enables conservative IP, MAC, IBAN, email, and phone input rules, and `json_api()`
 adds strict JSON-output and unsafe-URL inspection. `all_text_rules()` enables
-all 16 text rules, requires an explicit deployment-owned
+all 17 text rules, requires an explicit deployment-owned
 `BannedSubstringCatalog`, and uses a 30-second request timeout suitable for
 initial large-payload testing. Deployments must still tune that deadline from
 their own payload and latency measurements. Direct constructor parameters
@@ -596,6 +598,7 @@ by synchronous and asynchronous facades and managers.
 | `mac_address_config` | Enable bounded canonical 48-bit MAC-address inspection |
 | `iban_config` | Enable registered-length and MOD-97 IBAN inspection |
 | `authorization_header_config` | Enable bounded Basic/Bearer Authorization-header inspection |
+| `connection_string_config` | Enable bounded URI and ADO/ODBC connection-string credential inspection |
 | `email_address_config` | Enable bounded conservative email inspection |
 | `phone_number_config` | Enable bounded conservative E.164-style phone inspection |
 | `payment_card_config` | Customize enabled payment-card limits and scopes |
@@ -607,7 +610,7 @@ by synchronous and asynchronous facades and managers.
 
 The two secret-catalog parameters are mutually exclusive. Passing `None` for
 the opt-in banned-substring, JSON, unsafe-URL, IP-address, MAC-address, IBAN,
-Authorization-header, email-address, phone-number, and repetition configurations leaves each corresponding
+Authorization-header, connection-string, email-address, phone-number, and repetition configurations leaves each corresponding
 rule disabled. Payment-card,
 private-key, JWT,
 invisible-character, and Unicode tag rules are enabled by `RuleScannerConfig`
@@ -683,6 +686,7 @@ Strict and audit policies can change the effective action.
 | `pii.mac_address` | Opt-in | Input by default | Redact | `MACAddressConfig` |
 | `pii.iban` | Opt-in | Input by default | Redact | `IBANConfig` |
 | `secrets.authorization_header` | Opt-in | Input/output | Redact | `AuthorizationHeaderConfig` |
+| `secrets.connection_string` | Opt-in | Input/output | Redact | `ConnectionStringConfig` |
 | `pii.email_address` | Opt-in | Input by default | Redact | `EmailAddressConfig` |
 | `pii.phone_number` | Opt-in | Input by default | Redact | `PhoneNumberConfig` |
 | `text.excessive_repetition` | Opt-in | Input/output | Review | `RepetitionConfig` |
@@ -1034,6 +1038,44 @@ Syntactic validity does not prove
 that a credential is active or accepted by any server, and the rule makes no
 network call.
 
+### Opt-in connection-string inspection
+
+Applications that send configuration, logs, or generated deployment material
+through a model can redact embedded database and message-broker credentials:
+
+```python
+from llm_ffw import ConnectionStringConfig, Firewall
+
+firewall = Firewall(
+    connection_string_config=ConnectionStringConfig(),
+)
+```
+
+`ConnectionStringRule` recognizes credentials in source-backed URI forms for
+AMQP, MongoDB, PostgreSQL, Redis, and SQL Server schemes. It also
+recognizes semicolon-delimited ADO/ODBC `Password=` or `Pwd=` fields when a
+nearby `Server=` or `Data Source=` field establishes connection-string context.
+URI passwords may be percent-encoded; keyword values may be unquoted,
+double-quoted, or ODBC brace-escaped. Only the credential value is redacted, so
+the surrounding connection-string structure remains usable for diagnosis.
+
+The rule is opt-in, scans both directions by default, ignores explicit password
+placeholders, and bounds candidate count, credential length, and keyword-context
+distance. It deliberately excludes generic URLs, password assignments without
+connection context, JDBC subprotocols, and unreviewed vendor-specific aliases.
+Malformed percent encoding or unterminated quoted values in an otherwise
+unambiguous connection string are redacted rather than allowed through. Syntax
+does not prove that a credential is active, and the rule performs no network
+or database calls.
+
+The supported forms are pinned to the vendor specifications for
+[RabbitMQ AMQP URIs](https://www.rabbitmq.com/docs/4.1/uri-spec),
+[MongoDB connection strings](https://www.mongodb.com/docs/manual/reference/connection-string-formats/),
+[PostgreSQL connection URIs](https://www.postgresql.org/docs/16/libpq-connect.html),
+[Redis URIs](https://redis.io/docs/latest/develop/tools/cli/),
+[SQL Server connection strings](https://learn.microsoft.com/en-us/sql/connect/golang/connection-strings),
+and [MySQL keyword connection strings](https://dev.mysql.com/doc/connector-net/en/connector-net-connections-string.html).
+
 ### Opt-in email-address inspection
 
 Applications that treat email addresses as personal data can enable bounded,
@@ -1324,6 +1366,7 @@ py -3.14 -m venv .venv
 .venv\Scripts\python benchmarks/bench_mac_addresses.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_ibans.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_authorization_headers.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
+.venv\Scripts\python benchmarks/bench_connection_strings.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_phone_numbers.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_repetition.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_tool_calls.py
@@ -1357,7 +1400,7 @@ optional expanded JSONL corpus is written under the ignored
 `benchmarks/generated/` directory, while the compact seed, group counts, and
 expected digest remain version controlled.
 
-The all-rules harness enables all 16 text rules in every worker and exercises
+The all-rules harness enables all 17 text rules in every worker and exercises
 clean input, multilingual code/log-like input, valid JSON output, invalid JSON
 output, sparse positives for every rule, dense bounded matches, and adversarial
 near-misses. It verifies exact rule IDs, spans, and

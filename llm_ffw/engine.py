@@ -13,6 +13,7 @@ from .rules.ip_address import IPAddressRule
 from .rules.mac_address import MACAddressRule
 from .rules.iban import IBANRule
 from .rules.authorization_header import AuthorizationHeaderRule
+from .rules.connection_string import ConnectionStringRule
 from .rules.email_address import EmailAddressRule
 from .rules.phone_number import PhoneNumberRule
 from .rules.json_output import JSONOutputRule
@@ -106,6 +107,7 @@ class RuleScanner:
             MACAddressRule,
             IBANRule,
             AuthorizationHeaderRule,
+            ConnectionStringRule,
             EmailAddressRule,
             PhoneNumberRule,
             JSONOutputRule,

@@ -5,6 +5,7 @@ from llm_ffw import (
     AuthorizationHeaderConfig,
     BannedSubstring,
     BannedSubstringCatalog,
+    ConnectionStringConfig,
     EmailAddressConfig,
     IBANConfig,
     IPAddressConfig,
@@ -44,6 +45,7 @@ def _all_config_pairs() -> tuple[tuple[str, object], ...]:
         ("mac_address_config", MACAddressConfig()),
         ("iban_config", IBANConfig()),
         ("authorization_header_config", AuthorizationHeaderConfig()),
+        ("connection_string_config", ConnectionStringConfig()),
         ("email_address_config", EmailAddressConfig()),
         ("phone_number_config", PhoneNumberConfig()),
         ("payment_card_config", PaymentCardConfig()),
@@ -59,7 +61,7 @@ class RuleRegistryTests(unittest.TestCase):
         rules = build_registered_rules(configured)
         capabilities = registered_rule_capabilities(configured)
 
-        self.assertEqual(len(RULE_SPECS), 13)
+        self.assertEqual(len(RULE_SPECS), 14)
         self.assertEqual(
             tuple(field_name for field_name, _ in configured),
             tuple(spec.config_field for spec in RULE_SPECS),

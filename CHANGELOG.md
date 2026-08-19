@@ -6,6 +6,10 @@ All notable changes are recorded here before a tagged release.
 
 ### Added
 
+- Add opt-in `ConnectionStringRule` for bounded, exact credential redaction in
+  source-backed URI and ADO/ODBC connection-string forms, including process
+  propagation, disclosure-safe capabilities, adversarial tests, and an 8 MB
+  benchmark.
 - Add bounded exact and DNS-suffix hostname deny/allow policy to the opt-in
   unsafe-URL rule, with construction-time normalization, disclosure-safe
   capability counts, process propagation, and 8 MB performance coverage.

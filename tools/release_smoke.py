@@ -28,6 +28,8 @@ from llm_ffw import (
     AsyncFirewallManager,
     AuthorizationHeaderConfig,
     AuthorizationHeaderRule,
+    ConnectionStringConfig,
+    ConnectionStringRule,
     RuleEngine,
     FirewallStream,
     EmailAddressConfig,
@@ -110,6 +112,7 @@ assert "ip_address_config" in facade_parameters
 assert "mac_address_config" in facade_parameters
 assert "iban_config" in facade_parameters
 assert "authorization_header_config" in facade_parameters
+assert "connection_string_config" in facade_parameters
 assert "repetition_config" in facade_parameters
 assert "email_address_config" in facade_parameters
 assert "phone_number_config" in facade_parameters
@@ -183,6 +186,22 @@ assert authorization_firewall.capabilities().authorization_header.schemes == (
     "bearer",
 )
 authorization_firewall.close()
+connection_firewall = Firewall(
+    connection_string_config=ConnectionStringConfig()
+)
+assert connection_firewall.capabilities().connection_string.max_candidates == 128
+assert any(
+    rule.rule_id == ConnectionStringRule.RULE_ID
+    for rule in connection_firewall.capabilities().rules
+)
+connection_firewall.close()
+connection_result = RuleEngine(
+    scanner=RuleScanner(rules=(ConnectionStringRule(),))
+).process("postgres://user:synthetic-db-password-123@db.example/prod")
+assert connection_result.decision is Action.REDACT
+assert connection_result.processed_text == (
+    "postgres://user:[REDACTED]@db.example/prod"
+)
 authorization_result = RuleEngine(
     scanner=RuleScanner(rules=(AuthorizationHeaderRule(),))
 ).process("Authorization: Bearer synthetic_bearer_token_123456")

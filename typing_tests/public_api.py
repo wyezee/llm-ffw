@@ -4,6 +4,7 @@ from typing import assert_type
 
 from llm_ffw import (
     AsyncFirewall,
+    ConnectionStringConfig,
     EmailAddressConfig,
     Finding,
     Firewall,
@@ -23,6 +24,7 @@ from llm_ffw import (
 
 
 config = FirewallConfig(
+    connection_string_config=ConnectionStringConfig(),
     email_address_config=EmailAddressConfig(),
     ip_address_config=IPAddressConfig(),
     phone_number_config=PhoneNumberConfig(),

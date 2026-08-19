@@ -18,6 +18,7 @@ from .ip_address import IPAddressConfig
 from .mac_address import MACAddressConfig
 from .iban import IBANConfig
 from .authorization_header import AuthorizationHeaderConfig
+from .connection_string import ConnectionStringConfig
 from .email_address import EmailAddressConfig
 from .phone_number import PhoneNumberConfig
 from .facade_config import FirewallConfig
@@ -209,6 +210,7 @@ class AsyncFirewall:
         mac_address_config: MACAddressConfig | None = None,
         iban_config: IBANConfig | None = None,
         authorization_header_config: AuthorizationHeaderConfig | None = None,
+        connection_string_config: ConnectionStringConfig | None = None,
         email_address_config: EmailAddressConfig | None = None,
         phone_number_config: PhoneNumberConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
@@ -235,6 +237,7 @@ class AsyncFirewall:
             mac_address_config=mac_address_config,
             iban_config=iban_config,
             authorization_header_config=authorization_header_config,
+            connection_string_config=connection_string_config,
             email_address_config=email_address_config,
             phone_number_config=phone_number_config,
             payment_card_config=payment_card_config,
@@ -399,6 +402,7 @@ class AsyncFirewallManager:
         mac_address_config: MACAddressConfig | None = None,
         iban_config: IBANConfig | None = None,
         authorization_header_config: AuthorizationHeaderConfig | None = None,
+        connection_string_config: ConnectionStringConfig | None = None,
         email_address_config: EmailAddressConfig | None = None,
         phone_number_config: PhoneNumberConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
@@ -425,6 +429,7 @@ class AsyncFirewallManager:
             mac_address_config=mac_address_config,
             iban_config=iban_config,
             authorization_header_config=authorization_header_config,
+            connection_string_config=connection_string_config,
             email_address_config=email_address_config,
             phone_number_config=phone_number_config,
             payment_card_config=payment_card_config,

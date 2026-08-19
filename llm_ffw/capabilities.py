@@ -232,6 +232,41 @@ class AuthorizationHeaderCapability:
 
 
 @dataclass(frozen=True, slots=True)
+class ConnectionStringCapability:
+    """Disclosure-safe connection-string inspection limits."""
+
+    max_candidates: int
+    max_credential_chars: int
+    max_connection_chars: int
+    schemes: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "max_candidates",
+            "max_credential_chars",
+            "max_connection_chars",
+        ):
+            value = getattr(self, field_name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value <= 0
+            ):
+                raise ValueError(f"{field_name} must be a positive integer")
+        try:
+            schemes = tuple(self.schemes)
+        except TypeError as exc:
+            raise TypeError("schemes must be iterable") from exc
+        if not schemes or any(
+            not isinstance(value, str) or not value for value in schemes
+        ):
+            raise ValueError("schemes must contain non-empty strings")
+        if schemes != tuple(sorted(set(schemes))):
+            raise ValueError("schemes must be sorted and unique")
+        object.__setattr__(self, "schemes", schemes)
+
+
+@dataclass(frozen=True, slots=True)
 class EmailAddressCapability:
     """Disclosure-safe email-address inspection configuration."""
 
@@ -332,6 +367,7 @@ class FirewallCapabilities:
     mac_address: MACAddressCapability | None = None
     iban: IBANCapability | None = None
     authorization_header: AuthorizationHeaderCapability | None = None
+    connection_string: ConnectionStringCapability | None = None
     email_address: EmailAddressCapability | None = None
     phone_number: PhoneNumberCapability | None = None
     payment_card: PaymentCardCapability | None = None
@@ -397,6 +433,12 @@ class FirewallCapabilities:
             raise TypeError(
                 "email_address must be an EmailAddressCapability or None"
             )
+        if self.connection_string is not None and not isinstance(
+            self.connection_string, ConnectionStringCapability
+        ):
+            raise TypeError(
+                "connection_string must be a ConnectionStringCapability or None"
+            )
         if self.phone_number is not None and not isinstance(
             self.phone_number, PhoneNumberCapability
         ):
@@ -444,6 +486,7 @@ __all__ = [
     "MACAddressCapability",
     "IBANCapability",
     "AuthorizationHeaderCapability",
+    "ConnectionStringCapability",
     "PaymentCardCapability",
     "PrivateKeyCapability",
     "JWTTokenCapability",
