@@ -1,4 +1,4 @@
-"""Deterministic Basic and Bearer Authorization-header detection."""
+"""Deterministic Basic and Bearer Authorization credential detection."""
 
 from base64 import b64decode, b64encode
 from binascii import Error as Base64Error
@@ -10,10 +10,23 @@ from ..inspection import Inspection, ScanScope
 from .base import Rule, RuleMatch
 
 
-# Fixed literals and bounded alternatives anchored to the start of a line.
-# Credential parsing is performed by explicit bounded character checks.
-_HEADER_PREFIX = re.compile(
-    r"^[ \t]*authorization:[ \t]*(?P<scheme>basic|bearer)[ \t]+",
+# Fixed literals, disjoint syntax alternatives, and simple whitespace runs.
+# There are no nested or ambiguous quantifiers. Credential parsing is performed
+# by explicit bounded character checks after one combined discovery pass.
+_AUTHORIZATION_PREFIX = re.compile(
+    r"(?P<header>"
+    r"^[ \t]*authorization:[ \t]*"
+    r"(?P<header_scheme>basic|bearer)[ \t]+"
+    r")"
+    r"|(?P<curl>"
+    r"^[ \t]*curl[ \t]+(?:-H|--header)[ \t]+"
+    r"(?P<curl_quote>[\"'])authorization:[ \t]*"
+    r"(?P<curl_scheme>basic|bearer)[ \t]+"
+    r")"
+    r"|(?P<json>"
+    r"[{,][ \t\r\n]*\"authorization\"[ \t\r\n]*:"
+    r"[ \t\r\n]*\"(?P<json_scheme>basic|bearer)[ \t]+"
+    r")",
     re.ASCII | re.IGNORECASE | re.MULTILINE,
 )
 _BEARER_CHARS = frozenset(
@@ -25,7 +38,7 @@ _BASIC_CHARS = frozenset(
 _PLACEHOLDERS = frozenset(("<token>", "your token"))
 
 
-def _credential_end(text: str, start: int) -> tuple[int, int]:
+def _line_credential_end(text: str, start: int) -> tuple[int, int]:
     newline = text.find("\n", start)
     line_end = len(text) if newline < 0 else newline
     end = line_end
@@ -34,6 +47,35 @@ def _credential_end(text: str, start: int) -> tuple[int, int]:
     while end > start and text[end - 1] in " \t":
         end -= 1
     return end, line_end
+
+
+def _quoted_credential_end(
+    text: str,
+    start: int,
+    quote: str,
+) -> tuple[int, int]:
+    newline = text.find("\n", start)
+    line_end = len(text) if newline < 0 else newline
+    quote_end = text.find(quote, start, line_end)
+    boundary = line_end if quote_end < 0 else quote_end
+    end = boundary
+    if end > start and text[end - 1] == "\r":
+        end -= 1
+    while end > start and text[end - 1] in " \t":
+        end -= 1
+    return end, boundary
+
+
+def _prefix_details(prefix: re.Match[str]) -> tuple[str, str, str | None]:
+    if prefix.group("header") is not None:
+        return "header", prefix.group("header_scheme").lower(), None
+    if prefix.group("curl") is not None:
+        return (
+            "curl",
+            prefix.group("curl_scheme").lower(),
+            prefix.group("curl_quote"),
+        )
+    return "json", prefix.group("json_scheme").lower(), '"'
 
 
 def _valid_bearer(value: str) -> bool:
@@ -66,7 +108,7 @@ def _is_placeholder(value: str) -> bool:
 
 
 class AuthorizationHeaderRule(Rule):
-    """Find credentials in line-oriented HTTP Authorization headers."""
+    """Find credentials in explicit HTTP Authorization syntaxes."""
 
     RULE_ID = "secrets.authorization_header"
     PURPOSE = "Detect Basic and Bearer Authorization-header credentials."
@@ -103,7 +145,7 @@ class AuthorizationHeaderRule(Rule):
         text = inspection.text
         matches: list[RuleMatch] = []
         candidate_count = 0
-        for prefix in _HEADER_PREFIX.finditer(text):
+        for prefix in _AUTHORIZATION_PREFIX.finditer(text):
             candidate_count += 1
             if candidate_count > self._config.max_candidates:
                 matches.append(
@@ -125,14 +167,18 @@ class AuthorizationHeaderRule(Rule):
                 )
                 break
 
+            syntax, scheme, quote = _prefix_details(prefix)
             start = prefix.end()
-            end, line_end = _credential_end(text, start)
+            end, candidate_end = (
+                _line_credential_end(text, start)
+                if quote is None
+                else _quoted_credential_end(text, start, quote)
+            )
             credential_length = end - start
-            scheme = prefix.group("scheme").lower()
             if credential_length > self._config.max_credential_chars:
                 matches.append(
                     RuleMatch(
-                        span=Span(start, line_end),
+                        span=Span(start, candidate_end),
                         severity=Severity.HIGH,
                         action=Action.BLOCK,
                         message="Authorization credential exceeds inspection limit.",
@@ -140,6 +186,7 @@ class AuthorizationHeaderRule(Rule):
                             "reason": "credential_limit_exceeded",
                             "limit": str(self._config.max_credential_chars),
                             "scheme": scheme,
+                            "syntax": syntax,
                             "detector": "bounded_authorization_header",
                             "span_basis": "characters",
                         },
@@ -171,6 +218,7 @@ class AuthorizationHeaderRule(Rule):
                     metadata={
                         "reason": reason,
                         "scheme": scheme,
+                        "syntax": syntax,
                         "detector": "bounded_authorization_header",
                         "span_basis": "characters",
                     },

@@ -54,6 +54,10 @@ def benchmark(
         size,
         f"\nAuthorization: Bearer {_BEARER}",
     )
+    structured_text = _sized_suffix(
+        size,
+        f'\n{{"Authorization": "Bearer {_BEARER}"}}',
+    )
     workloads = (
         ("clean", "a" * size, Action.ALLOW),
         ("line_dense", ("header-like\n" * ((size // 12) + 1))[:size], Action.ALLOW),
@@ -68,6 +72,15 @@ def benchmark(
             Action.REDACT,
         ),
         ("bearer_at_end", valid_text, Action.REDACT),
+        (
+            "curl_at_end",
+            _sized_suffix(
+                size,
+                f'\ncurl -H "Authorization: Bearer {_BEARER}" https://example.test',
+            ),
+            Action.REDACT,
+        ),
+        ("json_at_end", structured_text, Action.REDACT),
         (
             "basic_at_end",
             _sized_suffix(size, f"\nAuthorization: Basic {_BASIC}"),
@@ -98,7 +111,7 @@ def benchmark(
                 )
 
     tracemalloc.start()
-    measured = firewall.process(valid_text, scope=ScanScope.INPUT)
+    measured = firewall.process(structured_text, scope=ScanScope.INPUT)
     _, peak_bytes = tracemalloc.get_traced_memory()
     tracemalloc.stop()
     if measured.decision is not Action.REDACT:
@@ -114,7 +127,11 @@ def benchmark(
     )
     with pool:
         if (
-            pool.process(valid_text, scope=ScanScope.INPUT, timeout=120).decision
+            pool.process(
+                structured_text,
+                scope=ScanScope.INPUT,
+                timeout=120,
+            ).decision
             is not Action.REDACT
         ):
             raise RuntimeError("process warm-up did not sanitize credential")
@@ -123,7 +140,7 @@ def benchmark(
             results = tuple(
                 callers.map(
                     lambda _: pool.process(
-                        valid_text,
+                        structured_text,
                         scope=ScanScope.INPUT,
                         timeout=120,
                     ),

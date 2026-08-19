@@ -18,6 +18,12 @@ All notable changes are recorded here before a tagged release.
   Use `Firewall`, `AsyncFirewall`, `FirewallManager`,
   `AsyncFirewallManager`, `RuleScanner`, `RuleScannerConfig`, and `RuleEngine`.
 
+### Changed
+
+- Extend opt-in Authorization-header inspection with separate bounded syntax
+  modes for quoted line-start `curl -H`/`--header` arguments and JSON object
+  fields, while preserving exact credential-only redaction.
+
 ### Documentation
 
 - Add compile and public-import regression coverage for every README Python

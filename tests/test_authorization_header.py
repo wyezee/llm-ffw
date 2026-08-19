@@ -94,10 +94,54 @@ class AuthorizationHeaderRuleTests(unittest.TestCase):
                     text[finding.span.start : finding.span.end], credential
                 )
                 self.assertEqual(finding.metadata["scheme"], scheme)
+                self.assertEqual(finding.metadata["syntax"], "header")
                 self.assertEqual(
                     finding.redacted_preview,
                     "[REDACTED:authorization_credential]",
                 )
+
+    def test_detects_quoted_curl_header_arguments(self) -> None:
+        cases = (
+            (
+                f'curl -H "Authorization: Bearer {_BEARER}" https://example.test',
+                _BEARER,
+                "bearer",
+            ),
+            (
+                f"  CURL --HEADER 'authorization: Basic {_BASIC}' https://example.test",
+                _BASIC,
+                "basic",
+            ),
+        )
+        scanner = _scanner()
+        for text, credential, scheme in cases:
+            with self.subTest(scheme=scheme):
+                finding = scanner.scan(text)[0]
+                self.assertEqual(
+                    text[finding.span.start : finding.span.end],
+                    credential,
+                )
+                self.assertEqual(finding.metadata["scheme"], scheme)
+                self.assertEqual(finding.metadata["syntax"], "curl")
+
+    def test_detects_json_authorization_fields(self) -> None:
+        cases = (
+            f'{{"Authorization": "Bearer {_BEARER}"}}',
+            f'{{"other": 1, "authorization":"Bearer {_BEARER}"}}',
+            '{\n  "AUTHORIZATION" :\n  "Bearer '
+            + _BEARER
+            + '"\n}',
+        )
+        scanner = _scanner()
+        for text in cases:
+            with self.subTest(text=text[:30]):
+                finding = scanner.scan(text)[0]
+                self.assertEqual(
+                    text[finding.span.start : finding.span.end],
+                    _BEARER,
+                )
+                self.assertEqual(finding.metadata["scheme"], "bearer")
+                self.assertEqual(finding.metadata["syntax"], "json")
 
     def test_rejects_nonheaders_unsupported_schemes_and_placeholders(self) -> None:
         cases = (
@@ -110,10 +154,27 @@ class AuthorizationHeaderRuleTests(unittest.TestCase):
             "Authorization: Bearer your token",
             "Authorization: Bearer",
             f"authorization： bearer {_BEARER}",
+            f'curl -H Authorization: Bearer {_BEARER}',
+            f'prefix curl -H "Authorization: Bearer {_BEARER}"',
+            f'curl -X GET -H "Authorization: Bearer {_BEARER}"',
+            f'{{"X-Authorization": "Bearer {_BEARER}"}}',
+            f'{{"note": "Authorization: Bearer {_BEARER}"}}',
+            f'"Authorization": "Bearer {_BEARER}"',
+            f'{{"Authorization": "Digest {_BEARER}"}}',
         )
         scanner = _scanner()
         for text in cases:
             with self.subTest(text=text[:40]):
+                self.assertEqual(scanner.scan(text), ())
+
+    def test_structured_placeholders_are_not_findings(self) -> None:
+        cases = (
+            'curl -H "Authorization: Bearer <token>" https://example.test',
+            '{"Authorization": "Bearer your token"}',
+        )
+        scanner = _scanner()
+        for text in cases:
+            with self.subTest(text=text):
                 self.assertEqual(scanner.scan(text), ())
 
     def test_redacts_malformed_credentials_in_unambiguous_headers(self) -> None:
@@ -159,6 +220,39 @@ class AuthorizationHeaderRuleTests(unittest.TestCase):
             "Authorization: Basic [REDACTED]",
         )
 
+    def test_structured_malformed_values_redact_without_disclosure(self) -> None:
+        texts = (
+            'curl -H "Authorization: Bearer private value" https://example.test',
+            '{"Authorization": "Basic private-value"}',
+        )
+        scanner = _scanner()
+        for text in texts:
+            with self.subTest(text=text[:20]):
+                finding = scanner.scan(text)[0]
+                credential = text[finding.span.start : finding.span.end]
+                self.assertEqual(
+                    finding.metadata["reason"],
+                    "malformed_authorization_credential",
+                )
+                self.assertNotIn(credential, finding.message)
+                self.assertNotIn(credential, repr(finding))
+
+    def test_candidate_limit_is_shared_across_supported_syntaxes(self) -> None:
+        text = (
+            f'curl -H "Authorization: Bearer {_BEARER}" https://example.test\n'
+            f'{{"Authorization": "Bearer {_BEARER}"}}'
+        )
+        findings = _scanner(
+            AuthorizationHeaderConfig(max_candidates=1)
+        ).scan(text)
+
+        self.assertEqual(len(findings), 2)
+        self.assertEqual(findings[0].metadata["syntax"], "curl")
+        self.assertEqual(
+            findings[1].metadata["reason"],
+            "candidate_limit_exceeded",
+        )
+
     def test_candidate_and_credential_limits_fail_closed(self) -> None:
         header = f"Authorization: Bearer {_BEARER}"
         findings = _scanner(
@@ -197,6 +291,10 @@ class AuthorizationHeaderRuleTests(unittest.TestCase):
             "\n" * 8_000_000,
             "Authorization: Bearer " + "A" * 7_999_978,
             ("Authorization: Bearer <token>\n" * 300_000)[:8_000_000],
+            ('curl -H "Authorization: Bearer <token>"\n' * 250_000)[
+                :8_000_000
+            ],
+            "{" + " " * 7_999_999,
         )
         started = time.perf_counter()
         self.assertEqual(scanner.scan(workloads[0]), ())
@@ -209,7 +307,15 @@ class AuthorizationHeaderRuleTests(unittest.TestCase):
             scanner.scan(workloads[3])[-1].metadata["reason"],
             "candidate_limit_exceeded",
         )
-        self.assertLess(time.perf_counter() - started, 4.0)
+        self.assertEqual(
+            scanner.scan(workloads[4])[-1].metadata["reason"],
+            "candidate_limit_exceeded",
+        )
+        self.assertEqual(scanner.scan(workloads[5]), ())
+        # Allow at most one second per exact 8 MB adversarial path. Keeping the
+        # budget proportional avoids weakening or accidentally tightening the
+        # gate when another independently bounded syntax path is added.
+        self.assertLess(time.perf_counter() - started, len(workloads) * 1.0)
 
 
 class AuthorizationHeaderFacadeTests(unittest.TestCase):
@@ -230,9 +336,9 @@ class AuthorizationHeaderFacadeTests(unittest.TestCase):
         with firewall:
             self.assertEqual(
                 firewall.sanitize_output(
-                    f"Authorization: Bearer {_BEARER}"
+                    f'{{"Authorization": "Bearer {_BEARER}"}}'
                 ),
-                "Authorization: Bearer [REDACTED]",
+                '{"Authorization": "Bearer [REDACTED]"}',
             )
 
     def test_manager_and_async_facade_preserve_configuration(self) -> None:

@@ -1013,20 +1013,24 @@ firewall = Firewall(
 )
 ```
 
-`AuthorizationHeaderRule` recognizes optionally indented, case-insensitive
-`Authorization:` headers
-only at the start of a normalized line. The field name must be followed
-immediately by `:`. Bearer values use the token68 alphabet with any padding
-confined to the end. Basic values must be canonical base64, decode successfully,
-and contain the required username/password colon. Only the credential span is
-redacted; the header name and authentication scheme remain.
+`AuthorizationHeaderRule` recognizes three explicit, case-insensitive shapes:
+optionally indented `Authorization:` headers at the start of a normalized line;
+a line-start `curl -H` or `curl --header` command whose immediately following
+header is single- or double-quoted; and a double-quoted `Authorization` field at
+an object-style `{` or `,` JSON boundary. The field name must be followed by the
+syntax-appropriate colon. Bearer values use the token68 alphabet with any
+padding confined to the end. Basic values must be canonical base64, decode
+successfully, and contain the required username/password colon. Only the
+credential span is redacted; surrounding header, command, and JSON structure
+remain.
 
 The rule is opt-in, scans input and output by default, and has hard bounds on
 candidate count and credential length. It deliberately excludes Digest,
 `Proxy-Authorization`, authentication parameters, header folding, inline prose,
-and placeholder syntax such as `<token>`. Non-placeholder values are redacted
-even when malformed, because an unambiguous credential header must not fail
-open. Syntactic validity does not prove
+unquoted curl header arguments, curl options before `-H`/`--header`, and
+placeholder syntax such as `<token>`. Non-placeholder values are redacted even
+when malformed, because an unambiguous credential shape must not fail open.
+Syntactic validity does not prove
 that a credential is active or accepted by any server, and the rule makes no
 network call.
 
