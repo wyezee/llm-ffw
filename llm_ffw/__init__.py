@@ -257,4 +257,4 @@ __all__ = [
     "config_from_preset",
 ]
 
-__version__ = "0.17.1"
+__version__ = "0.18.0"

@@ -4,6 +4,8 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.18.0 - 2026-08-19
+
 ### Added
 
 - Add immutable public discovery for all 22 built-in rules and four named
