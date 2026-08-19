@@ -6,7 +6,7 @@ from itertools import islice
 import re
 
 from ..findings import Action, Severity, Span
-from ..inspection import Inspection, ScanScope
+from ..inspection import Inspection, InspectionFeature, ScanScope
 from ..repetition import RepetitionConfig
 from .base import Rule, RuleMatch
 
@@ -30,11 +30,15 @@ class _Repeat:
 
 
 def _character_repeats(
-    text: str, threshold: int, limit: int
+    text: str,
+    threshold: int,
+    limit: int,
+    ascii_characters: tuple[str, ...] | None,
 ) -> Iterator[_Repeat]:
-    if text.isascii():
+    if ascii_characters is not None:
         candidates: list[_Repeat] = []
-        for character in sorted(set(text)):
+        text_length = len(text)
+        for character in ascii_characters:
             if character.isspace():
                 continue
             needle = character * threshold
@@ -45,7 +49,11 @@ def _character_repeats(
                 if start < 0:
                     break
                 end = start + threshold
-                while end < len(text) and text[end] == character:
+                while end + threshold <= text_length and text.startswith(
+                    needle, end
+                ):
+                    end += threshold
+                while end < text_length and text[end] == character:
                     end += 1
                 candidates.append(
                     _Repeat(start, end, "character_run", end - start, 1)
@@ -115,11 +123,11 @@ def _contains_alphanumeric(value: str) -> bool:
 
 
 def _token_repeats(
-    text: str, threshold: int, limit: int
+    text: str, threshold: int, limit: int, *, is_ascii: bool
 ) -> Iterator[_Repeat]:
     if re.search(r"\s", text) is None or re.search(r"\w", text) is None:
         return
-    if not text.isascii() or sum(
+    if not is_ascii or sum(
         text.count(character) for character in " \t\n\r\v\f"
     ) > _MAX_SPLIT_SEPARATORS:
         yield from _many_token_repeats(text, threshold)
@@ -297,26 +305,44 @@ class RepetitionRule(Rule):
     def config(self) -> RepetitionConfig:
         return self._config
 
+    @property
+    def inspection_features(self) -> frozenset[InspectionFeature]:
+        return frozenset((InspectionFeature.ASCII,))
+
     def scan(self, inspection: Inspection) -> tuple[RuleMatch, ...]:
         if not isinstance(inspection, Inspection):
             raise TypeError("inspection must be an Inspection")
         text = inspection.text
+        is_ascii = inspection.is_ascii
         inspection_limit = self._config.max_findings + 1
         repeats: list[_Repeat] = []
-        for detector in (
-            _character_repeats(
-                text,
-                self._config.character_run_threshold,
-                inspection_limit,
-            ),
-            _token_repeats(
-                text,
-                self._config.token_repeat_threshold,
-                inspection_limit,
-            ),
-            _line_repeats(text, self._config.line_repeat_threshold),
-        ):
-            repeats.extend(islice(detector, inspection_limit))
+        ascii_characters = tuple(sorted(set(text))) if is_ascii else None
+        if ascii_characters is not None and len(ascii_characters) == 1:
+            character = ascii_characters[0]
+            if (
+                not character.isspace()
+                and len(text) >= self._config.character_run_threshold
+            ):
+                repeats.append(
+                    _Repeat(0, len(text), "character_run", len(text), 1)
+                )
+        else:
+            for detector in (
+                _character_repeats(
+                    text,
+                    self._config.character_run_threshold,
+                    inspection_limit,
+                    ascii_characters,
+                ),
+                _token_repeats(
+                    text,
+                    self._config.token_repeat_threshold,
+                    inspection_limit,
+                    is_ascii=is_ascii,
+                ),
+                _line_repeats(text, self._config.line_repeat_threshold),
+            ):
+                repeats.extend(islice(detector, inspection_limit))
         repeats.sort(key=lambda item: (item.start, item.end, item.reason))
         matches: list[RuleMatch] = []
         for repeat in repeats:

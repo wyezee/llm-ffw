@@ -9,7 +9,7 @@ import venv
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "0.12.0"
+EXPECTED_VERSION = "0.13.0"
 SMOKE_CODE = """
 from importlib.metadata import files, metadata, version
 from inspect import signature
@@ -60,7 +60,7 @@ from llm_ffw import (
 )
 from llm_ffw.rules import SecretsRule
 
-assert version("llm-ffw") == "0.12.0"
+assert version("llm-ffw") == "0.13.0"
 assert __version__ == version("llm-ffw")
 assert metadata("llm-ffw").get_all("Requires-Dist") is None
 assert metadata("llm-ffw")["License-Expression"] == "Apache-2.0"

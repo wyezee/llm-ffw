@@ -4,6 +4,8 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.13.0 - 2026-08-19
+
 ### Added
 
 - Added opt-in, input-default `PhoneNumberRule` inspection for a conservative
@@ -17,6 +19,10 @@ All notable changes are recorded here before a tagged release.
   when `FirewallConfig` is constructed rather than later during facade creation.
 - Centralize configuration-backed built-in rule metadata, worker construction,
   policy validation, and generic capabilities in a private immutable registry.
+- Keep 8 MB policy and repetition correctness cases deterministic in the unit
+  suite while enforcing their machine-dependent speed in dedicated benchmarks.
+- Accelerate long exact character-run detection with bounded chunked extension
+  while preserving exact finding spans and counts.
 
 ### Documentation
 

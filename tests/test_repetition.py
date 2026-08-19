@@ -1,4 +1,3 @@
-import time
 import unittest
 
 from llm_ffw import (
@@ -10,6 +9,7 @@ from llm_ffw import (
     RepetitionConfig,
     RepetitionRule,
     ScanScope,
+    InspectionFeature,
     RuleScanner,
 )
 
@@ -50,13 +50,18 @@ class RepetitionRuleTests(unittest.TestCase):
     def test_is_opt_in_and_supports_both_scopes(self) -> None:
         text = "x" * 256
         self.assertEqual(RuleScanner().scan(text), ())
-        scanner = _scanner()
+        rule = RepetitionRule()
+        self.assertEqual(
+            rule.inspection_features,
+            frozenset((InspectionFeature.ASCII,)),
+        )
+        scanner = RuleScanner(rules=(rule,))
         self.assertEqual(len(scanner.scan(text, scope=ScanScope.INPUT)), 1)
         self.assertEqual(len(scanner.scan(text, scope=ScanScope.OUTPUT)), 1)
 
     def test_detects_exact_character_token_and_nonempty_line_runs(self) -> None:
         cases = (
-            ("prefix " + ("x" * 256), "character_run", 256),
+            ("prefix " + ("x" * 1_024), "character_run", 1_024),
             ("go " * 64, "token_run", 64),
             ("same line\n" * 32, "line_run", 32),
             (("windows line\r\n" * 31) + "windows line", "line_run", 32),
@@ -139,7 +144,7 @@ class RepetitionRuleTests(unittest.TestCase):
         self.assertIs(findings[-1].action, Action.BLOCK)
         self.assertEqual(findings[-1].span.end, len(text))
 
-    def test_eight_million_character_adversarial_paths_are_bounded(self) -> None:
+    def test_eight_million_character_adversarial_paths_are_correct(self) -> None:
         scanner = _scanner()
         workloads = (
             "x" * 8_000_000,
@@ -148,18 +153,17 @@ class RepetitionRuleTests(unittest.TestCase):
             ("aa " * 2_666_667)[:8_000_000],
             (("a" * 255) + "b") * 31_250,
         )
-        started = time.perf_counter()
-        self.assertEqual(
-            scanner.scan(workloads[0])[0].metadata["reason"],
-            "character_run",
-        )
+        character_finding = scanner.scan(workloads[0])[0]
+        self.assertEqual(character_finding.metadata["reason"], "character_run")
+        self.assertEqual(character_finding.metadata["repeat_count"], "8000000")
+        self.assertEqual(character_finding.span.start, 0)
+        self.assertEqual(character_finding.span.end, 8_000_000)
         self.assertEqual(scanner.scan(workloads[1]), ())
         self.assertEqual(scanner.scan(workloads[2]), ())
         self.assertEqual(
             scanner.scan(workloads[3])[0].metadata["reason"], "token_run"
         )
         self.assertEqual(scanner.scan(workloads[4]), ())
-        self.assertLess(time.perf_counter() - started, 8.0)
 
 
 class RepetitionFacadeTests(unittest.TestCase):
