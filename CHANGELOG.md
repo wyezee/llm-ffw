@@ -12,6 +12,8 @@ All notable changes are recorded here before a tagged release.
   accounting, and explicit `MAC:` label detection.
 - Make excessive-line repetition detection consistent for every supported
   Unicode line separator, including its bounded streaming fallback.
+- Reject zero request deadlines and unbounded admission waits, and raise the
+  default process-facade request deadline from 5 to 30 seconds.
 
 ## 0.11.1 - 2026-08-19
 

@@ -461,7 +461,7 @@ by synchronous and asynchronous facades and managers.
 | `jwt_token_config` | Customize enabled JWT limits and scopes |
 | `repetition_config` | Enable conservative exact character, token, and line repetition inspection |
 | `policy` | Select balanced, strict, audit, or a versioned custom policy |
-| `request_timeout_seconds` | Per-request facade deadline; defaults to 5 seconds |
+| `request_timeout_seconds` | Positive per-request facade deadline; defaults to 30 seconds |
 
 The two secret-catalog parameters are mutually exclusive. Passing `None` for
 the opt-in banned-substring, JSON, unsafe-URL, IP-address, MAC-address, IBAN,

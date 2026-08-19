@@ -83,6 +83,13 @@ def _validate_timeout(value: object, field_name: str) -> float | None:
     return float(value)
 
 
+def _validate_admission_timeout(value: object, field_name: str) -> float:
+    timeout = _validate_timeout(value, field_name)
+    if timeout is None:
+        raise TypeError(f"{field_name} must be numeric")
+    return timeout
+
+
 @dataclass(frozen=True, slots=True)
 class ProcessScannerPoolConfig:
     """Resource, recycling, and admission controls for worker processes."""
@@ -90,7 +97,7 @@ class ProcessScannerPoolConfig:
     max_workers: int = min(4, _available_cpu_count())
     max_in_flight: int | None = None
     max_tasks_per_child: int | None = 1_000
-    admission_timeout_seconds: float | None = 0.0
+    admission_timeout_seconds: float = 0.0
 
     def __post_init__(self) -> None:
         if isinstance(self.max_workers, bool) or not isinstance(self.max_workers, int):
@@ -116,9 +123,13 @@ class ProcessScannerPoolConfig:
             if tasks <= 0:
                 raise ValueError("max_tasks_per_child must be positive")
 
-        _validate_timeout(
-            self.admission_timeout_seconds,
+        object.__setattr__(
+            self,
             "admission_timeout_seconds",
+            _validate_admission_timeout(
+                self.admission_timeout_seconds,
+                "admission_timeout_seconds",
+            ),
         )
 
 
@@ -775,7 +786,7 @@ class ProcessScannerPool:
                 raise ProcessPoolNotRunningError(
                     f"pool is not accepting work in state {self._state.value}"
                 )
-        timeout = _validate_timeout(
+        timeout = _validate_admission_timeout(
             self._pool_config.admission_timeout_seconds
             if admission_timeout is None
             else admission_timeout,

@@ -122,9 +122,9 @@ def _validate_request_timeout(value: object) -> float:
         raise TypeError("request_timeout_seconds must be numeric")
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise TypeError("request_timeout_seconds must be numeric")
-    if value < 0 or not math.isfinite(value):
+    if value <= 0 or not math.isfinite(value):
         raise ValueError(
-            "request_timeout_seconds must be finite and not negative"
+            "request_timeout_seconds must be finite and positive"
         )
     return float(value)
 
@@ -152,7 +152,7 @@ class Firewall:
         jwt_token_config: JWTTokenConfig | None = None,
         repetition_config: RepetitionConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
-        request_timeout_seconds: float = 5.0,
+        request_timeout_seconds: float = 30.0,
     ) -> None:
         self._request_timeout_seconds = _validate_request_timeout(
             request_timeout_seconds

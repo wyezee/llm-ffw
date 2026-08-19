@@ -83,7 +83,7 @@ class FirewallManager:
         jwt_token_config: JWTTokenConfig | None = None,
         repetition_config: RepetitionConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
-        request_timeout_seconds: float = 5.0,
+        request_timeout_seconds: float = 30.0,
     ) -> None:
         self._scanner_config = scanner_config
         self._pool_config = pool_config

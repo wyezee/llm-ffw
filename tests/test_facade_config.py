@@ -80,6 +80,9 @@ class FirewallConfigTests(unittest.TestCase):
             FirewallConfig(request_timeout_seconds=True)
         with self.assertRaises(ValueError):
             FirewallConfig(request_timeout_seconds=float("inf"))
+        with self.assertRaises(ValueError):
+            FirewallConfig(request_timeout_seconds=0)
+        self.assertEqual(FirewallConfig().request_timeout_seconds, 30.0)
 
     def test_all_facades_reject_non_configuration_values(self) -> None:
         factories = (

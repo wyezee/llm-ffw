@@ -75,7 +75,7 @@ class FirewallConfig:
     jwt_token_config: JWTTokenConfig | None = None
     repetition_config: RepetitionConfig | None = None
     policy: FirewallPolicy = BALANCED_POLICY
-    request_timeout_seconds: float = 5.0
+    request_timeout_seconds: float = 30.0
 
     def __post_init__(self) -> None:
         required: tuple[tuple[str, object, type[object]], ...] = (
@@ -134,9 +134,9 @@ class FirewallConfig:
         timeout = self.request_timeout_seconds
         if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
             raise TypeError("request_timeout_seconds must be numeric")
-        if timeout < 0 or not math.isfinite(timeout):
+        if timeout <= 0 or not math.isfinite(timeout):
             raise ValueError(
-                "request_timeout_seconds must be finite and not negative"
+                "request_timeout_seconds must be finite and positive"
             )
         object.__setattr__(self, "request_timeout_seconds", float(timeout))
 

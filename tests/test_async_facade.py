@@ -210,18 +210,12 @@ class AsyncLLMFirewallTests(unittest.IsolatedAsyncioTestCase):
         await closing
         self.assertTrue(firewall._requests._closed)
 
-    async def test_request_timeout_preserves_broken_pool_semantics(self) -> None:
-        firewall = AsyncFirewall(
-            pool_config=_pool_config(),
-            request_timeout_seconds=0,
-        )
-        await firewall.start()
-        with self.assertRaises(FirewallUnavailableError) as unavailable:
-            await firewall.sanitize_input("x" * 1_000_000)
-
-        self.assertEqual(unavailable.exception.cause_type, "TimeoutError")
-        self.assertEqual(firewall.state, ProcessPoolState.BROKEN)
-        await firewall.close()
+    async def test_rejects_zero_request_timeout_before_startup(self) -> None:
+        with self.assertRaisesRegex(ValueError, "positive"):
+            AsyncFirewall(
+                pool_config=_pool_config(),
+                request_timeout_seconds=0,
+            )
 
     async def test_rejects_cross_event_loop_reuse(self) -> None:
         firewall = AsyncFirewall(pool_config=_pool_config())

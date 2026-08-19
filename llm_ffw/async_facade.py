@@ -94,9 +94,6 @@ class _AsyncRequestRunner:
                 raise FirewallUnavailableError("ProcessPoolSaturatedError")
             await capacity.acquire()
             return
-        if timeout is None:
-            await capacity.acquire()
-            return
         try:
             async with asyncio.timeout(timeout):
                 await capacity.acquire()
@@ -190,7 +187,7 @@ class AsyncFirewall:
         jwt_token_config: JWTTokenConfig | None = None,
         repetition_config: RepetitionConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
-        request_timeout_seconds: float = 5.0,
+        request_timeout_seconds: float = 30.0,
     ) -> None:
         resolved_pool_config = (
             pool_config
@@ -376,7 +373,7 @@ class AsyncFirewallManager:
         jwt_token_config: JWTTokenConfig | None = None,
         repetition_config: RepetitionConfig | None = None,
         policy: FirewallPolicy = BALANCED_POLICY,
-        request_timeout_seconds: float = 5.0,
+        request_timeout_seconds: float = 30.0,
     ) -> None:
         resolved_pool_config = (
             pool_config

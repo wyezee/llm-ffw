@@ -352,7 +352,7 @@ class LLMFirewallTests(unittest.TestCase):
         self.assertIsNone(error.__context__)
 
     def test_validates_timeout_and_payloads_before_submission(self) -> None:
-        invalid_timeouts = (None, True, -1, float("inf"), "5")
+        invalid_timeouts = (None, True, -1, 0, float("inf"), "5")
         for timeout in invalid_timeouts:
             with self.subTest(timeout=timeout), self.assertRaises(
                 (TypeError, ValueError)

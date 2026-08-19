@@ -51,6 +51,11 @@ class ProcessScannerPoolConfigTests(unittest.TestCase):
             lambda: ProcessScannerPoolConfig(max_workers=2, max_in_flight=1),
             lambda: ProcessScannerPoolConfig(max_tasks_per_child=0),
             lambda: ProcessScannerPoolConfig(admission_timeout_seconds=-1),
+            lambda: ProcessScannerPoolConfig(admission_timeout_seconds=None),
+            lambda: ProcessScannerPoolConfig(admission_timeout_seconds=True),
+            lambda: ProcessScannerPoolConfig(
+                admission_timeout_seconds=float("inf")
+            ),
         )
         for builder in invalid_builders:
             with self.subTest(builder=builder), self.assertRaises(
