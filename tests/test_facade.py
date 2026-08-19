@@ -1,5 +1,6 @@
 import unittest
 import string
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import FrozenInstanceError
 
 from llm_ffw import (
@@ -295,6 +296,30 @@ class LLMFirewallTests(unittest.TestCase):
         firewall.close()
         firewall.close()
 
+        self.assertEqual(firewall.state, ProcessPoolState.CLOSED)
+
+    def test_one_firewall_supports_concurrent_thread_callers(self) -> None:
+        secret = "sk-" + "T" * 20
+        requests = tuple(
+            f"request-{index} {secret}" if index % 2 else f"request-{index} safe"
+            for index in range(32)
+        )
+        expected = tuple(
+            value.replace(secret, "[REDACTED]") for value in requests
+        )
+        firewall = Firewall(
+            pool_config=ProcessScannerPoolConfig(
+                max_workers=2,
+                max_in_flight=16,
+                max_tasks_per_child=64,
+                admission_timeout_seconds=5,
+            )
+        )
+
+        with firewall, ThreadPoolExecutor(max_workers=8) as callers:
+            actual = tuple(callers.map(firewall.sanitize_input, requests))
+
+        self.assertEqual(actual, expected)
         self.assertEqual(firewall.state, ProcessPoolState.CLOSED)
 
     def test_strict_block_exposes_only_safe_metadata(self) -> None:

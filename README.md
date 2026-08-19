@@ -21,6 +21,22 @@ before results return to the model. `AuthorizationHeaderRule` redacts exact
 Basic and Bearer credentials, while `RepetitionRule` reviews conservative exact
 character, token, and line runs.
 
+## Contents
+
+- [Rule coverage and policy](#rule-coverage-and-policy)
+- [Security boundary and limitations](#security-boundary-and-limitations)
+- [Installation and quick start](#installation-and-quick-start)
+- [Common recipes](#common-recipes)
+- [Measured performance](#measured-performance)
+- [Usage](#usage)
+- [Facade configuration](#facade-configuration)
+- [Rule configuration](#rule-configuration)
+- [Versioned signature catalogs](#versioned-signature-catalogs)
+- [Runtime catalog updates](#runtime-catalog-updates)
+- [Development and validation](#development-and-validation)
+- [Production process concurrency](#production-process-concurrency)
+- [License](#license)
+
 ## Rule coverage and policy
 
 `BALANCED_POLICY` is the default. Scope below means the scope selected by the
@@ -60,12 +76,49 @@ overflow, or another resource-limit condition can produce a fail-closed
 The bundled alternatives are `STRICT_POLICY` and `AUDIT_POLICY`. A custom
 immutable `FirewallPolicy` provides finer per-rule, per-scope control.
 
+## Security boundary and limitations
+
+LLM FFW provides deterministic, format-based inspection. It can enforce known
+text shapes, configured literal catalogs, bounded structural rules, and typed
+tool schemas. It does not determine intent, factual correctness, toxicity,
+prompt-injection semantics, whether a credential is active, whether a URL is
+reachable, or whether a tool actually ran. It is one enforcement layer, not a
+replacement for authentication, authorization, network egress controls, tool
+allowlisting, or application validation.
+
+Exact formats have exact boundaries. Deliberate or accidental obfuscation,
+unsupported Unicode transformations, local phone formats, non-catalog secrets,
+and values outside a rule's documented grammar may not match. The default
+scanner covers six broadly useful rules; privacy and deployment-specific rules
+remain opt-in to avoid silently changing legitimate data. Opt-in PII rules scan
+input by default and inspect output only when their configured `scopes` include
+`ScanScope.OUTPUT`.
+
+Tool-call arguments and tool-result content are scanned by the deterministic
+text baseline by default, in addition to structural validation. This blocks
+known findings but does not establish that arguments are authorized for the
+current user or that returned content is trustworthy. The host must retain those
+authorization and trust decisions.
+
+`Firewall` and its managers provide worker-process isolation and bounded
+timeouts. `RuleScanner`, `RuleEngine`, and `FirewallStream` execute in the
+calling process and therefore do not provide worker crash containment or a
+terminate-on-timeout boundary. Review the rule-specific sections below before
+enabling a policy, and reject rather than forward content when inspection is
+unavailable.
+
 ## Installation and quick start
 
 LLM FFW requires Python 3.14.7 or a newer Python 3.14 patch release. Its base
 installation has no runtime dependencies outside the Python standard library.
 The distribution includes a PEP 561 `py.typed` marker, so type checkers such as
 mypy and Pyright consume the library's inline annotations.
+
+The command below installs the latest published release. Documentation on the
+`master` branch also covers entries under `Unreleased` in the changelog; use the
+matching Git tag when documentation must describe an installed version exactly.
+Examples using an `Unreleased` API require the source checkout until the next
+package release.
 
 ```console
 python -m pip install llm-ffw==0.12.0
@@ -147,8 +200,11 @@ reloads, and direct process-pool orchestration.
 
 ## Measured performance
 
-The current implementation was benchmarked on GitHub-hosted Ubuntu and Windows
-runners with Python 3.14.7. Each request contains 8,000,000 synthetic ASCII
+The table is the published 0.12.0 benchmark of its six-rule default and 15-rule
+all-text configurations. The development branch now contains another opt-in
+rule; its next publication benchmark will replace these results rather than
+silently relabeling old measurements. Tests ran on GitHub-hosted Ubuntu and
+Windows runners with Python 3.14.7. Each request contains 8,000,000 synthetic ASCII
 characters (about 7.63 MiB), representative of a million-token-scale prompt.
 This is a size comparison rather than an exact token count: tokenization varies
 by model, tokenizer, language, and content.
@@ -172,6 +228,24 @@ These are reproducible CI measurements, not universal latency guarantees;
 performance varies with input, enabled rules, policy, CPU, and concurrency.
 See the [exact publication run](https://github.com/wyezee/llm-ffw/actions/runs/32179652076)
 and the commands under [Development and validation](#development-and-validation).
+
+### Capacity starting point
+
+Benchmark the exact payload distribution and enabled rules that production will
+use. As an initial estimate, divide the required aggregate MiB/s by measured
+per-worker MiB/s and round up, then verify the result under the intended caller
+concurrency; process scaling is not perfectly linear. Start `max_in_flight` at
+one to two requests per worker so overload stays bounded, and increase it only
+when measured queueing and memory remain acceptable. Set the request timeout
+above measured service latency, not pooled latency that already includes caller
+queueing.
+
+Reserve memory for the parent process, every active worker, payload copies, and
+operating-system variation. `FirewallManager.reload()` briefly runs old and new
+worker generations together, so a reload-capable service needs enough headroom
+for both generations. Treat the table as a reproducible baseline, then use the
+included all-rules, concurrency, memory, and soak harnesses for deployment
+sizing.
 
 ## Usage
 
@@ -209,6 +283,20 @@ remain compatible temporarily, but new code should import `RuleEngine` from
 Production integrations should normally begin with the `Firewall` quick
 start above. The remaining APIs expose async lifecycle, streaming, hot reload,
 or lower-level control when those capabilities are specifically required.
+
+### Concurrency and object sharing
+
+Create one synchronous `Firewall` or `FirewallManager` per application process
+and share it across request threads. Their request paths and the underlying
+`ProcessScannerPool` support concurrent callers with bounded admission. Coordinate
+lifecycle transitions with the service lifecycle: a request racing with close,
+terminate, or a broken worker can safely receive `FirewallUnavailableError`.
+
+Create one `AsyncFirewall` or `AsyncFirewallManager` per application process and
+event loop. A single instance supports concurrent tasks on that loop, but it is
+not a cross-thread or cross-event-loop request object. `FirewallStream` is
+stateful and belongs to exactly one request. Never share a stream between
+callers.
 
 ### Unified streaming
 
@@ -273,6 +361,9 @@ batch scan. Candidate shapes that would need attacker-sized retention fall
 back to buffered execution in `AUTO` mode. Findings retain spans into the
 original concatenated text and disclosure-safe metadata. Each stream belongs
 to one request and must not be shared between concurrent callers.
+Streaming is an in-process `RuleEngine` API: it does not provide the worker
+process isolation, crash containment, or terminate-on-timeout enforcement of
+the production facades.
 
 ### Async usage
 
@@ -311,6 +402,65 @@ finishes under the configured request timeout and retains its capacity slot
 until completion, preventing cancellation-driven queue growth. Lifecycle
 cleanup also finishes before cancellation propagates, even when cleanup itself
 fails, so worker executors are not leaked.
+
+### FastAPI lifespan integration
+
+FastAPI applications should create one `AsyncFirewall` inside the application's
+lifespan and reuse it for every request handled by that worker. FastAPI itself
+remains an optional host dependency and is not installed by `llm-ffw`:
+
+```python
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Annotated
+
+from fastapi import Body, FastAPI, HTTPException, Request
+from llm_ffw import (
+    AsyncFirewall,
+    ContentBlockedError,
+    FirewallUnavailableError,
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    firewall = AsyncFirewall()
+    try:
+        await firewall.start()
+        app.state.firewall = firewall
+        yield
+    finally:
+        await firewall.close()
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+@app.post("/sanitize")
+async def sanitize(
+    request: Request,
+    prompt: Annotated[str, Body(embed=True)],
+) -> dict[str, str]:
+    firewall: AsyncFirewall = request.app.state.firewall
+    try:
+        return {"text": await firewall.sanitize_input(prompt)}
+    except ContentBlockedError:
+        raise HTTPException(status_code=422, detail="content blocked") from None
+    except FirewallUnavailableError:
+        raise HTTPException(
+            status_code=503,
+            detail="inspection unavailable",
+        ) from None
+```
+
+With multiple ASGI server workers, each worker process runs its own lifespan and
+owns its own firewall worker pool. Include those nested processes in CPU and
+memory sizing. The prompt is a JSON request-body field rather than a query
+parameter so access logs do not normally capture it; configure an upstream body
+size limit no greater than the firewall's input limit so oversized bodies are
+rejected before application parsing. FastAPI recommends the lifespan
+async-context-manager pattern for startup and shutdown; see its
+[official lifespan documentation](https://fastapi.tiangolo.com/advanced/events/).
 
 ### Results and failure handling
 

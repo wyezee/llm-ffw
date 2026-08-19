@@ -11,6 +11,18 @@ All notable changes are recorded here before a tagged release.
   privacy/all-rules preset integration, deterministic accuracy coverage, and
   an 8 MB performance gate.
 
+### Changed
+
+- Validate contradictory default-rule enable flags and dedicated rule configs
+  when `FirewallConfig` is constructed rather than later during facade creation.
+
+### Documentation
+
+- Added an explicit security boundary, concurrency-sharing contract, deployment
+  sizing guidance, streaming isolation warning, and runnable fail-closed path.
+- Added an optional FastAPI lifespan integration without adding a runtime
+  dependency, and clarified development-branch versus published-version docs.
+
 ## 0.12.0 - 2026-08-19
 
 - Detect lowercase and mixed-case IBAN representations without changing their

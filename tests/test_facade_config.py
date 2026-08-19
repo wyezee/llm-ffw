@@ -9,7 +9,11 @@ from llm_ffw import (
     FirewallConfig,
     Firewall,
     FirewallManager,
+    JWTTokenConfig,
+    PaymentCardConfig,
+    PrivateKeyConfig,
     ProcessScannerPoolConfig,
+    RuleScannerConfig,
 )
 
 
@@ -96,6 +100,29 @@ class FirewallConfigTests(unittest.TestCase):
             with self.subTest(factory=factory.__qualname__):
                 with self.assertRaises(TypeError):
                     factory(object())  # type: ignore[arg-type]
+
+    def test_disabled_default_rules_reject_dedicated_configuration_early(self) -> None:
+        cases = (
+            (
+                RuleScannerConfig(enable_payment_cards=False),
+                {"payment_card_config": PaymentCardConfig()},
+                "payment_card_config requires enable_payment_cards=True",
+            ),
+            (
+                RuleScannerConfig(enable_private_keys=False),
+                {"private_key_config": PrivateKeyConfig()},
+                "private_key_config requires enable_private_keys=True",
+            ),
+            (
+                RuleScannerConfig(enable_jwt_tokens=False),
+                {"jwt_token_config": JWTTokenConfig()},
+                "jwt_token_config requires enable_jwt_tokens=True",
+            ),
+        )
+        for scanner_config, kwargs, message in cases:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    FirewallConfig(scanner_config=scanner_config, **kwargs)
 
 
 if __name__ == "__main__":

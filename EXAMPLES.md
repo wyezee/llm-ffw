@@ -1,8 +1,10 @@
 # LLM FFW examples
 
-These examples target `llm-ffw==0.12.0`. Every Python block is a complete
-program and is executed by the documentation regression test. All credentials,
-addresses, and identifiers are deterministic synthetic values.
+These examples track the current source tree, including changelog entries under
+`Unreleased`. Use the matching Git tag for a published package version. Every
+Python block is a complete program and is executed by the documentation
+regression test. All credentials, addresses, and identifiers are deterministic
+synthetic values.
 
 Use one long-lived `Firewall` per application process. The synchronous and
 asynchronous facades own worker processes, so executable programs need the
@@ -81,6 +83,43 @@ def main() -> None:
             ]
         else:
             raise AssertionError("invalid JSON was not blocked")
+
+if __name__ == "__main__":
+    main()
+```
+
+## Fail closed on blocked or unavailable inspection
+
+Treat a policy block and an unavailable scanner as different operational
+events, but never forward the original text in either case. Both exception
+types expose bounded, disclosure-safe metadata.
+
+```python
+from llm_ffw import (
+    ContentBlockedError,
+    Firewall,
+    FirewallUnavailableError,
+    STRICT_POLICY,
+)
+
+def main() -> None:
+    synthetic_secret = "sk-" + "F" * 20
+    firewall = Firewall(policy=STRICT_POLICY)
+
+    with firewall:
+        try:
+            firewall.sanitize_input(synthetic_secret)
+        except ContentBlockedError as exc:
+            assert exc.findings[0].rule_id == "secrets.detected"
+        else:
+            raise AssertionError("strict policy did not block the secret")
+
+    try:
+        firewall.sanitize_input("safe text")
+    except FirewallUnavailableError as exc:
+        assert exc.cause_type
+    else:
+        raise AssertionError("closed firewall accepted a request")
 
 if __name__ == "__main__":
     main()

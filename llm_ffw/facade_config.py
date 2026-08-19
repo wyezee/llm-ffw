@@ -135,6 +135,29 @@ class FirewallConfig:
                 "additional_secret_catalog and replacement_secret_catalog "
                 "are mutually exclusive"
             )
+        enabled_config_pairs = (
+            (
+                "payment_card_config",
+                self.payment_card_config,
+                "enable_payment_cards",
+                self.scanner_config.enable_payment_cards,
+            ),
+            (
+                "private_key_config",
+                self.private_key_config,
+                "enable_private_keys",
+                self.scanner_config.enable_private_keys,
+            ),
+            (
+                "jwt_token_config",
+                self.jwt_token_config,
+                "enable_jwt_tokens",
+                self.scanner_config.enable_jwt_tokens,
+            ),
+        )
+        for config_name, config_value, flag_name, enabled in enabled_config_pairs:
+            if config_value is not None and not enabled:
+                raise ValueError(f"{config_name} requires {flag_name}=True")
         timeout = self.request_timeout_seconds
         if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
             raise TypeError("request_timeout_seconds must be numeric")

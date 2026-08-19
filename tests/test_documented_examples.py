@@ -16,7 +16,7 @@ class DocumentedExampleTests(unittest.TestCase):
     def test_every_python_block_is_a_complete_runnable_program(self) -> None:
         document = EXAMPLES.read_text(encoding="utf-8")
         blocks = PYTHON_BLOCK.findall(document)
-        self.assertEqual(len(blocks), 8)
+        self.assertEqual(len(blocks), 9)
         environment = os.environ.copy()
         existing_path = environment.get("PYTHONPATH")
         environment["PYTHONPATH"] = (
