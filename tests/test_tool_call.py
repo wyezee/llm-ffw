@@ -3,6 +3,8 @@ import unittest
 
 from llm_ffw import (
     Action,
+    EmailAddressRule,
+    RuleScanner,
     ScanScope,
     ToolCall,
     ToolCallBlockedError,
@@ -65,9 +67,69 @@ class ToolCallDataTests(unittest.TestCase):
             ToolCallConfig(max_nodes=True)
         with self.assertRaises(ValueError):
             ToolCallConfig(max_depth=65)
+        with self.assertRaises(TypeError):
+            ToolCallConfig(inspect_content="yes")  # type: ignore[arg-type]
 
 
 class ToolCallRuleTests(unittest.TestCase):
+    def test_default_content_inspection_blocks_secret_values_and_keys(self) -> None:
+        secret = "sk-" + "A" * 20
+        rule = ToolCallRule(
+            (
+                ToolDefinition(
+                    "open",
+                    {"type": "object", "additionalProperties": True},
+                ),
+            )
+        )
+        for arguments in ({"value": secret}, {secret: "value"}):
+            with self.subTest(arguments=tuple(arguments)):
+                finding = rule.validate(ToolCall("open", arguments))[0]
+                self.assertEqual(
+                    finding.metadata["reason"],
+                    "content_policy_violation",
+                )
+                self.assertEqual(
+                    finding.metadata["content_rule_id"],
+                    "secrets.detected",
+                )
+                self.assertEqual(finding.metadata["content_action"], "redact")
+                self.assertNotIn(secret, repr(finding))
+
+    def test_content_inspection_uses_outbound_scope_and_can_be_disabled(self) -> None:
+        definition = ToolDefinition(
+            "open",
+            {"type": "object", "additionalProperties": True},
+        )
+        email = "customer@example.com"
+        email_scanner = RuleScanner(rules=(EmailAddressRule(),))
+        outbound = ToolCallRule(
+            (definition,),
+            content_scanner=email_scanner,
+        )
+        self.assertEqual(
+            outbound.validate(ToolCall("open", {"value": email})),
+            (),
+        )
+        disabled = ToolCallRule(
+            (definition,),
+            ToolCallConfig(inspect_content=False),
+        )
+        self.assertEqual(
+            disabled.validate(
+                ToolCall("open", {"value": "sk-" + "A" * 20})
+            ),
+            (),
+        )
+        with self.assertRaises(ValueError):
+            ToolCallRule(
+                (definition,),
+                ToolCallConfig(inspect_content=False),
+                content_scanner=email_scanner,
+            )
+        with self.assertRaises(TypeError):
+            ToolCallRule((definition,), content_scanner=object())  # type: ignore[arg-type]
+
     def test_accepts_declared_call_with_valid_typed_arguments(self) -> None:
         rule = ToolCallRule((_weather_definition(),))
         self.assertEqual(

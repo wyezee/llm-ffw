@@ -3,6 +3,8 @@ import unittest
 
 from llm_ffw import (
     Action,
+    EmailAddressRule,
+    RuleScanner,
     ScanScope,
     ToolCall,
     ToolResult,
@@ -65,9 +67,54 @@ class ToolResultDataTests(unittest.TestCase):
             ToolResultConfig(max_results=0)
         with self.assertRaises(ValueError):
             ToolResultConfig(max_depth=65)
+        with self.assertRaises(TypeError):
+            ToolResultConfig(inspect_content="yes")  # type: ignore[arg-type]
 
 
 class ToolResultRuleTests(unittest.TestCase):
+    def test_default_content_inspection_blocks_secret_values_and_keys(self) -> None:
+        secret = "sk-" + "B" * 20
+        rule = ToolResultRule()
+        for content in (secret, [{secret: "value"}]):
+            with self.subTest(content_type=type(content).__name__):
+                batch = ToolResultBatch(
+                    (_call(),),
+                    (_result(content=content),),
+                )
+                finding = rule.validate(batch)[0]
+                self.assertEqual(
+                    finding.metadata["reason"],
+                    "content_policy_violation",
+                )
+                self.assertEqual(
+                    finding.metadata["content_rule_id"],
+                    "secrets.detected",
+                )
+                self.assertNotIn(secret, repr(finding))
+
+    def test_content_inspection_uses_inbound_scope_and_can_be_disabled(self) -> None:
+        email = "customer@example.com"
+        scanner = RuleScanner(rules=(EmailAddressRule(),))
+        batch = ToolResultBatch(
+            (_call(),),
+            (_result(content=email),),
+        )
+        finding = ToolResultRule(content_scanner=scanner).validate(batch)[0]
+        self.assertEqual(finding.metadata["content_rule_id"], "pii.email_address")
+        self.assertEqual(
+            ToolResultRule(
+                ToolResultConfig(inspect_content=False)
+            ).validate(batch),
+            (),
+        )
+        with self.assertRaises(ValueError):
+            ToolResultRule(
+                ToolResultConfig(inspect_content=False),
+                content_scanner=scanner,
+            )
+        with self.assertRaises(TypeError):
+            ToolResultRule(content_scanner=object())  # type: ignore[arg-type]
+
     def test_accepts_linked_string_and_content_block_results(self) -> None:
         batch = ToolResultBatch(
             (_call("call-1"), _call("call-2", "search")),

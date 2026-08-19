@@ -1,11 +1,16 @@
 """Deterministic validation of provider-neutral tool results."""
 
 from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 from ..findings import Action, Finding, Severity, Span
 from ..inspection import ScanScope
+from ..structured_content import first_structured_content_violation
 from ..tool_result import ToolResultBatch, ToolResultConfig
 from .base import StructuredRule
+
+if TYPE_CHECKING:
+    from ..engine import RuleScanner
 
 
 class ToolResultBlockedError(RuntimeError):
@@ -27,10 +32,37 @@ class ToolResultRule(StructuredRule[ToolResultBatch]):
     PURPOSE = "Validate bounded tool-result batches before model consumption."
     SCOPES = frozenset((ScanScope.TOOL_RESULT,))
 
-    def __init__(self, config: ToolResultConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: ToolResultConfig | None = None,
+        *,
+        content_scanner: "RuleScanner | None" = None,
+    ) -> None:
+        from ..engine import RuleScanner
+
         if config is not None and not isinstance(config, ToolResultConfig):
             raise TypeError("config must be a ToolResultConfig or None")
         self._config = config if config is not None else ToolResultConfig()
+        if content_scanner is not None and not isinstance(
+            content_scanner, RuleScanner
+        ):
+            raise TypeError("content_scanner must be a RuleScanner or None")
+        if not self._config.inspect_content and content_scanner is not None:
+            raise ValueError(
+                "content_scanner requires inspect_content=True"
+            )
+        self._content_scanner = (
+            content_scanner if content_scanner is not None else RuleScanner()
+        ) if self._config.inspect_content else None
+        if (
+            self._content_scanner is not None
+            and self._content_scanner.config.max_input_chars
+            < self._config.max_total_string_chars
+        ):
+            raise ValueError(
+                "content_scanner max_input_chars must cover "
+                "max_total_string_chars"
+            )
 
     @property
     def rule_id(self) -> str:
@@ -84,6 +116,19 @@ class ToolResultRule(StructuredRule[ToolResultBatch]):
         resource_error = self._validate_resources(batch)
         if resource_error is not None:
             return self._finding(resource_error, "content")
+        if self._content_scanner is not None:
+            violation = first_structured_content_violation(
+                tuple(result.content for result in batch.results),
+                scanner=self._content_scanner,
+                scope=ScanScope.INPUT,
+            )
+            if violation is not None:
+                return self._finding(
+                    "content_policy_violation",
+                    "content",
+                    content_rule_id=violation.rule_id,
+                    content_action=violation.action.value,
+                )
         return ()
 
     def enforce(self, batch: ToolResultBatch) -> ToolResultBatch:
@@ -127,7 +172,23 @@ class ToolResultRule(StructuredRule[ToolResultBatch]):
                 stack.extend((child, depth + 1) for child in reversed(value))
         return None
 
-    def _finding(self, reason: str, location: str) -> tuple[Finding, ...]:
+    def _finding(
+        self,
+        reason: str,
+        location: str,
+        *,
+        content_rule_id: str | None = None,
+        content_action: str | None = None,
+    ) -> tuple[Finding, ...]:
+        metadata = {
+            "reason": reason,
+            "location": location,
+            "detector": "bounded_typed_tool_result",
+            "span_basis": "structured",
+        }
+        if content_rule_id is not None and content_action is not None:
+            metadata["content_rule_id"] = content_rule_id
+            metadata["content_action"] = content_action
         return (
             Finding(
                 rule_id=self.RULE_ID,
@@ -135,12 +196,7 @@ class ToolResultRule(StructuredRule[ToolResultBatch]):
                 action=Action.BLOCK,
                 span=Span(0, 0),
                 message="Tool result batch failed deterministic validation.",
-                metadata={
-                    "reason": reason,
-                    "location": location,
-                    "detector": "bounded_typed_tool_result",
-                    "span_basis": "structured",
-                },
+                metadata=metadata,
             ),
         )
 

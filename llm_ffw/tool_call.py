@@ -144,6 +144,7 @@ class ToolCallConfig:
     max_total_string_chars: int = 100_000
     max_object_properties: int = 256
     max_array_items: int = 1_024
+    inspect_content: bool = True
 
     def __post_init__(self) -> None:
         limits = (
@@ -166,6 +167,8 @@ class ToolCallConfig:
                 raise TypeError(f"{name} must be an integer")
             if value <= 0 or value > hard_maximum:
                 raise ValueError(f"{name} must be between 1 and {hard_maximum}")
+        if not isinstance(self.inspect_content, bool):
+            raise TypeError("inspect_content must be a boolean")
 
 
 def _validate_definitions(

@@ -20,6 +20,8 @@ All notable changes are recorded here before a tagged release.
   fail-closed finding for token runs beyond the 45-character parser bound.
 - Require every object in the supported tool-call schema subset to declare an
   explicit boolean `additionalProperties` policy.
+- Inspect tool-call arguments as outbound text and tool-result content as
+  inbound text with the deterministic scanner baseline, blocking on findings.
 
 ## 0.11.1 - 2026-08-19
 

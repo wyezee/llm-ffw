@@ -2,10 +2,11 @@
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import cast
+from typing import cast, TYPE_CHECKING
 
 from ..findings import Action, Finding, Severity, Span
 from ..inspection import ScanScope
+from ..structured_content import first_structured_content_violation
 from ..tool_call import (
     FrozenJSON,
     ToolCall,
@@ -14,6 +15,9 @@ from ..tool_call import (
     _validate_definitions,
 )
 from .base import StructuredRule
+
+if TYPE_CHECKING:
+    from ..engine import RuleScanner
 
 
 _SCHEMA_TYPES = frozenset(
@@ -196,11 +200,35 @@ class ToolCallRule(StructuredRule[ToolCall]):
         self,
         definitions: Iterable[ToolDefinition],
         config: ToolCallConfig | None = None,
+        *,
+        content_scanner: "RuleScanner | None" = None,
     ) -> None:
+        from ..engine import RuleScanner
+
         self._definitions = _validate_definitions(definitions)
         if config is not None and not isinstance(config, ToolCallConfig):
             raise TypeError("config must be a ToolCallConfig or None")
         self._config = config if config is not None else ToolCallConfig()
+        if content_scanner is not None and not isinstance(
+            content_scanner, RuleScanner
+        ):
+            raise TypeError("content_scanner must be a RuleScanner or None")
+        if not self._config.inspect_content and content_scanner is not None:
+            raise ValueError(
+                "content_scanner requires inspect_content=True"
+            )
+        self._content_scanner = (
+            content_scanner if content_scanner is not None else RuleScanner()
+        ) if self._config.inspect_content else None
+        if (
+            self._content_scanner is not None
+            and self._content_scanner.config.max_input_chars
+            < self._config.max_total_string_chars
+        ):
+            raise ValueError(
+                "content_scanner max_input_chars must cover "
+                "max_total_string_chars"
+            )
         self._schemas = {
             definition.name: (
                 None
@@ -246,9 +274,22 @@ class ToolCallRule(StructuredRule[ToolCall]):
             return self._finding("arguments_required", "arguments")
 
         error = self._validate_value(cast(FrozenJSON, call.arguments), schema)
-        if error is None:
-            return ()
-        return self._finding(error.reason, error.location)
+        if error is not None:
+            return self._finding(error.reason, error.location)
+        if self._content_scanner is not None:
+            violation = first_structured_content_violation(
+                (call.arguments,),
+                scanner=self._content_scanner,
+                scope=ScanScope.OUTPUT,
+            )
+            if violation is not None:
+                return self._finding(
+                    "content_policy_violation",
+                    "arguments",
+                    content_rule_id=violation.rule_id,
+                    content_action=violation.action.value,
+                )
+        return ()
 
     def enforce(self, call: ToolCall) -> ToolCall:
         """Return an executable call or raise without retaining its arguments."""
@@ -329,7 +370,23 @@ class ToolCallRule(StructuredRule[ToolCall]):
                     )
         return None
 
-    def _finding(self, reason: str, location: str) -> tuple[Finding, ...]:
+    def _finding(
+        self,
+        reason: str,
+        location: str,
+        *,
+        content_rule_id: str | None = None,
+        content_action: str | None = None,
+    ) -> tuple[Finding, ...]:
+        metadata = {
+            "reason": reason,
+            "location": location,
+            "detector": "bounded_typed_tool_call",
+            "span_basis": "structured",
+        }
+        if content_rule_id is not None and content_action is not None:
+            metadata["content_rule_id"] = content_rule_id
+            metadata["content_action"] = content_action
         return (
             Finding(
                 rule_id=self.RULE_ID,
@@ -337,12 +394,7 @@ class ToolCallRule(StructuredRule[ToolCall]):
                 action=Action.BLOCK,
                 span=Span(0, 0),
                 message="Tool call failed deterministic validation.",
-                metadata={
-                    "reason": reason,
-                    "location": location,
-                    "detector": "bounded_typed_tool_call",
-                    "span_basis": "structured",
-                },
+                metadata=metadata,
             ),
         )
 

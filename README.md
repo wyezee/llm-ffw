@@ -585,7 +585,9 @@ dispatch(safe_call.name, safe_call.arguments)
 
 `ToolCallRule` blocks undeclared tools, arguments supplied to no-argument
 tools, type and enum mismatches, missing required properties, forbidden extra
-properties, and configured resource-limit violations. Its supported schema
+properties, configured resource-limit violations, and text-rule findings in
+argument keys or string values. Structured arguments are treated as outbound
+text. Its supported schema
 keywords are `type`, `properties`, `required`, `additionalProperties`, `items`,
 and scalar `enum`; each schema node must declare one of `object`, `array`,
 `string`, `number`, `integer`, `boolean`, or `null`. Regex, references,
@@ -639,6 +641,12 @@ configured batch or content resource-limit violations. A batch may contain
 results for a subset of the expected calls, but every included result must
 link exactly once. It does
 not claim that a tool actually ran or that returned content is truthful.
+
+Content inspection is enabled by default. It uses the deterministic scanner
+baseline, treats tool calls as outbound text and tool results as inbound text,
+and translates the first text finding into one disclosure-safe structured
+BLOCK finding. A trusted host can inject a narrower `RuleScanner`; setting
+`inspect_content=False` explicitly disables this layer.
 
 Result content must be either a string or a list/tuple of JSON object blocks.
 This provider-neutral shape can carry simple text or multimodal references
