@@ -4,6 +4,8 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.17.0 - 2026-08-19
+
 ### Added
 
 - Add opt-in `CredentialAssignmentRule` for bounded value-only redaction in
