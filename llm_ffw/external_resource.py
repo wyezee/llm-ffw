@@ -10,8 +10,6 @@ _HARD_MAX_CANDIDATES = 1_024
 _HARD_MAX_MARKUP_CHARS = 65_536
 _HARD_MAX_URL_CHARS = 65_536
 _HARD_MAX_HOSTNAME_POLICY_ENTRIES = 1_024
-_MIN_OPAQUE_SEGMENT_CHARS = 16
-_HARD_MAX_OPAQUE_SEGMENT_CHARS = 4_096
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,7 +19,6 @@ class ExternalResourceConfig:
     max_candidates: int = 128
     max_markup_chars: int = 4_096
     max_url_chars: int = 2_048
-    opaque_path_segment_chars: int = 64
     allowed_hostnames: tuple[str, ...] = field(default=(), repr=False)
     allowed_hostname_suffixes: tuple[str, ...] = field(default=(), repr=False)
 
@@ -30,10 +27,6 @@ class ExternalResourceConfig:
             ("max_candidates", _HARD_MAX_CANDIDATES),
             ("max_markup_chars", _HARD_MAX_MARKUP_CHARS),
             ("max_url_chars", _HARD_MAX_URL_CHARS),
-            (
-                "opaque_path_segment_chars",
-                _HARD_MAX_OPAQUE_SEGMENT_CHARS,
-            ),
         )
         for field_name, hard_maximum in limits:
             value = getattr(self, field_name)
@@ -45,12 +38,6 @@ class ExternalResourceConfig:
                 raise ValueError(
                     f"{field_name} must not exceed {hard_maximum}"
                 )
-        if self.opaque_path_segment_chars < _MIN_OPAQUE_SEGMENT_CHARS:
-            raise ValueError(
-                "opaque_path_segment_chars must be at least "
-                f"{_MIN_OPAQUE_SEGMENT_CHARS}"
-            )
-
         raw_entry_count = 0
         for field_name, allow_ip in (
             ("allowed_hostnames", True),

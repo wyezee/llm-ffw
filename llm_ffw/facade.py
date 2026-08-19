@@ -379,9 +379,6 @@ class Firewall:
                     max_url_chars=(
                         self._pool.external_resource_config.max_url_chars
                     ),
-                    opaque_path_segment_chars=(
-                        self._pool.external_resource_config.opaque_path_segment_chars
-                    ),
                     allowed_hostname_count=len(
                         self._pool.external_resource_config.allowed_hostnames
                     ),

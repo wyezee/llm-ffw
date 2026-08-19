@@ -23,8 +23,8 @@ before results return to the model. `AuthorizationHeaderRule` redacts exact
 Basic and Bearer credentials, `ConnectionStringRule` redacts credentials from
 explicit URI and ADO/ODBC connection-string forms, and `RepetitionRule` reviews
 conservative exact character, token, and line runs. Output-only
-`ExternalResourceRule` can redact suspicious external Markdown/HTML image URLs
-before a host renders them.
+`ExternalResourceRule` can redact non-allowlisted external Markdown/HTML image
+URLs before a host renders them.
 
 ## Contents
 
@@ -100,7 +100,7 @@ allowlisting, or application validation.
 Exact formats have exact boundaries. Deliberate or accidental obfuscation,
 unsupported Unicode transformations, local phone formats, non-catalog secrets,
 and values outside a rule's documented grammar may not match. The default
-scanner covers six broadly useful rules; privacy and deployment-specific rules
+scanner covers seven broadly useful rules; privacy and deployment-specific rules
 remain opt-in to avoid silently changing legitimate data. Opt-in PII rules scan
 input by default and inspect output only when their configured `scopes` include
 `ScanScope.OUTPUT`.
@@ -949,7 +949,7 @@ allowlist. Denies and built-in unsafe-URL findings always take precedence over
 allows. The four policy fields together accept at most 1,024 entries. Runtime
 capabilities disclose only policy entry counts, never configured hostnames.
 
-### Opt-in external image-resource inspection
+### Opt-in external image-resource allowlist
 
 Applications that render model output as Markdown or HTML can inspect
 auto-loaded external images before rendering:
@@ -968,14 +968,15 @@ with Firewall(
 ```
 
 `ExternalResourceRule` is output-only and recognizes bounded inline CommonMark
-image destinations and HTML `<img src>` attributes. It redacts only an external
-HTTP(S) URL when the host is outside the configured allowlist and the URL has a
-non-empty query string or a single opaque alphanumeric/base64url-like path
-segment of at least 64 characters. Scheme-relative URLs are included. Hostname
-normalization and label-boundary suffix matching are shared with
-`UnsafeURLRule`; an empty allowlist trusts no external hostname. Exact and
-suffix entries are bounded to 1,024 total, and capabilities disclose counts,
-never hostname values.
+image destinations and HTML `<img src>` attributes. It redacts every external
+HTTP(S) URL whose host is outside the configured allowlist, regardless of the
+URL's path or query shape. Scheme-relative URLs are included, malformed or
+ambiguous HTTP(S) authorities fail closed, and an empty allowlist denies every
+external image host. Hostname normalization and label-boundary suffix matching
+are shared with `UnsafeURLRule`. Exact and suffix entries are bounded to 1,024
+total, and capabilities disclose counts, never hostname values. A suffix entry
+trusts its apex and every subdomain, so do not allowlist public or untrusted
+multi-tenant suffixes.
 
 The syntax boundary follows [CommonMark 0.31.2 images](https://spec.commonmark.org/0.31.2/#images)
 and the HTML Standard's [`img` resource model](https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element).

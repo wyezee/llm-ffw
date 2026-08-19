@@ -525,7 +525,7 @@ def _builtin_policy(
     )
     return FirewallPolicy(
         policy_id=policy_id,
-        version="1.16.0",
+        version="1.17.0",
         overrides=(
             PolicyOverride("secrets.detected", ScanScope.INPUT, input_action),
             PolicyOverride("secrets.detected", ScanScope.OUTPUT, output_action),

@@ -141,7 +141,6 @@ class ExternalResourceCapability:
     max_candidates: int
     max_markup_chars: int
     max_url_chars: int
-    opaque_path_segment_chars: int
     allowed_hostname_count: int = 0
     allowed_hostname_suffix_count: int = 0
 
@@ -150,7 +149,6 @@ class ExternalResourceCapability:
             "max_candidates",
             "max_markup_chars",
             "max_url_chars",
-            "opaque_path_segment_chars",
         ):
             value = getattr(self, field_name)
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:

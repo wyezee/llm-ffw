@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from html import unescape
 import re
-from urllib.parse import unquote, urlsplit
+from urllib.parse import urlsplit
 
 from ..external_resource import ExternalResourceConfig
 from ..findings import Action, Severity, Span
@@ -16,7 +16,6 @@ _RESOURCE_START = re.compile(
     r"(?P<markdown>!\[)|(?P<html><img(?=[\t\n\f\r />]))",
     re.IGNORECASE | re.ASCII,
 )
-_OPAQUE_SEGMENT = re.compile(r"[A-Za-z0-9_-]+\Z", re.ASCII)
 _COMMONMARK_ESCAPE = re.compile(
     r"\\([!\"#$%&'()*+,\-./:;<=>?@\[\]\\^_`{|}~])",
     re.ASCII,
@@ -309,7 +308,6 @@ def _is_allowed_hostname(
 def _resource_risk(
     raw: str,
     syntax: str,
-    config: ExternalResourceConfig,
     allowed_hostnames: frozenset[str],
     allowed_hostname_suffixes: frozenset[str],
 ) -> tuple[str, str] | None:
@@ -333,11 +331,9 @@ def _resource_risk(
     try:
         parsed = urlsplit(parse_value)
     except ValueError:
-        if "?" not in canonical_value:
-            return None
         return "ambiguous_authority", scheme
     if not parsed.netloc:
-        return None
+        return "ambiguous_authority", scheme
     ambiguous_authority = had_backslash or "%" in parsed.netloc
     try:
         hostname = parsed.hostname
@@ -345,43 +341,22 @@ def _resource_risk(
     except ValueError:
         ambiguous_authority = True
         hostname = None
-    if (
-        not ambiguous_authority
-        and hostname is not None
-        and _is_allowed_hostname(
-            hostname,
-            allowed_hostnames,
-            allowed_hostname_suffixes,
-        )
+    if ambiguous_authority or hostname is None:
+        return "ambiguous_authority", scheme
+    if _is_allowed_hostname(
+        hostname,
+        allowed_hostnames,
+        allowed_hostname_suffixes,
     ):
         return None
-    if parsed.query:
-        return (
-            "ambiguous_authority" if ambiguous_authority else "query_string",
-            scheme,
-        )
-    path = unquote(parsed.path)
-    if any(
-        len(segment) >= config.opaque_path_segment_chars
-        and _OPAQUE_SEGMENT.fullmatch(segment) is not None
-        for segment in path.split("/")
-    ):
-        return (
-            "ambiguous_authority"
-            if ambiguous_authority
-            else "opaque_path_segment",
-            scheme,
-        )
-    return None
+    return "hostname_not_allowed", scheme
 
 
 class ExternalResourceRule(Rule):
-    """Detect external auto-loaded image URLs that can transmit output data."""
+    """Detect auto-loaded image URLs outside the trusted hostname policy."""
 
     RULE_ID = "output.external_resource"
-    PURPOSE = (
-        "Detect external Markdown or HTML image URLs that can transmit data."
-    )
+    PURPOSE = "Detect Markdown or HTML image URLs outside the hostname allowlist."
     SCOPES = frozenset((ScanScope.OUTPUT,))
 
     def __init__(self, config: ExternalResourceConfig | None = None) -> None:
@@ -436,7 +411,6 @@ class ExternalResourceRule(Rule):
             risk = _resource_risk(
                 text[candidate.span.start : candidate.span.end],
                 candidate.syntax,
-                self._config,
                 self._allowed_hostnames,
                 self._allowed_hostname_suffixes,
             )

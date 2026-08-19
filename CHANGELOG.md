@@ -4,6 +4,14 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Changed
+
+- Make opt-in `ExternalResourceRule` a deterministic hostname allowlist:
+  redact every external HTTP(S) image URL outside the allowlist, fail closed
+  on ambiguous authorities, and remove the obsolete
+  `opaque_path_segment_chars` configuration and capability field.
+- Correct the documented default scanner count from six rules to seven.
+
 ## 0.15.0 - 2026-08-19
 
 ### Added
