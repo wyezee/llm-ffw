@@ -16,11 +16,11 @@ from .base import Rule, RuleMatch
 # Fixed-width prefix discovery with unambiguous lookarounds. Candidate parsing
 # and checksum validation are explicit bounded loops.
 _IBAN_PREFIX = re.compile(
-    r"(?<![A-Za-z0-9_])(?P<country>[A-Z]{2})(?P<check>[0-9]{2})",
+    r"(?<![A-Za-z0-9_])(?P<country>[A-Za-z]{2})(?P<check>[0-9]{2})",
     re.ASCII,
 )
 _ASCII_ALNUM = frozenset(
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 )
 _DIGITS = "0123456789"
 
@@ -117,7 +117,7 @@ class IBANRule(Rule):
                 or text[prefix.start() - 1] == "_"
             ):
                 continue
-            country = prefix.group("country")
+            country = prefix.group("country").upper()
             compact_length = IBAN_LENGTHS.get(country)
             if compact_length is None:
                 continue
@@ -143,7 +143,7 @@ class IBANRule(Rule):
             if parsed is None:
                 continue
             end, compact = parsed
-            if not _mod97_is_valid(compact):
+            if not _mod97_is_valid(compact.upper()):
                 continue
             matches.append(
                 RuleMatch(

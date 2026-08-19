@@ -107,6 +107,22 @@ class IBANRuleTests(unittest.TestCase):
         self.assertEqual(finding.metadata["format"], "print")
         self.assertEqual(finding.span.end - finding.span.start, len(iban))
 
+    def test_detects_ascii_case_variants_without_changing_spans(self) -> None:
+        variants = (
+            "de89370400440532013000",
+            "De89370400440532013000",
+            "gb29 nwbk 6016 1331 9268 19",
+        )
+        scanner = _scanner()
+        for iban in variants:
+            text = f"Account ({iban})."
+            with self.subTest(iban=iban):
+                finding = scanner.scan(text)[0]
+                self.assertEqual(text[finding.span.start : finding.span.end], iban)
+                self.assertEqual(
+                    finding.metadata["country_code"], iban[:2].upper()
+                )
+
     def test_every_registered_country_length_can_pass_mod97(self) -> None:
         scanner = _scanner()
         for country, length in IBAN_LENGTHS.items():
@@ -122,7 +138,6 @@ class IBANRuleTests(unittest.TestCase):
             "DE8937040044053201300",
             "DE893704004405320130000",
             "US89370400440532013000",
-            "de89370400440532013000",
             "DE89-3704-0044-0532-0130-00",
             "DE89  3704 0044 0532 0130 00",
             "DE893704 0044 0532 0130 00",
@@ -187,13 +202,15 @@ class IBANRuleTests(unittest.TestCase):
         workloads = (
             "a" * 8_000_000,
             "A" * 8_000_000,
+            "a" * 7_999_977 + " " + "de89370400440532013000",
             (("DE00" + "0" * 18 + " ") * 400_000)[:8_000_000],
             ("DE00 " * 1_600_000)[:8_000_000],
         )
         started = time.perf_counter()
         self.assertEqual(scanner.scan(workloads[0]), ())
         self.assertEqual(scanner.scan(workloads[1]), ())
-        for text in workloads[2:]:
+        self.assertEqual(len(scanner.scan(workloads[2])), 1)
+        for text in workloads[3:]:
             findings = scanner.scan(text)
             self.assertTrue(findings)
             self.assertIs(findings[-1].action, Action.BLOCK)

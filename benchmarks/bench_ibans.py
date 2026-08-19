@@ -66,6 +66,11 @@ def benchmark(
             Action.REDACT,
         ),
         (
+            "lowercase_at_end",
+            _sized_suffix(size, " de89370400440532013000"),
+            Action.REDACT,
+        ),
+        (
             "print_at_end",
             _sized_suffix(size, " GB29 NWBK 6016 1331 9268 19"),
             Action.REDACT,
@@ -89,7 +94,7 @@ def benchmark(
                     f"{result.decision.value}"
                 )
 
-    valid_text = workloads[-2][1]
+    valid_text = workloads[-3][1]
     tracemalloc.start()
     measured = firewall.process(valid_text, scope=ScanScope.INPUT)
     _, peak_bytes = tracemalloc.get_traced_memory()

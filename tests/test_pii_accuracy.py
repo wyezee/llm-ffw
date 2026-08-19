@@ -27,7 +27,7 @@ from tools import pii_accuracy_gate
 
 
 EXPECTED_DIGEST = (
-    "33fd63fb34f40a60d81e3ddb619fa7acdd6c6ea8460e8206e39e506562eef4e3"
+    "0b62d20820a1efd7563c3759ddeea65c7b3cf3841812dbf5afd672bc4c029ee4"
 )
 
 
@@ -91,7 +91,7 @@ class PIIAccuracyCorpusTests(unittest.TestCase):
                     self.assertTrue(all(len(item) == 2 for item in octets))
                     self.assertEqual(int(octets[0], 16) & 2, 2)
                 elif finding.rule_id == IBANRule.RULE_ID:
-                    compact = value.replace(" ", "")
+                    compact = value.replace(" ", "").upper()
                     converted = "".join(
                         character
                         if character.isdigit()

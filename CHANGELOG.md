@@ -4,6 +4,9 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+- Detect lowercase and mixed-case IBAN representations without changing their
+  original redaction spans.
+
 ## 0.11.1 - 2026-08-19
 
 ### Changed

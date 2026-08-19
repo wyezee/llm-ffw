@@ -336,6 +336,10 @@ def _iban_scenarios(count: int) -> list[PIIAccuracyScenario]:
     for index, (country, length) in enumerate(IBAN_LENGTHS.items()):
         bban = f"{index + 1:0{length - 4}d}"
         value = country + _iban_mod97(country, bban) + bban
+        if index == 0:
+            value = value.lower()
+        elif index == 1:
+            value = value[0] + value[1].lower() + value[2:]
         text = contexts[index % len(contexts)].format(value=value)
         scenarios.append(
             PIIAccuracyScenario(
@@ -611,8 +615,8 @@ def _curated_iban_negative_scenarios(
         "short DE8937040044053201300",
         "long DE893704004405320130000",
         "unknown US89370400440532013000",
-        "lowercase de89370400440532013000",
-        "mixed case De89370400440532013000",
+        "lowercase bad checksum de00370400440532013000",
+        "mixed case unknown country Us89370400440532013000",
         "hyphens DE89-3704-0044-0532-0130-00",
         "double spaces DE89  3704 0044 0532 0130 00",
         "tabs DE89\t3704\t0044\t0532\t0130\t00",

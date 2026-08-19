@@ -804,7 +804,7 @@ firewall = Firewall(
 )
 ```
 
-`IBANRule` recognizes uppercase electronic IBANs and canonical space-grouped
+`IBANRule` recognizes ASCII case-insensitive electronic IBANs and canonical space-grouped
 print forms. A candidate must use a country code and exact length pinned to
 the
 [SWIFT IBAN Registry Release 102 (June 2026)](https://www.swift.com/swift-resource/9606/download),
