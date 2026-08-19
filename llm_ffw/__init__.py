@@ -93,7 +93,12 @@ from .stream_types import (
     StreamMode,
 )
 from .tool_call import ToolCall, ToolCallConfig, ToolDefinition
-from .tool_result import ToolResult, ToolResultBatch, ToolResultConfig
+from .tool_result import (
+    ToolResult,
+    ToolResultBatch,
+    ToolResultConfig,
+    ToolResultContent,
+)
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.banned_substrings import BannedSubstringsRule
@@ -209,6 +214,7 @@ __all__ = [
     "ToolResultBatch",
     "ToolResultBlockedError",
     "ToolResultConfig",
+    "ToolResultContent",
     "ToolResultRule",
     "UnsafeURLCapability",
     "UnsafeURLConfig",

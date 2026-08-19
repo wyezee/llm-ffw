@@ -69,9 +69,34 @@ class ToolResultDataTests(unittest.TestCase):
             ToolResultConfig(max_depth=65)
         with self.assertRaises(TypeError):
             ToolResultConfig(inspect_content="yes")  # type: ignore[arg-type]
+        with self.assertRaises(TypeError):
+            ToolResult("call", "value", limits=object())  # type: ignore[arg-type]
+
+    def test_construction_enforces_per_result_and_aggregate_budgets(self) -> None:
+        with self.assertRaisesRegex(ValueError, "too much string data"):
+            ToolResult("call", "x" * 100_001)
+        first = ToolResult("call-1", "x" * 60_000, "tool")
+        second = ToolResult("call-2", "y" * 60_000, "tool")
+        calls = (
+            ToolCall("tool", call_id="call-1"),
+            ToolCall("tool", call_id="call-2"),
+        )
+        with self.assertRaisesRegex(ValueError, "string_limit_exceeded"):
+            ToolResultBatch(calls, (first, second))
 
 
 class ToolResultRuleTests(unittest.TestCase):
+    def test_builders_apply_one_config_to_results_and_batches(self) -> None:
+        config = ToolResultConfig(max_total_string_chars=20)
+        rule = ToolResultRule(config)
+        result = rule.build_result("call-1", "safe", "get_weather")
+        batch = rule.build_batch((_call(),), (result,))
+        self.assertIs(result.limits, config)
+        self.assertIs(batch.limits, config)
+        self.assertIs(rule.enforce(batch), batch)
+        with self.assertRaisesRegex(ValueError, "too much string data"):
+            rule.build_result("call-1", "x" * 21, "get_weather")
+
     def test_default_content_inspection_blocks_secret_values_and_keys(self) -> None:
         secret = "sk-" + "B" * 20
         rule = ToolResultRule()
@@ -226,9 +251,14 @@ class ToolResultRuleTests(unittest.TestCase):
 
     def test_large_adversarial_content_is_bounded_and_fails_closed(self) -> None:
         blocks = [{"index": index} for index in range(10_000)]
+        relaxed = ToolResultConfig(
+            max_nodes=100_000,
+            max_array_items=10_000,
+        )
         batch = ToolResultBatch(
             (_call(),),
-            (_result(content=blocks),),
+            (ToolResult("call-1", blocks, "get_weather", limits=relaxed),),
+            limits=relaxed,
         )
         rule = ToolResultRule(
             ToolResultConfig(max_nodes=1_000, max_array_items=10_000)

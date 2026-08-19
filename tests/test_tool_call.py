@@ -69,6 +69,14 @@ class ToolCallDataTests(unittest.TestCase):
             ToolCallConfig(max_depth=65)
         with self.assertRaises(TypeError):
             ToolCallConfig(inspect_content="yes")  # type: ignore[arg-type]
+        with self.assertRaises(TypeError):
+            ToolCall("tool", {}, limits=object())  # type: ignore[arg-type]
+
+    def test_construction_enforces_configured_copy_budget(self) -> None:
+        with self.assertRaisesRegex(ValueError, "too much string data"):
+            ToolCall("tool", {"value": "x" * 100_001})
+        with self.assertRaisesRegex(ValueError, "oversized array"):
+            ToolCall("tool", {"values": list(range(1_025))})
 
 
 class ToolCallRuleTests(unittest.TestCase):
@@ -158,8 +166,9 @@ class ToolCallRuleTests(unittest.TestCase):
 
     def test_enforce_returns_valid_call_and_raises_disclosure_safe_error(self) -> None:
         rule = ToolCallRule((_weather_definition(),))
-        valid = ToolCall("get_weather", {"city": "Pune"})
+        valid = rule.build_call("get_weather", {"city": "Pune"})
         self.assertIs(rule.enforce(valid), valid)
+        self.assertIs(valid.limits, rule.config)
         secret = "customer-secret-key"
         with self.assertRaises(ToolCallBlockedError) as raised:
             rule.enforce(ToolCall("get_weather", {secret: "sensitive"}))
@@ -231,6 +240,11 @@ class ToolCallRuleTests(unittest.TestCase):
             {"type": "object", "required": ["missing"]},
             {"type": "object", "properties": {}},
             {"type": "object", "additionalProperties": {}},
+            {
+                "type": "object",
+                "properties": {"nested": {"type": "object"}},
+                "additionalProperties": False,
+            },
             {"type": "string", "enum": [1]},
             {"type": "object", "enum": [None]},
         )
@@ -277,7 +291,14 @@ class ToolCallRuleTests(unittest.TestCase):
             ),
             ToolCallConfig(max_nodes=1_000, max_array_items=10_000),
         )
-        call = ToolCall("batch", {"values": list(range(10_000))})
+        call = ToolCall(
+            "batch",
+            {"values": list(range(10_000))},
+            limits=ToolCallConfig(
+                max_nodes=100_000,
+                max_array_items=10_000,
+            ),
+        )
         started = time.perf_counter()
         finding = rule.validate(call)[0]
         elapsed = time.perf_counter() - started

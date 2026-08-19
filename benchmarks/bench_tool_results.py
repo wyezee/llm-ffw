@@ -36,6 +36,10 @@ def benchmark(*, rounds: int, batch_size: int) -> dict[str, float]:
         (ToolCall("search", {"query": "Pune"}, "call-1"),),
         (ToolResult("call-1", "sk-" + "A" * 20, "search"),),
     )
+    relaxed = ToolResultConfig(
+        max_nodes=100_000,
+        max_array_items=10_000,
+    )
     oversized = ToolResultBatch(
         (ToolCall("batch", {}, "call-2"),),
         (
@@ -43,8 +47,10 @@ def benchmark(*, rounds: int, batch_size: int) -> dict[str, float]:
                 "call-2",
                 [{"index": index} for index in range(10_000)],
                 "batch",
+                limits=relaxed,
             ),
         ),
+        limits=relaxed,
     )
     rule = ToolResultRule(
         ToolResultConfig(max_nodes=1_000, max_array_items=10_000)

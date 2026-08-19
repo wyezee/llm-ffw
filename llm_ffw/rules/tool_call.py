@@ -299,6 +299,16 @@ class ToolCallRule(StructuredRule[ToolCall]):
             raise ToolCallBlockedError(findings)
         return call
 
+    def build_call(
+        self,
+        name: str,
+        arguments: dict[str, object] | None = None,
+        call_id: str | None = None,
+    ) -> ToolCall:
+        """Copy an untrusted call under this rule's configured limits."""
+
+        return ToolCall(name, arguments, call_id, limits=self._config)
+
     def _validate_value(
         self,
         root: FrozenJSON,

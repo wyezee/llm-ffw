@@ -1,12 +1,18 @@
 """Deterministic validation of provider-neutral tool results."""
 
-from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from ..findings import Action, Finding, Severity, Span
 from ..inspection import ScanScope
 from ..structured_content import first_structured_content_violation
-from ..tool_result import ToolResultBatch, ToolResultConfig
+from ..tool_call import ToolCall
+from ..tool_result import (
+    ToolResult,
+    ToolResultBatch,
+    ToolResultConfig,
+    ToolResultContent,
+    _validate_tool_result_resources,
+)
 from .base import StructuredRule
 
 if TYPE_CHECKING:
@@ -139,38 +145,31 @@ class ToolResultRule(StructuredRule[ToolResultBatch]):
             raise ToolResultBlockedError(findings)
         return batch
 
+    def build_result(
+        self,
+        call_id: str | None,
+        content: ToolResultContent,
+        name: str | None = None,
+    ) -> ToolResult:
+        """Copy untrusted result content under this rule's limits."""
+
+        return ToolResult(call_id, content, name, limits=self._config)
+
+    def build_batch(
+        self,
+        expected_calls: list[ToolCall] | tuple[ToolCall, ...],
+        results: list[ToolResult] | tuple[ToolResult, ...],
+    ) -> ToolResultBatch:
+        """Assemble a batch under this rule's aggregate limits."""
+
+        return ToolResultBatch(
+            expected_calls,
+            results,
+            limits=self._config,
+        )
+
     def _validate_resources(self, batch: ToolResultBatch) -> str | None:
-        nodes = 0
-        string_chars = 0
-        stack: list[tuple[object, int]] = [
-            (result.content, 0) for result in reversed(batch.results)
-        ]
-        while stack:
-            value, depth = stack.pop()
-            nodes += 1
-            if nodes > self._config.max_nodes:
-                return "node_limit_exceeded"
-            if depth > self._config.max_depth:
-                return "depth_limit_exceeded"
-            if type(value) is str:
-                string_chars += len(value)
-                if string_chars > self._config.max_total_string_chars:
-                    return "string_limit_exceeded"
-            elif isinstance(value, Mapping):
-                string_chars += sum(len(key) for key in value)
-                if string_chars > self._config.max_total_string_chars:
-                    return "string_limit_exceeded"
-                if len(value) > self._config.max_object_properties:
-                    return "object_limit_exceeded"
-                stack.extend(
-                    (child, depth + 1)
-                    for child in reversed(tuple(value.values()))
-                )
-            elif isinstance(value, tuple):
-                if len(value) > self._config.max_array_items:
-                    return "array_limit_exceeded"
-                stack.extend((child, depth + 1) for child in reversed(value))
-        return None
+        return _validate_tool_result_resources(batch.results, self._config)
 
     def _finding(
         self,

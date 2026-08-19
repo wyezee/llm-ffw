@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import math
 import string
 from types import MappingProxyType
-from typing import cast, TypeAlias
+from typing import cast, Protocol, TypeAlias
 
 
 JSONScalar: TypeAlias = None | bool | int | float | str
@@ -19,6 +19,14 @@ _HARD_MAX_NODES = 100_000
 _HARD_MAX_STRING_CHARS = 1_000_000
 _HARD_MAX_CONTAINER_ITEMS = 10_000
 _HARD_MAX_TOOLS = 1_024
+
+
+class _JSONLimits(Protocol):
+    max_depth: int
+    max_nodes: int
+    max_total_string_chars: int
+    max_object_properties: int
+    max_array_items: int
 
 
 def _validate_name(value: object, field_name: str) -> str:
@@ -45,7 +53,12 @@ def _validate_call_id(value: object) -> str:
     return value
 
 
-def _freeze_json(value: object, *, field_name: str) -> FrozenJSON:
+def _freeze_json(
+    value: object,
+    *,
+    field_name: str,
+    limits: _JSONLimits | None = None,
+) -> FrozenJSON:
     """Copy JSON-compatible built-ins into an immutable, hard-bounded tree."""
 
     nodes = 0
@@ -54,9 +67,16 @@ def _freeze_json(value: object, *, field_name: str) -> FrozenJSON:
     def freeze(item: object, depth: int) -> FrozenJSON:
         nonlocal nodes, string_chars
         nodes += 1
-        if nodes > _HARD_MAX_NODES:
+        max_nodes = _HARD_MAX_NODES if limits is None else limits.max_nodes
+        max_depth = _HARD_MAX_DEPTH if limits is None else limits.max_depth
+        max_string_chars = (
+            _HARD_MAX_STRING_CHARS
+            if limits is None
+            else limits.max_total_string_chars
+        )
+        if nodes > max_nodes:
             raise ValueError(f"{field_name} contains too many values")
-        if depth > _HARD_MAX_DEPTH:
+        if depth > max_depth:
             raise ValueError(f"{field_name} is nested too deeply")
         if item is None or type(item) is bool or type(item) is int:
             return item
@@ -66,24 +86,34 @@ def _freeze_json(value: object, *, field_name: str) -> FrozenJSON:
             return item
         if type(item) is str:
             string_chars += len(item)
-            if string_chars > _HARD_MAX_STRING_CHARS:
+            if string_chars > max_string_chars:
                 raise ValueError(f"{field_name} contains too much string data")
             return item
         if type(item) in (list, tuple):
             sequence = cast(list[object] | tuple[object, ...], item)
-            if len(sequence) > _HARD_MAX_CONTAINER_ITEMS:
+            max_items = (
+                _HARD_MAX_CONTAINER_ITEMS
+                if limits is None
+                else limits.max_array_items
+            )
+            if len(sequence) > max_items:
                 raise ValueError(f"{field_name} contains an oversized array")
             return tuple(freeze(child, depth + 1) for child in sequence)
         if type(item) is dict:
             source = cast(dict[object, object], item)
-            if len(source) > _HARD_MAX_CONTAINER_ITEMS:
+            max_properties = (
+                _HARD_MAX_CONTAINER_ITEMS
+                if limits is None
+                else limits.max_object_properties
+            )
+            if len(source) > max_properties:
                 raise ValueError(f"{field_name} contains an oversized object")
             frozen: dict[str, FrozenJSON] = {}
             for key, child in source.items():
                 if type(key) is not str:
                     raise TypeError(f"{field_name} object keys must be strings")
                 string_chars += len(key)
-                if string_chars > _HARD_MAX_STRING_CHARS:
+                if string_chars > max_string_chars:
                     raise ValueError(f"{field_name} contains too much string data")
                 frozen[key] = freeze(child, depth + 1)
             return MappingProxyType(frozen)
@@ -120,6 +150,12 @@ class ToolCall:
     name: str
     arguments: Mapping[str, object] | None = field(default=None, repr=False)
     call_id: str | None = field(default=None, repr=False)
+    limits: "ToolCallConfig | None" = field(
+        default=None,
+        repr=False,
+        compare=False,
+        kw_only=True,
+    )
 
     def __post_init__(self) -> None:
         _validate_name(self.name, "name")
@@ -127,12 +163,20 @@ class ToolCall:
             _validate_call_id(self.call_id)
         if self.arguments is not None and type(self.arguments) is not dict:
             raise TypeError("arguments must be a dict or None")
+        limits = self.limits if self.limits is not None else ToolCallConfig()
+        if not isinstance(limits, ToolCallConfig):
+            raise TypeError("limits must be a ToolCallConfig or None")
         frozen = (
             None
             if self.arguments is None
-            else _freeze_json(self.arguments, field_name="arguments")
+            else _freeze_json(
+                self.arguments,
+                field_name="arguments",
+                limits=limits,
+            )
         )
         object.__setattr__(self, "arguments", frozen)
+        object.__setattr__(self, "limits", limits)
 
 
 @dataclass(frozen=True, slots=True)

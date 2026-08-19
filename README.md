@@ -578,7 +578,10 @@ tool_calls = ToolCallRule(
     )
 )
 
-call = ToolCall("get_weather", {"city": "Pune", "units": "celsius"})
+call = tool_calls.build_call(
+    "get_weather",
+    {"city": "Pune", "units": "celsius"},
+)
 safe_call = tool_calls.enforce(call)
 dispatch(safe_call.name, safe_call.arguments)
 ```
@@ -595,7 +598,10 @@ combinators, coercion, and defaults are deliberately unsupported. Every object
 node must explicitly set boolean `additionalProperties`; use `false` for the
 safe closed-object contract or deliberately choose `true` for an open object.
 
-`ToolCall` copies decoded built-in JSON values into an immutable bounded tree
+`build_call()` copies decoded built-in JSON values into an immutable tree under
+the rule's configured limits before validation. Direct `ToolCall` construction
+uses the same production defaults and accepts a trusted `limits=` override.
+`ToolCall`
 and excludes arguments and call IDs from `repr()`. The rule declares
 `ScanScope.TOOL_CALL`. A rejected call produces one disclosure-safe `Finding`
 with a structured zero-width span and no tool name, argument key, or argument
@@ -624,13 +630,14 @@ expected = ToolCall(
     {"city": "Pune"},
     call_id="call-1",
 )
-returned = ToolResult(
+tool_results = ToolResultRule()
+returned = tool_results.build_result(
     call_id="call-1",
     name="get_weather",
     content="Sunny, 28 C",
 )
-safe_batch = ToolResultRule().enforce(
-    ToolResultBatch((expected,), (returned,))
+safe_batch = tool_results.enforce(
+    tool_results.build_batch((expected,), (returned,))
 )
 add_tool_results_to_context(safe_batch.results)
 ```
@@ -650,8 +657,11 @@ BLOCK finding. A trusted host can inject a narrower `RuleScanner`; setting
 
 Result content must be either a string or a list/tuple of JSON object blocks.
 This provider-neutral shape can carry simple text or multimodal references
-without accepting provider code. Values are copied into bounded immutable
-trees, and result IDs, names, content, and complete batches are excluded from
+without accepting provider code. `build_result()` and `build_batch()` apply one
+configuration while copying values and enforcing aggregate batch budgets.
+Direct constructors use the same defaults and accept a trusted `limits=`
+override. Values are copied into bounded immutable trees, and result IDs,
+names, content, and complete batches are excluded from
 `repr()`. The rule declares `ScanScope.TOOL_RESULT`; rejection produces one
 structured zero-width finding without dynamic IDs, names, keys, or values.
 `enforce()` raises `ToolResultBlockedError`, while `validate()` returns the

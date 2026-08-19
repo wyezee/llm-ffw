@@ -22,6 +22,8 @@ All notable changes are recorded here before a tagged release.
   explicit boolean `additionalProperties` policy.
 - Inspect tool-call arguments as outbound text and tool-result content as
   inbound text with the deterministic scanner baseline, blocking on findings.
+- Enforce configured tool-call, per-result, and aggregate result-batch budgets
+  while copying untrusted structured values into immutable trees.
 
 ## 0.11.1 - 2026-08-19
 

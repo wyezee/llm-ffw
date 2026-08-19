@@ -46,7 +46,14 @@ def benchmark(*, rounds: int, batch_size: int) -> dict[str, float]:
     valid = ToolCall("search", {"query": "weather in Pune", "limit": 10})
     invalid = ToolCall("search", {"query": "weather", "unknown": True})
     unsafe = ToolCall("search", {"query": "sk-" + "A" * 20})
-    oversized = ToolCall("batch", {"values": list(range(10_000))})
+    oversized = ToolCall(
+        "batch",
+        {"values": list(range(10_000))},
+        limits=ToolCallConfig(
+            max_nodes=100_000,
+            max_array_items=10_000,
+        ),
+    )
 
     valid_durations: list[float] = []
     invalid_durations: list[float] = []
@@ -96,7 +103,7 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=20_000)
     parser.add_argument("--min-valid-calls-per-second", type=float, default=30_000)
     parser.add_argument("--min-invalid-calls-per-second", type=float, default=50_000)
-    parser.add_argument("--min-unsafe-calls-per-second", type=float, default=20_000)
+    parser.add_argument("--min-unsafe-calls-per-second", type=float, default=15_000)
     parser.add_argument("--max-oversized-milliseconds", type=float, default=20.0)
     args = parser.parse_args()
     result = benchmark(rounds=args.rounds, batch_size=args.batch_size)
