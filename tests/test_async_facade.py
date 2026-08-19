@@ -183,6 +183,28 @@ class AsyncLLMFirewallTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(completed.is_set())
         await firewall.close()
 
+    async def test_cancellation_is_preserved_when_lifecycle_operation_fails(
+        self,
+    ) -> None:
+        started = Event()
+        release = Event()
+        firewall = AsyncFirewall(pool_config=_pool_config())
+
+        def failing_start() -> object:
+            started.set()
+            if not release.wait(timeout=5):
+                raise TimeoutError("test release was not signaled")
+            raise RuntimeError("synthetic lifecycle failure")
+
+        firewall._firewall.start = failing_start  # type: ignore[method-assign]
+        starting = asyncio.create_task(firewall.start())
+        self.assertTrue(await asyncio.to_thread(started.wait, 2))
+        starting.cancel()
+        release.set()
+        with self.assertRaises(asyncio.CancelledError):
+            await starting
+        await firewall.close()
+
     async def test_close_stops_admission_and_drains_running_requests(self) -> None:
         started = Event()
         release = Event()
@@ -234,6 +256,40 @@ class AsyncLLMFirewallTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.to_thread(use_from_new_loop)
         await firewall.close()
 
+    async def test_close_from_new_loop_still_releases_resources(self) -> None:
+        firewall = AsyncFirewall(pool_config=_pool_config())
+
+        def bind_on_temporary_loop() -> None:
+            asyncio.run(firewall._requests.run(lambda: None))
+
+        await asyncio.to_thread(bind_on_temporary_loop)
+        await firewall.close()
+        self.assertTrue(firewall._closed)
+        self.assertTrue(firewall._requests._closed)
+
+    async def test_cancelled_close_preserves_cancellation_after_failure(
+        self,
+    ) -> None:
+        started = Event()
+        release = Event()
+        firewall = AsyncFirewall(pool_config=_pool_config())
+
+        def failing_close() -> None:
+            started.set()
+            if not release.wait(timeout=5):
+                raise TimeoutError("test release was not signaled")
+            raise RuntimeError("synthetic close failure")
+
+        firewall._firewall.close = failing_close  # type: ignore[method-assign]
+        closing = asyncio.create_task(firewall.close())
+        self.assertTrue(await asyncio.to_thread(started.wait, 2))
+        closing.cancel()
+        release.set()
+        with self.assertRaises(asyncio.CancelledError):
+            await closing
+        self.assertTrue(firewall._closed)
+        self.assertTrue(firewall._requests._closed)
+
 
 class AsyncLLMFirewallManagerTests(unittest.IsolatedAsyncioTestCase):
     async def test_structured_results_match_async_facade_contract(self) -> None:
@@ -269,6 +325,17 @@ class AsyncLLMFirewallManagerTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(manager.state, FirewallManagerState.RUNNING)
 
         self.assertEqual(manager.state, FirewallManagerState.CLOSED)
+        self.assertTrue(manager._requests._closed)
+
+    async def test_close_from_new_loop_still_releases_resources(self) -> None:
+        manager = AsyncFirewallManager(pool_config=_pool_config())
+
+        def bind_on_temporary_loop() -> None:
+            asyncio.run(manager._requests.run(lambda: None))
+
+        await asyncio.to_thread(bind_on_temporary_loop)
+        await manager.close()
+        self.assertTrue(manager._closed)
         self.assertTrue(manager._requests._closed)
 
 

@@ -14,6 +14,8 @@ All notable changes are recorded here before a tagged release.
   Unicode line separator, including its bounded streaming fallback.
 - Reject zero request deadlines and unbounded admission waits, and raise the
   default process-facade request deadline from 5 to 30 seconds.
+- Guarantee async worker cleanup across cancellation, cleanup failures, and
+  shutdown calls made from a different event loop.
 
 ## 0.11.1 - 2026-08-19
 

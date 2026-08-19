@@ -304,9 +304,12 @@ The async facade uses the same process scanner, policies, configuration,
 timeouts, and exceptions as `Firewall`. Its private request executor and
 async admission gate are both bounded by `ProcessScannerPoolConfig`; it never
 blocks the event loop while waiting for CPU workers. One instance belongs to
-one event loop. Canceling an await does not abandon its running scan: the scan
+one event loop for request processing; an idle instance can still be closed
+from a replacement shutdown loop. Canceling an await does not abandon its running scan: the scan
 finishes under the configured request timeout and retains its capacity slot
-until completion, preventing cancellation-driven queue growth.
+until completion, preventing cancellation-driven queue growth. Lifecycle
+cleanup also finishes before cancellation propagates, even when cleanup itself
+fails, so worker executors are not leaked.
 
 ### Results and failure handling
 

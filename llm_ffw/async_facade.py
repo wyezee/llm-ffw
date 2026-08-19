@@ -38,6 +38,33 @@ from .unsafe_url import UnsafeURLConfig
 _T = TypeVar("_T")
 
 
+async def _await_without_cancelling(
+    operation: asyncio.Future[_T],
+) -> _T:
+    """Await one future without propagating caller cancellation into it."""
+
+    await asyncio.wait((operation,))
+    return operation.result()
+
+
+async def _finish_after_cancellation(
+    operation: asyncio.Future[_T],
+) -> None:
+    """Finish and consume one shielded operation after caller cancellation."""
+
+    while not operation.done():
+        try:
+            await asyncio.wait((operation,))
+        except asyncio.CancelledError:
+            continue
+        except BaseException:
+            break
+    try:
+        operation.result()
+    except BaseException:
+        pass
+
+
 async def _run_blocking(
     function: Callable[..., _T],
     /,
@@ -50,9 +77,9 @@ async def _run_blocking(
         asyncio.to_thread(function, *args, **kwargs)
     )
     try:
-        return await asyncio.shield(operation)
+        return await _await_without_cancelling(operation)
     except asyncio.CancelledError:
-        await operation
+        await _finish_after_cancellation(operation)
         raise
 
 
@@ -136,32 +163,32 @@ class _AsyncRequestRunner:
                 value.exception()  # Consume errors after a caller cancellation.
 
         tracked.add_done_callback(completed)
-        return await asyncio.shield(future)
+        return await _await_without_cancelling(future)
 
     def stop_accepting(self) -> None:
-        self._bind()
         self._accepting = False
 
     async def drain(self) -> None:
+        if not self._pending:
+            return
         self._bind()
         while self._pending:
             pending = tuple(self._pending)
-            await asyncio.gather(
-                *(asyncio.shield(item) for item in pending),
-                return_exceptions=True,
-            )
+            await asyncio.wait(pending)
 
     async def shutdown(self) -> None:
         if self._closed:
             return
         self.stop_accepting()
-        await self.drain()
-        self._closed = True
-        await asyncio.to_thread(
-            self._executor.shutdown,
-            wait=True,
-            cancel_futures=True,
-        )
+        try:
+            await self.drain()
+        finally:
+            self._closed = True
+            await asyncio.to_thread(
+                self._executor.shutdown,
+                wait=True,
+                cancel_futures=True,
+            )
 
 
 class AsyncFirewall:
@@ -287,10 +314,12 @@ class AsyncFirewall:
         try:
             if drain_first:
                 await self._requests.drain()
-            await _run_blocking(operation)
         finally:
-            await self._requests.shutdown()
-            self._closed = True
+            try:
+                await _run_blocking(operation)
+            finally:
+                await self._requests.shutdown()
+                self._closed = True
 
     async def _finish_lifecycle(
         self,
@@ -305,9 +334,9 @@ class AsyncFirewall:
                 self._close_impl(operation, drain_first=drain_first)
             )
             try:
-                await asyncio.shield(cleanup)
+                await _await_without_cancelling(cleanup)
             except asyncio.CancelledError:
-                await cleanup
+                await _finish_after_cancellation(cleanup)
                 raise
 
     async def close(self) -> None:
@@ -503,10 +532,12 @@ class AsyncFirewallManager:
         self._requests.stop_accepting()
         try:
             await self._requests.drain()
-            await _run_blocking(self._manager.close)
         finally:
-            await self._requests.shutdown()
-            self._closed = True
+            try:
+                await _run_blocking(self._manager.close)
+            finally:
+                await self._requests.shutdown()
+                self._closed = True
 
     async def close(self) -> None:
         """Stop admission, drain requests, and close every generation."""
@@ -516,9 +547,9 @@ class AsyncFirewallManager:
                 return
             cleanup = asyncio.create_task(self._close_impl())
             try:
-                await asyncio.shield(cleanup)
+                await _await_without_cancelling(cleanup)
             except asyncio.CancelledError:
-                await cleanup
+                await _finish_after_cancellation(cleanup)
                 raise
 
     async def __aenter__(self) -> "AsyncFirewallManager":
