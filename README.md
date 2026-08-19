@@ -156,6 +156,8 @@ if __name__ == "__main__":
 The entry-point guard is required because the facade uses worker processes.
 Long-lived services should call `start()` and `close()` from their lifecycle
 hooks instead of constructing a facade per request.
+See the complete, provider-neutral
+[model I/O hook example](EXAMPLES.md#reusable-model-io-hook).
 
 ## Common recipes
 

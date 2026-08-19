@@ -35,6 +35,56 @@ if __name__ == "__main__":
     main()
 ```
 
+## Reusable model I/O hook
+
+Own one hook for the application process and call it on both sides of the
+model boundary. Choose the preset at deployment time rather than per request;
+`FirewallConfig.privacy_input()` and `FirewallConfig.json_api()` can replace
+the baseline preset below when those protections are required.
+
+```python
+from llm_ffw import Firewall, FirewallConfig, SanitizationResult
+
+class ModelIOHook:
+    def __init__(self, config: FirewallConfig) -> None:
+        self._firewall = Firewall.from_config(config)
+
+    def start(self) -> None:
+        self._firewall.start()
+
+    def before_model(self, text: str) -> SanitizationResult:
+        return self._firewall.sanitize_input_result(text)
+
+    def after_model(self, text: str) -> SanitizationResult:
+        return self._firewall.sanitize_output_result(text)
+
+    def close(self) -> None:
+        self._firewall.close()
+
+def call_model(safe_prompt: str) -> str:
+    assert "sk-" not in safe_prompt
+    return "Model response contains sk-" + "B" * 20
+
+def main() -> None:
+    hook = ModelIOHook(FirewallConfig.default())
+    hook.start()
+    try:
+        prompt = "Summarize this token: sk-" + "A" * 20
+        input_result = hook.before_model(prompt)
+        model_output = call_model(input_result.text)
+        output_result = hook.after_model(model_output)
+    finally:
+        hook.close()
+
+    assert input_result.text == "Summarize this token: [REDACTED]"
+    assert output_result.text == "Model response contains [REDACTED]"
+    assert input_result.findings[0].rule_id == "secrets.detected"
+    assert output_result.findings[0].rule_id == "secrets.detected"
+
+if __name__ == "__main__":
+    main()
+```
+
 ## Activate the privacy preset
 
 The baseline rules remain enabled. The preset additionally enables input-side
