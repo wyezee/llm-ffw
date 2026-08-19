@@ -54,21 +54,8 @@ from .process_pool import (
     ProcessScannerPoolConfig,
 )
 from .rules.secrets import SecretsRule
-from .rules.banned_substrings import BannedSubstringsRule
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
-from .rules.json_output import JSONOutputRule
-from .rules.ip_address import IPAddressRule
-from .rules.mac_address import MACAddressRule
-from .rules.iban import IBANRule
-from .rules.authorization_header import AuthorizationHeaderRule
-from .rules.email_address import EmailAddressRule
-from .rules.phone_number import PhoneNumberRule
-from .rules.unsafe_url import UnsafeURLRule
-from .rules.payment_card import PaymentCardRule
-from .rules.private_key import PrivateKeyRule
-from .rules.jwt_token import JWTTokenRule
-from .rules.repetition import RepetitionRule
 from .secret_catalog import (
     BUILTIN_SECRET_CATALOG,
     SecretCatalog,
@@ -212,110 +199,7 @@ class Firewall:
                 )
             )
         literal_catalog = self._pool.banned_substring_catalog
-        if literal_catalog is not None:
-            rule_capabilities.append(
-                RuleCapability(
-                    rule_id=BannedSubstringsRule.RULE_ID,
-                    purpose=BannedSubstringsRule.PURPOSE,
-                    scopes=tuple(literal_catalog.scopes),
-                )
-            )
-        if self._pool.json_output_config is not None:
-            rule_capabilities.append(
-                RuleCapability(
-                    rule_id=JSONOutputRule.RULE_ID,
-                    purpose=JSONOutputRule.PURPOSE,
-                    scopes=tuple(JSONOutputRule.SCOPES),
-                )
-            )
-        if self._pool.unsafe_url_config is not None:
-            rule_capabilities.append(
-                RuleCapability(
-                    rule_id=UnsafeURLRule.RULE_ID,
-                    purpose=UnsafeURLRule.PURPOSE,
-                    scopes=tuple(self._pool.unsafe_url_config.scopes),
-                )
-            )
-        if self._pool.ip_address_config is not None:
-            rule_capabilities.append(
-                RuleCapability(
-                    rule_id=IPAddressRule.RULE_ID,
-                    purpose=IPAddressRule.PURPOSE,
-                    scopes=tuple(self._pool.ip_address_config.scopes),
-                )
-            )
-        if self._pool.mac_address_config is not None:
-            rule_capabilities.append(
-                RuleCapability(
-                    rule_id=MACAddressRule.RULE_ID,
-                    purpose=MACAddressRule.PURPOSE,
-                    scopes=tuple(self._pool.mac_address_config.scopes),
-                )
-            )
-        if self._pool.iban_config is not None:
-            rule_capabilities.append(
-                RuleCapability(
-                    rule_id=IBANRule.RULE_ID,
-                    purpose=IBANRule.PURPOSE,
-                    scopes=tuple(self._pool.iban_config.scopes),
-                )
-            )
-        if self._pool.authorization_header_config is not None:
-            rule_capabilities.append(
-                RuleCapability(
-                    rule_id=AuthorizationHeaderRule.RULE_ID,
-                    purpose=AuthorizationHeaderRule.PURPOSE,
-                    scopes=tuple(self._pool.authorization_header_config.scopes),
-                )
-            )
-        if self._pool.email_address_config is not None:
-            rule_capabilities.append(
-                RuleCapability(
-                    rule_id=EmailAddressRule.RULE_ID,
-                    purpose=EmailAddressRule.PURPOSE,
-                    scopes=tuple(self._pool.email_address_config.scopes),
-                )
-            )
-        if self._pool.payment_card_config is not None:
-            rule_capabilities.append(
-                RuleCapability(
-                    rule_id=PaymentCardRule.RULE_ID,
-                    purpose=PaymentCardRule.PURPOSE,
-                    scopes=tuple(self._pool.payment_card_config.scopes),
-                )
-            )
-        if self._pool.private_key_config is not None:
-            rule_capabilities.append(
-                RuleCapability(
-                    rule_id=PrivateKeyRule.RULE_ID,
-                    purpose=PrivateKeyRule.PURPOSE,
-                    scopes=tuple(self._pool.private_key_config.scopes),
-                )
-            )
-        if self._pool.jwt_token_config is not None:
-            rule_capabilities.append(
-                RuleCapability(
-                    rule_id=JWTTokenRule.RULE_ID,
-                    purpose=JWTTokenRule.PURPOSE,
-                    scopes=tuple(self._pool.jwt_token_config.scopes),
-                )
-            )
-        if self._pool.phone_number_config is not None:
-            rule_capabilities.append(
-                RuleCapability(
-                    rule_id=PhoneNumberRule.RULE_ID,
-                    purpose=PhoneNumberRule.PURPOSE,
-                    scopes=tuple(self._pool.phone_number_config.scopes),
-                )
-            )
-        if self._pool.repetition_config is not None:
-            rule_capabilities.append(
-                RuleCapability(
-                    rule_id=RepetitionRule.RULE_ID,
-                    purpose=RepetitionRule.PURPOSE,
-                    scopes=tuple(self._pool.repetition_config.scopes),
-                )
-            )
+        rule_capabilities.extend(self._pool._registered_rule_capabilities())
         self._capabilities = FirewallCapabilities(
             rules=tuple(rule_capabilities),
             secret_catalog=SecretCatalogCapability(

@@ -15,6 +15,8 @@ All notable changes are recorded here before a tagged release.
 
 - Validate contradictory default-rule enable flags and dedicated rule configs
   when `FirewallConfig` is constructed rather than later during facade creation.
+- Centralize configuration-backed built-in rule metadata, worker construction,
+  policy validation, and generic capabilities in a private immutable registry.
 
 ### Documentation
 

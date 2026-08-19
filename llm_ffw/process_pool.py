@@ -12,7 +12,16 @@ from threading import BoundedSemaphore, Lock
 import time
 from typing import TypeAlias
 
+from ._rule_registry import (
+    ConfiguredRuleConfigs,
+    REGISTERED_RULE_IDS,
+    build_registered_rules,
+    normalize_rule_configs,
+    registered_rule_capabilities,
+    registered_rule_ids,
+)
 from .config import RuleScannerConfig
+from .capabilities import RuleCapability
 from .banned_substring_catalog import BannedSubstringCatalog
 from .engine import RuleScanner
 from .findings import Action, Finding, Severity, Span
@@ -32,21 +41,9 @@ from .repetition import RepetitionConfig
 from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult, PolicyOverride
 from .rules.secrets import SecretsRule
 from .rules.base import Rule
-from .rules.banned_substrings import BannedSubstringsRule
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.json_output import JSONOutputRule
-from .rules.ip_address import IPAddressRule
-from .rules.mac_address import MACAddressRule
-from .rules.iban import IBANRule
-from .rules.authorization_header import AuthorizationHeaderRule
-from .rules.email_address import EmailAddressRule
-from .rules.phone_number import PhoneNumberRule
-from .rules.unsafe_url import UnsafeURLRule
-from .rules.payment_card import PaymentCardRule
-from .rules.private_key import PrivateKeyRule
-from .rules.jwt_token import JWTTokenRule
-from .rules.repetition import RepetitionRule
 from .secret_catalog import BUILTIN_SECRET_CATALOG, SecretCatalog
 
 
@@ -154,41 +151,14 @@ _WORKER_POLICY: FirewallPolicy | None = None
 def _initialize_worker(
     scanner_config: RuleScannerConfig,
     secret_catalog: SecretCatalog | None,
-    banned_substring_catalog: BannedSubstringCatalog | None,
-    json_output_config: JSONOutputConfig | None,
-    unsafe_url_config: UnsafeURLConfig | None,
-    ip_address_config: IPAddressConfig | None,
-    mac_address_config: MACAddressConfig | None,
-    iban_config: IBANConfig | None,
-    authorization_header_config: AuthorizationHeaderConfig | None,
-    email_address_config: EmailAddressConfig | None,
-    phone_number_config: PhoneNumberConfig | None,
-    payment_card_config: PaymentCardConfig | None,
-    private_key_config: PrivateKeyConfig | None,
-    jwt_token_config: JWTTokenConfig | None,
-    repetition_config: RepetitionConfig | None,
+    configured_rule_configs: ConfiguredRuleConfigs,
     policy_id: str,
     policy_version: str,
     policy_overrides: tuple[PolicyOverride, ...],
 ) -> None:
     global _WORKER_POLICY, _WORKER_SCANNER
     _WORKER_POLICY = FirewallPolicy(policy_id, policy_version, policy_overrides)
-    if (
-        secret_catalog is None
-        and banned_substring_catalog is None
-        and json_output_config is None
-        and unsafe_url_config is None
-        and ip_address_config is None
-        and mac_address_config is None
-        and iban_config is None
-        and authorization_header_config is None
-        and email_address_config is None
-        and phone_number_config is None
-        and payment_card_config is None
-        and private_key_config is None
-        and jwt_token_config is None
-        and repetition_config is None
-    ):
+    if secret_catalog is None and not configured_rule_configs:
         _WORKER_SCANNER = RuleScanner(config=scanner_config)
     else:
         rules: list[Rule] = [
@@ -198,32 +168,7 @@ def _initialize_worker(
             rules.append(InvisibleCharactersRule())
         if scanner_config.enable_unicode_tag_smuggling:
             rules.append(UnicodeTagSmugglingRule())
-        if banned_substring_catalog is not None:
-            rules.append(BannedSubstringsRule(banned_substring_catalog))
-        if json_output_config is not None:
-            rules.append(JSONOutputRule(json_output_config))
-        if unsafe_url_config is not None:
-            rules.append(UnsafeURLRule(unsafe_url_config))
-        if ip_address_config is not None:
-            rules.append(IPAddressRule(ip_address_config))
-        if mac_address_config is not None:
-            rules.append(MACAddressRule(mac_address_config))
-        if iban_config is not None:
-            rules.append(IBANRule(iban_config))
-        if authorization_header_config is not None:
-            rules.append(AuthorizationHeaderRule(authorization_header_config))
-        if email_address_config is not None:
-            rules.append(EmailAddressRule(email_address_config))
-        if phone_number_config is not None:
-            rules.append(PhoneNumberRule(phone_number_config))
-        if payment_card_config is not None:
-            rules.append(PaymentCardRule(payment_card_config))
-        if private_key_config is not None:
-            rules.append(PrivateKeyRule(private_key_config))
-        if jwt_token_config is not None:
-            rules.append(JWTTokenRule(jwt_token_config))
-        if repetition_config is not None:
-            rules.append(RepetitionRule(repetition_config))
+        rules.extend(build_registered_rules(configured_rule_configs))
         _WORKER_SCANNER = RuleScanner(
             rules=rules,
             config=scanner_config,
@@ -377,80 +322,23 @@ class ProcessScannerPool:
             secret_catalog, SecretCatalog
         ):
             raise TypeError("secret_catalog must be a SecretCatalog or None")
-        if banned_substring_catalog is not None and not isinstance(
-            banned_substring_catalog, BannedSubstringCatalog
-        ):
-            raise TypeError(
-                "banned_substring_catalog must be a "
-                "BannedSubstringCatalog or None"
+        normalize_rule_configs(
+            (
+                ("banned_substring_catalog", banned_substring_catalog),
+                ("json_output_config", json_output_config),
+                ("unsafe_url_config", unsafe_url_config),
+                ("ip_address_config", ip_address_config),
+                ("mac_address_config", mac_address_config),
+                ("iban_config", iban_config),
+                ("authorization_header_config", authorization_header_config),
+                ("email_address_config", email_address_config),
+                ("phone_number_config", phone_number_config),
+                ("payment_card_config", payment_card_config),
+                ("private_key_config", private_key_config),
+                ("jwt_token_config", jwt_token_config),
+                ("repetition_config", repetition_config),
             )
-        if json_output_config is not None and not isinstance(
-            json_output_config, JSONOutputConfig
-        ):
-            raise TypeError(
-                "json_output_config must be a JSONOutputConfig or None"
-            )
-        if unsafe_url_config is not None and not isinstance(
-            unsafe_url_config, UnsafeURLConfig
-        ):
-            raise TypeError(
-                "unsafe_url_config must be an UnsafeURLConfig or None"
-            )
-        if ip_address_config is not None and not isinstance(
-            ip_address_config, IPAddressConfig
-        ):
-            raise TypeError(
-                "ip_address_config must be an IPAddressConfig or None"
-            )
-        if mac_address_config is not None and not isinstance(
-            mac_address_config, MACAddressConfig
-        ):
-            raise TypeError(
-                "mac_address_config must be a MACAddressConfig or None"
-            )
-        if iban_config is not None and not isinstance(iban_config, IBANConfig):
-            raise TypeError("iban_config must be an IBANConfig or None")
-        if authorization_header_config is not None and not isinstance(
-            authorization_header_config, AuthorizationHeaderConfig
-        ):
-            raise TypeError(
-                "authorization_header_config must be an "
-                "AuthorizationHeaderConfig or None"
-            )
-        if email_address_config is not None and not isinstance(
-            email_address_config, EmailAddressConfig
-        ):
-            raise TypeError(
-                "email_address_config must be an EmailAddressConfig or None"
-            )
-        if phone_number_config is not None and not isinstance(
-            phone_number_config, PhoneNumberConfig
-        ):
-            raise TypeError(
-                "phone_number_config must be a PhoneNumberConfig or None"
-            )
-        if payment_card_config is not None and not isinstance(
-            payment_card_config, PaymentCardConfig
-        ):
-            raise TypeError(
-                "payment_card_config must be a PaymentCardConfig or None"
-            )
-        if private_key_config is not None and not isinstance(
-            private_key_config, PrivateKeyConfig
-        ):
-            raise TypeError(
-                "private_key_config must be a PrivateKeyConfig or None"
-            )
-        if jwt_token_config is not None and not isinstance(
-            jwt_token_config, JWTTokenConfig
-        ):
-            raise TypeError("jwt_token_config must be a JWTTokenConfig or None")
-        if repetition_config is not None and not isinstance(
-            repetition_config, RepetitionConfig
-        ):
-            raise TypeError(
-                "repetition_config must be a RepetitionConfig or None"
-            )
+        )
         if not isinstance(policy, FirewallPolicy):
             raise TypeError("policy must be a FirewallPolicy")
         resolved_scanner_config = scanner_config or RuleScannerConfig()
@@ -490,102 +378,38 @@ class ProcessScannerPool:
             if resolved_scanner_config.enable_jwt_tokens
             else None
         )
+        configured_rule_configs = normalize_rule_configs(
+            (
+                ("banned_substring_catalog", banned_substring_catalog),
+                ("json_output_config", json_output_config),
+                ("unsafe_url_config", unsafe_url_config),
+                ("ip_address_config", ip_address_config),
+                ("mac_address_config", mac_address_config),
+                ("iban_config", iban_config),
+                ("authorization_header_config", authorization_header_config),
+                ("email_address_config", email_address_config),
+                ("phone_number_config", phone_number_config),
+                ("payment_card_config", resolved_payment_card_config),
+                ("private_key_config", resolved_private_key_config),
+                ("jwt_token_config", resolved_jwt_token_config),
+                ("repetition_config", repetition_config),
+            )
+        )
+        active_rule_ids = {"secrets.detected"}
+        if resolved_scanner_config.enable_invisible_characters:
+            active_rule_ids.add("unicode.invisible_characters")
+        if resolved_scanner_config.enable_unicode_tag_smuggling:
+            active_rule_ids.add("unicode.tag_smuggling")
+        active_rule_ids.update(registered_rule_ids(configured_rule_configs))
         policy.validate_rule_ids(
-            frozenset(
-                (
-                    "secrets.detected",
-                    *(
-                        ("unicode.invisible_characters",)
-                        if resolved_scanner_config.enable_invisible_characters
-                        else ()
-                    ),
-                    *(
-                        ("unicode.tag_smuggling",)
-                        if resolved_scanner_config.enable_unicode_tag_smuggling
-                        else ()
-                    ),
-                    *(
-                        ("content.banned_substrings",)
-                        if banned_substring_catalog is not None
-                        else ()
-                    ),
-                    *(
-                        ("output.json.validity",)
-                        if json_output_config is not None
-                        else ()
-                    ),
-                    *(
-                        ("url.unsafe",)
-                        if unsafe_url_config is not None
-                        else ()
-                    ),
-                    *(
-                        ("pii.ip_address",)
-                        if ip_address_config is not None
-                        else ()
-                    ),
-                    *(
-                        ("pii.mac_address",)
-                        if mac_address_config is not None
-                        else ()
-                    ),
-                    *(("pii.iban",) if iban_config is not None else ()),
-                    *(
-                        ("secrets.authorization_header",)
-                        if authorization_header_config is not None
-                        else ()
-                    ),
-                    *(
-                        ("pii.email_address",)
-                        if email_address_config is not None
-                        else ()
-                    ),
-                    *(
-                        ("pii.phone_number",)
-                        if phone_number_config is not None
-                        else ()
-                    ),
-                    *(
-                        ("pii.payment_card",)
-                        if resolved_payment_card_config is not None
-                        else ()
-                    ),
-                    *(
-                        ("secrets.private_key",)
-                        if resolved_private_key_config is not None
-                        else ()
-                    ),
-                    *(
-                        ("secrets.jwt_token",)
-                        if resolved_jwt_token_config is not None
-                        else ()
-                    ),
-                    *(
-                        ("text.excessive_repetition",)
-                        if repetition_config is not None
-                        else ()
-                    ),
-                )
-            ),
-            supported_rule_ids=frozenset(
-                (
-                    "content.banned_substrings",
-                    "output.json.validity",
+            frozenset(active_rule_ids),
+            supported_rule_ids=REGISTERED_RULE_IDS
+            | frozenset(
+                {
                     "secrets.detected",
                     "unicode.invisible_characters",
                     "unicode.tag_smuggling",
-                    "url.unsafe",
-                    "pii.ip_address",
-                    "pii.mac_address",
-                    "pii.iban",
-                    "secrets.authorization_header",
-                    "pii.email_address",
-                    "pii.phone_number",
-                    "pii.payment_card",
-                    "secrets.private_key",
-                    "secrets.jwt_token",
-                    "text.excessive_repetition",
-                )
+                }
             ),
         )
         self._scanner_config = resolved_scanner_config
@@ -605,6 +429,7 @@ class ProcessScannerPool:
         self._private_key_config = resolved_private_key_config
         self._jwt_token_config = resolved_jwt_token_config
         self._repetition_config = repetition_config
+        self._configured_rule_configs = configured_rule_configs
         self._json_output_rule = (
             JSONOutputRule(json_output_config)
             if json_output_config is not None
@@ -695,6 +520,11 @@ class ProcessScannerPool:
     def repetition_config(self) -> RepetitionConfig | None:
         return self._repetition_config
 
+    def _registered_rule_capabilities(self) -> tuple[RuleCapability, ...]:
+        """Return safe generic capabilities for internal facade assembly."""
+
+        return registered_rule_capabilities(self._configured_rule_configs)
+
     def start(self) -> "ProcessScannerPool":
         """Start workers and validate process execution before accepting traffic."""
 
@@ -714,19 +544,7 @@ class ProcessScannerPool:
                     initargs=(
                         self._scanner_config,
                         self._configured_secret_catalog,
-                        self._banned_substring_catalog,
-                        self._json_output_config,
-                        self._unsafe_url_config,
-                        self._ip_address_config,
-                        self._mac_address_config,
-                        self._iban_config,
-                        self._authorization_header_config,
-                        self._email_address_config,
-                        self._phone_number_config,
-                        self._payment_card_config,
-                        self._private_key_config,
-                        self._jwt_token_config,
-                        self._repetition_config,
+                        self._configured_rule_configs,
                         self._policy.policy_id,
                         self._policy.version,
                         self._policy.overrides,
