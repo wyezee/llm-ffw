@@ -37,6 +37,8 @@ URLs before a host renders them.
 - [Measured performance](#measured-performance)
 - [Usage](#usage)
   - [Concurrency and object sharing](#concurrency-and-object-sharing)
+  - [Unified streaming](#unified-streaming)
+  - [Async usage](#async-usage)
   - [FastAPI lifespan integration](#fastapi-lifespan-integration)
   - [Results and failure handling](#results-and-failure-handling)
 - [Facade configuration](#facade-configuration)
@@ -216,8 +218,8 @@ reloads, and direct process-pool orchestration.
 
 ## Measured performance
 
-The table is the publication-grade benchmark of the `0.13.0` six-rule default
-and 16-rule all-text configurations at commit `4f5941a`. Tests ran on
+The table is the publication-grade benchmark of the current seven-rule default
+and complete 20-rule text configurations at commit `1c6ad32`. Tests ran on
 GitHub-hosted Ubuntu and Windows runners with Python 3.14.7. Each request
 contains 8,000,000 synthetic ASCII characters (about 7.63 MiB), representative
 of a million-token-scale prompt. This is a size comparison rather than an exact
@@ -225,10 +227,10 @@ token count: tokenization varies by model, tokenizer, language, and content.
 
 | Rules and payload | Ubuntu req/s / MiB/s / p95 | Windows req/s / MiB/s / p95 |
 | --- | ---: | ---: |
-| Default 6, clean input | 3.184 / 24.292 / 9.82 s | 5.113 / 39.009 / 6.25 s |
-| Default 6, valid JSON output | 3.427 / 26.144 / 9.26 s | 5.435 / 41.469 / 5.85 s |
-| All 16, clean input | 1.396 / 10.651 / 22.38 s | 2.065 / 15.756 / 15.47 s |
-| All 16, valid JSON output | 0.964 / 7.353 / 32.69 s | 1.466 / 11.184 / 21.80 s |
+| Default 7, clean input | 5.443 / 41.527 / 5.67 s | 3.291 / 25.107 / 9.71 s |
+| Default 7, valid JSON output | 5.854 / 44.659 / 5.38 s | 3.479 / 26.539 / 9.15 s |
+| All 20, clean input | 1.795 / 13.698 / 17.32 s | 0.912 / 6.957 / 35.08 s |
+| All 20, valid JSON output | 1.320 / 10.071 / 23.94 s | 0.637 / 4.860 / 50.20 s |
 
 Each row uses four workers, eight concurrent callers, and 32 requests per
 round for three rounds: 96 measured requests per row and 384 per operating
@@ -236,12 +238,12 @@ system. Throughput is the median of the three rounds. The pooled end-to-end
 p95 includes caller queueing from submitting 32 requests to eight caller
 slots; it is not single-request service time. All 768 measured requests across
 both operating systems completed with exact expected findings and no rejection,
-timeout, or failure. Per-row maximum process-tree RSS ranged from 300 to
-609 MiB.
+timeout, or failure. Per-row maximum process-tree RSS ranged from 219 to
+593 MiB.
 
 These are reproducible CI measurements, not universal latency guarantees;
 performance varies with input, enabled rules, policy, CPU, and concurrency.
-See the [exact publication run](https://github.com/wyezee/llm-ffw/actions/runs/32234500783)
+See the [exact publication run](https://github.com/wyezee/llm-ffw/actions/runs/32275505298)
 and the commands under [Development and validation](#development-and-validation).
 
 ### Capacity starting point
@@ -602,6 +604,8 @@ strict = FirewallConfig.all_text_rules(policy=STRICT_POLICY)
 audit = FirewallConfig.all_text_rules(policy=AUDIT_POLICY)
 ```
 
+See the [complete full-coverage example](EXAMPLES.md#enable-every-text-rule).
+
 Balanced handling redacts or removes findings where that operation is safe,
 while invalid JSON still blocks and excessive repetition remains review-only.
 Strict handling blocks every text finding in both directions. Audit handling
@@ -781,8 +785,7 @@ safe closed-object contract or deliberately choose `true` for an open object.
 `build_call()` copies decoded built-in JSON values into an immutable tree under
 the rule's configured limits before validation. Direct `ToolCall` construction
 uses the same production defaults and accepts a trusted `limits=` override.
-`ToolCall`
-and excludes arguments and call IDs from `repr()`. The rule declares
+`ToolCall` excludes arguments and call IDs from `repr()`. The rule declares
 `ScanScope.TOOL_CALL`. A rejected call produces one disclosure-safe `Finding`
 with a structured zero-width span and no tool name, argument key, or argument
 value taken from untrusted input. Construct `ToolCallRule` once and reuse it;
@@ -846,6 +849,8 @@ names, content, and complete batches are excluded from
 structured zero-width finding without dynamic IDs, names, keys, or values.
 `enforce()` raises `ToolResultBlockedError`, while `validate()` returns the
 finding tuple for hosts that apply enforcement themselves.
+
+See the [complete structured-tool example](EXAMPLES.md#validate-structured-tool-traffic).
 
 ### Default invisible-character canonicalization
 
@@ -1389,9 +1394,9 @@ An advanced deployment that deliberately wants no built-ins must say so:
 firewall = Firewall(replacement_secret_catalog=complete_catalog)
 ```
 
-The extension and replacement options are mutually exclusive. The earlier
-ambiguous `secret_catalog=` facade keyword is intentionally unsupported before
-the first release so an extension cannot silently disable built-in detection.
+The extension and replacement options are mutually exclusive. There is no
+ambiguous `secret_catalog=` facade keyword, so an extension cannot silently
+disable built-in detection.
 
 Clients can inspect a stable, immutable summary before startup:
 

@@ -41,6 +41,8 @@ Own one hook for the application process and call it on both sides of the
 model boundary. Choose the preset at deployment time rather than per request;
 `FirewallConfig.privacy_input()` and `FirewallConfig.json_api()` can replace
 the baseline preset below when those protections are required.
+`FirewallConfig.all_text_rules()` is the explicit full-coverage option for
+deployments whose outputs are always JSON.
 
 ```python
 from llm_ffw import Firewall, FirewallConfig, SanitizationResult
@@ -133,6 +135,31 @@ def main() -> None:
             ]
         else:
             raise AssertionError("invalid JSON was not blocked")
+
+if __name__ == "__main__":
+    main()
+```
+
+## Enable every text rule
+
+The full-coverage preset enables every self-contained text rule across every
+scope it supports. It also requires valid JSON output, so use it only for
+deployments with that output contract. A deployment-owned banned-substring
+catalog can be supplied separately when needed.
+
+```python
+from llm_ffw import Action, Firewall, FirewallConfig
+
+def main() -> None:
+    output = '{"contact":"alex@example.com"}'
+    with Firewall.from_config(FirewallConfig.all_text_rules()) as firewall:
+        result = firewall.sanitize_output_result(output)
+
+    assert result.text == '{"contact":"[REDACTED]"}'
+    assert result.decision is Action.REDACT
+    assert [finding.rule_id for finding in result.findings] == [
+        "pii.email_address"
+    ]
 
 if __name__ == "__main__":
     main()
@@ -284,6 +311,55 @@ def main() -> None:
         capabilities = manager.reload(additional_secret_catalog=second)
         assert capabilities.secret_catalog.version == "2"
         assert manager.sanitize_input("corp_next_ABCDEFGHIJKL") == "[REDACTED]"
+
+if __name__ == "__main__":
+    main()
+```
+
+## Validate structured tool traffic
+
+Declare tool schemas once, validate each model-selected call before execution,
+then validate linked tool results before returning them to model context.
+
+```python
+from llm_ffw import ToolCallRule, ToolDefinition, ToolResultRule
+
+def main() -> None:
+    calls = ToolCallRule(
+        (
+            ToolDefinition(
+                name="get_weather",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string"},
+                    },
+                    "required": ["city"],
+                    "additionalProperties": False,
+                },
+            ),
+        )
+    )
+    safe_call = calls.enforce(
+        calls.build_call(
+            "get_weather",
+            {"city": "Pune"},
+            call_id="call-1",
+        )
+    )
+
+    results = ToolResultRule()
+    returned = results.build_result(
+        call_id="call-1",
+        name="get_weather",
+        content="Sunny, 28 C",
+    )
+    safe_batch = results.enforce(
+        results.build_batch((safe_call,), (returned,))
+    )
+
+    assert safe_call.name == "get_weather"
+    assert safe_batch.results[0].content == "Sunny, 28 C"
 
 if __name__ == "__main__":
     main()

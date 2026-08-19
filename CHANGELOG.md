@@ -6,6 +6,8 @@ All notable changes are recorded here before a tagged release.
 
 ### Changed
 
+- Complete the public configuration and integration guidance with runnable
+  full-coverage and structured-tool examples and current benchmark evidence.
 - Make `FirewallConfig.all_text_rules()` a one-call full-coverage preset for
   every self-contained text rule across all supported scopes, with an optional
   deployment-owned banned substring catalog and explicit balanced, strict, or
