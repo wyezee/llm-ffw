@@ -4,6 +4,12 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Documentation
+
+- Add compile and public-import regression coverage for every README Python
+  block, surface critical integration sections in Contents, clarify synchronous
+  thread safety, and remove pre-adoption migration guidance.
+
 ## 0.13.0 - 2026-08-19
 
 ### Added

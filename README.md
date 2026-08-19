@@ -29,6 +29,9 @@ character, token, and line runs.
 - [Common recipes](#common-recipes)
 - [Measured performance](#measured-performance)
 - [Usage](#usage)
+  - [Concurrency and object sharing](#concurrency-and-object-sharing)
+  - [FastAPI lifespan integration](#fastapi-lifespan-integration)
+  - [Results and failure handling](#results-and-failure-handling)
 - [Facade configuration](#facade-configuration)
 - [Rule configuration](#rule-configuration)
 - [Versioned signature catalogs](#versioned-signature-catalogs)
@@ -264,31 +267,16 @@ Choose the highest-level API that fits the integration:
 | `ToolCallRule` | Provider-neutral allowlist and typed argument validation before tool execution |
 | `ToolResultRule` | Provider-neutral linkage and bounded-content validation before model consumption |
 
-### Pre-1.0 naming migration
-
-The canonical facade names are `Firewall`, `AsyncFirewall`,
-`FirewallManager`, and `AsyncFirewallManager`. The former `LLMFirewall`,
-`AsyncLLMFirewall`, `LLMFirewallManager`, and `AsyncLLMFirewallManager` names
-remain identity-preserving compatibility aliases during the pre-1.0 migration
-window. `Scanner` and `ScannerConfig` likewise remain aliases of `RuleScanner`
-and `RuleScannerConfig`.
-
-One collision cannot retain its old package-root meaning: before this change,
-`Firewall` named the in-process scan-and-policy class. That class is now
-`RuleEngine`; migrate `Firewall(scanner=..., policy=...)` to
-`RuleEngine(scanner=..., policy=...)`. Direct `llm_ffw.policy.Firewall` imports
-remain compatible temporarily, but new code should import `RuleEngine` from
-`llm_ffw`.
-
 Production integrations should normally begin with the `Firewall` quick
 start above. The remaining APIs expose async lifecycle, streaming, hot reload,
 or lower-level control when those capabilities are specifically required.
 
 ### Concurrency and object sharing
 
-Create one synchronous `Firewall` or `FirewallManager` per application process
-and share it across request threads. Their request paths and the underlying
-`ProcessScannerPool` support concurrent callers with bounded admission. Coordinate
+The request methods on synchronous `Firewall` and `FirewallManager` instances
+are thread-safe for concurrent callers while the instance is running. Create
+one per application process and share it across request threads. Their request
+paths and the underlying `ProcessScannerPool` use bounded admission. Coordinate
 lifecycle transitions with the service lifecycle: a request racing with close,
 terminate, or a broken worker can safely receive `FirewallUnavailableError`.
 

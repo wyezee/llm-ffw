@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 import os
 import re
@@ -6,13 +7,35 @@ import sys
 import tempfile
 import unittest
 
+import llm_ffw
+
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = ROOT / "EXAMPLES.md"
+README = ROOT / "README.md"
 PYTHON_BLOCK = re.compile(r"```python\n(.*?)\n```", re.DOTALL)
 
 
 class DocumentedExampleTests(unittest.TestCase):
+    def test_readme_python_blocks_compile_and_use_public_root_imports(self) -> None:
+        document = README.read_text(encoding="utf-8")
+        blocks = PYTHON_BLOCK.findall(document)
+        self.assertEqual(len(blocks), 34)
+        public_names = frozenset(llm_ffw.__all__)
+
+        for index, code in enumerate(blocks, start=1):
+            with self.subTest(example=index):
+                tree = ast.parse(code, filename=f"README.md block {index}")
+                for node in ast.walk(tree):
+                    if not (
+                        isinstance(node, ast.ImportFrom)
+                        and node.module == "llm_ffw"
+                    ):
+                        continue
+                    for imported in node.names:
+                        self.assertIn(imported.name, public_names)
+                        self.assertTrue(hasattr(llm_ffw, imported.name))
+
     def test_every_python_block_is_a_complete_runnable_program(self) -> None:
         document = EXAMPLES.read_text(encoding="utf-8")
         blocks = PYTHON_BLOCK.findall(document)
