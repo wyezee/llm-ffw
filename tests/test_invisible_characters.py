@@ -148,7 +148,7 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
         ).process(text)
 
         self.assertEqual(balanced.decision, Action.REMOVE)
-        self.assertEqual(balanced.policy_version, "1.18.0")
+        self.assertEqual(balanced.policy_version, "1.19.0")
         self.assertEqual(balanced.processed_text, "helloworld")
         self.assertEqual(strict.decision, Action.BLOCK)
         self.assertIsNone(strict.processed_text)

@@ -478,6 +478,8 @@ def _builtin_policy(
     json_output_action: Action,
     unsafe_url_action: Action,
     external_resource_action: Action,
+    banned_substring_action: Action | None,
+    repetition_action: Action | None,
     ip_address_action: Action,
     mac_address_action: Action,
     iban_action: Action,
@@ -524,9 +526,33 @@ def _builtin_policy(
         if unicode_tag_action is not None
         else ()
     )
+    banned_substring_overrides = (
+        tuple(
+            PolicyOverride(
+                "content.banned_substrings",
+                scope,
+                banned_substring_action,
+            )
+            for scope in (ScanScope.INPUT, ScanScope.OUTPUT)
+        )
+        if banned_substring_action is not None
+        else ()
+    )
+    repetition_overrides = (
+        tuple(
+            PolicyOverride(
+                "text.excessive_repetition",
+                scope,
+                repetition_action,
+            )
+            for scope in (ScanScope.INPUT, ScanScope.OUTPUT)
+        )
+        if repetition_action is not None
+        else ()
+    )
     return FirewallPolicy(
         policy_id=policy_id,
-        version="1.18.0",
+        version="1.19.0",
         overrides=(
             PolicyOverride("secrets.detected", ScanScope.INPUT, input_action),
             PolicyOverride("secrets.detected", ScanScope.OUTPUT, output_action),
@@ -553,6 +579,8 @@ def _builtin_policy(
                 ScanScope.OUTPUT,
                 external_resource_action,
             ),
+            *banned_substring_overrides,
+            *repetition_overrides,
             PolicyOverride(
                 "pii.ip_address",
                 ScanScope.INPUT,
@@ -677,6 +705,8 @@ BALANCED_POLICY = _builtin_policy(
     json_output_action=Action.BLOCK,
     unsafe_url_action=Action.REDACT,
     external_resource_action=Action.REDACT,
+    banned_substring_action=None,
+    repetition_action=None,
     ip_address_action=Action.REDACT,
     mac_address_action=Action.REDACT,
     iban_action=Action.REDACT,
@@ -692,13 +722,15 @@ BALANCED_POLICY = _builtin_policy(
 STRICT_POLICY = _builtin_policy(
     "llm_ffw.strict",
     input_action=Action.BLOCK,
-    output_action=Action.REDACT,
+    output_action=Action.BLOCK,
     bidi_action=Action.BLOCK,
     invisible_action=Action.BLOCK,
     unicode_tag_action=Action.BLOCK,
     json_output_action=Action.BLOCK,
     unsafe_url_action=Action.BLOCK,
     external_resource_action=Action.BLOCK,
+    banned_substring_action=Action.BLOCK,
+    repetition_action=Action.BLOCK,
     ip_address_action=Action.BLOCK,
     mac_address_action=Action.BLOCK,
     iban_action=Action.BLOCK,
@@ -721,6 +753,8 @@ AUDIT_POLICY = _builtin_policy(
     json_output_action=Action.REVIEW,
     unsafe_url_action=Action.REVIEW,
     external_resource_action=Action.REVIEW,
+    banned_substring_action=Action.REVIEW,
+    repetition_action=Action.REVIEW,
     ip_address_action=Action.REVIEW,
     mac_address_action=Action.REVIEW,
     iban_action=Action.REVIEW,
@@ -760,6 +794,8 @@ class RuleEngine:
                     "output.json.validity",
                     "url.unsafe",
                     "output.external_resource",
+                    "content.banned_substrings",
+                    "text.excessive_repetition",
                     "pii.ip_address",
                     "pii.mac_address",
                     "pii.iban",

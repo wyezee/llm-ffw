@@ -3,11 +3,17 @@ import unittest
 from unittest.mock import patch
 
 from benchmarks.synthetic_data import build_dataset
+from llm_ffw._rule_registry import RULE_SPECS
 from llm_ffw import (
     AUDIT_POLICY,
     BALANCED_POLICY,
     STRICT_POLICY,
     Action,
+    BannedSubstring,
+    BannedSubstringCatalog,
+    BannedSubstringsRule,
+    RepetitionConfig,
+    RepetitionRule,
     RuleEngine,
     FirewallPolicy,
     FirewallResult,
@@ -155,7 +161,7 @@ class FirewallPolicyTests(unittest.TestCase):
                     tuple(result.findings[0].metadata.values()),
                 )
 
-    def test_strict_policy_blocks_only_input_request(self) -> None:
+    def test_strict_policy_blocks_input_and_output(self) -> None:
         secret = _secret("B")
         firewall = RuleEngine(policy=STRICT_POLICY)
 
@@ -167,8 +173,8 @@ class FirewallPolicyTests(unittest.TestCase):
         self.assertEqual(blocked.decision, Action.BLOCK)
         self.assertIsNone(blocked.processed_text)
         self.assertEqual(blocked.findings[0].action, Action.BLOCK)
-        self.assertEqual(output.decision, Action.REDACT)
-        self.assertEqual(output.processed_text, "[REDACTED]")
+        self.assertEqual(output.decision, Action.BLOCK)
+        self.assertIsNone(output.processed_text)
         self.assertEqual(following_request.decision, Action.ALLOW)
         self.assertEqual(following_request.processed_text, "safe")
 
@@ -180,6 +186,80 @@ class FirewallPolicyTests(unittest.TestCase):
         self.assertEqual(result.decision, Action.REVIEW)
         self.assertEqual(result.processed_text, secret)
         self.assertEqual(result.findings[0].action, Action.REVIEW)
+
+    def test_strict_and_audit_cover_catalog_and_repetition_rules(self) -> None:
+        catalog = BannedSubstringCatalog(
+            "test.policy_catalog",
+            "1",
+            (
+                BannedSubstring(
+                    "test.blocked_literal",
+                    "forbidden marker",
+                    action=Action.BLOCK,
+                ),
+            ),
+        )
+        catalog_scanner = RuleScanner(
+            rules=(BannedSubstringsRule(catalog),)
+        )
+        repetition_scanner = RuleScanner(
+            rules=(
+                RepetitionRule(
+                    RepetitionConfig(character_run_threshold=8)
+                ),
+            )
+        )
+
+        for scope in (ScanScope.INPUT, ScanScope.OUTPUT):
+            with self.subTest(policy="strict", rule="catalog", scope=scope):
+                result = RuleEngine(
+                    scanner=catalog_scanner,
+                    policy=STRICT_POLICY,
+                ).process("forbidden marker", scope=scope)
+                self.assertIs(result.decision, Action.BLOCK)
+                self.assertIsNone(result.processed_text)
+            with self.subTest(policy="audit", rule="catalog", scope=scope):
+                result = RuleEngine(
+                    scanner=catalog_scanner,
+                    policy=AUDIT_POLICY,
+                ).process("forbidden marker", scope=scope)
+                self.assertIs(result.decision, Action.REVIEW)
+                self.assertEqual(result.processed_text, "forbidden marker")
+            with self.subTest(policy="strict", rule="repetition", scope=scope):
+                result = RuleEngine(
+                    scanner=repetition_scanner,
+                    policy=STRICT_POLICY,
+                ).process("x" * 8, scope=scope)
+                self.assertIs(result.decision, Action.BLOCK)
+                self.assertIsNone(result.processed_text)
+            with self.subTest(policy="audit", rule="repetition", scope=scope):
+                result = RuleEngine(
+                    scanner=repetition_scanner,
+                    policy=AUDIT_POLICY,
+                ).process("x" * 8, scope=scope)
+                self.assertIs(result.decision, Action.REVIEW)
+                self.assertEqual(result.processed_text, "x" * 8)
+
+    def test_strict_and_audit_cover_every_registered_rule_scope(self) -> None:
+        for policy, expected_action in (
+            (STRICT_POLICY, Action.BLOCK),
+            (AUDIT_POLICY, Action.REVIEW),
+        ):
+            actions = {
+                (override.rule_id, override.scope): override.action
+                for override in policy.overrides
+            }
+            for spec in RULE_SPECS:
+                for scope in spec.supported_scopes:
+                    with self.subTest(
+                        policy=policy.policy_id,
+                        rule_id=spec.rule_id,
+                        scope=scope,
+                    ):
+                        self.assertIs(
+                            actions[(spec.rule_id, scope)],
+                            expected_action,
+                        )
 
     def test_no_findings_allow_original_text(self) -> None:
         result = RuleEngine().process("safe")

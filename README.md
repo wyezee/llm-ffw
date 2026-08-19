@@ -589,12 +589,32 @@ with Firewall.from_config(config) as firewall:
 `default()` selects the seven-rule baseline, `privacy_input()` additionally
 enables conservative IP, MAC, IBAN, email, and phone input rules, and `json_api()`
 adds strict JSON-output and unsafe-URL inspection. `all_text_rules()` enables
-all 20 text rules, requires an explicit deployment-owned
-`BannedSubstringCatalog`, and uses a 30-second request timeout suitable for
-initial large-payload testing. Deployments must still tune that deadline from
-their own payload and latency measurements. Direct constructor parameters
-remain available for precise configuration, and `from_config()` is supported
-by synchronous and asynchronous facades and managers.
+all 19 self-contained text rules across every scope they support. Supplying a
+deployment-owned `BannedSubstringCatalog` enables the twentieth rule. The
+preset accepts an explicit policy and uses a 30-second request timeout suitable
+for initial large-payload testing:
+
+```python
+from llm_ffw import AUDIT_POLICY, STRICT_POLICY, FirewallConfig
+
+balanced = FirewallConfig.all_text_rules()
+strict = FirewallConfig.all_text_rules(policy=STRICT_POLICY)
+audit = FirewallConfig.all_text_rules(policy=AUDIT_POLICY)
+```
+
+Balanced handling redacts or removes findings where that operation is safe,
+while invalid JSON still blocks and excessive repetition remains review-only.
+Strict handling blocks every text finding in both directions. Audit handling
+returns the original text with `REVIEW` findings. A banned-substring catalog is never
+invented by the preset because no literal is universally unsafe.
+
+This preset also enables output JSON validation, so it is appropriate only when
+every successful model output is expected to be JSON. It is useful for explicit
+full-coverage deployments and evaluation, but it is not a universal production
+default. Deployments must still tune the timeout from their own payload and
+latency measurements. Direct constructor parameters remain available for
+precise configuration, and `from_config()` is supported by synchronous and
+asynchronous facades and managers.
 
 | Constructor parameter | Purpose |
 | --- | --- |
@@ -638,9 +658,9 @@ deployment load and memory rather than constructing an unbounded queue.
 
 The default `BALANCED_POLICY` preserves flow by redacting or removing content
 where safe and blocks invalid JSON or unsafe malformed private-key cases.
-`STRICT_POLICY` increases blocking for security findings. `AUDIT_POLICY` changes
-findings to `REVIEW` and returns the original text, so use it only when another
-trusted enforcement layer consumes the findings.
+`STRICT_POLICY` blocks every text finding in both directions. `AUDIT_POLICY`
+changes every text finding to `REVIEW` and returns the original text, so use it
+only when another trusted enforcement layer consumes the findings.
 
 Select a complete built-in policy directly, for example
 `Firewall(policy=STRICT_POLICY)`. Use a custom policy only when a deployment
@@ -1558,8 +1578,8 @@ to let active scans finish. Call `terminate()` at the grace deadline and reserve
 Advanced integrations using the pool directly should call `pool.process(...)`
 rather than `pool.scan(...)` to apply the configured policy. The balanced
 default redacts secret findings; `STRICT_POLICY` blocks secret-bearing input
-requests and `AUDIT_POLICY` reports without changing text. Blocking rejects one
-request and does not stop workers.
+and output requests, while `AUDIT_POLICY` reports without changing text.
+Blocking rejects one request and does not stop workers.
 
 Create one long-lived pool or manager per service instance, not one per request.
 Map `ProcessPoolSaturatedError` to overload handling and treat a broken pool as

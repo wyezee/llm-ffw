@@ -13,6 +13,7 @@ from .email_address import EmailAddressConfig
 from .external_resource import ExternalResourceConfig
 from .phone_number import PhoneNumberConfig
 from .iban import IBANConfig
+from .inspection import ScanScope
 from .ip_address import IPAddressConfig
 from .json_output import JSONOutputConfig
 from .jwt_token import JWTTokenConfig
@@ -222,28 +223,37 @@ class FirewallConfig:
     def all_text_rules(
         cls,
         *,
-        banned_substring_catalog: BannedSubstringCatalog,
+        banned_substring_catalog: BannedSubstringCatalog | None = None,
+        policy: FirewallPolicy = BALANCED_POLICY,
     ) -> "FirewallConfig":
-        """Enable every text rule with an explicit deployment-owned catalog."""
+        """Enable every self-contained text rule across supported scopes."""
 
-        if not isinstance(banned_substring_catalog, BannedSubstringCatalog):
+        if (
+            banned_substring_catalog is not None
+            and not isinstance(banned_substring_catalog, BannedSubstringCatalog)
+        ):
             raise TypeError(
-                "banned_substring_catalog must be a BannedSubstringCatalog"
+                "banned_substring_catalog must be a BannedSubstringCatalog "
+                "or None"
             )
+        if not isinstance(policy, FirewallPolicy):
+            raise TypeError("policy must be a FirewallPolicy")
+        all_scopes = (ScanScope.INPUT, ScanScope.OUTPUT)
         return cls(
             banned_substring_catalog=banned_substring_catalog,
             json_output_config=JSONOutputConfig(),
             unsafe_url_config=UnsafeURLConfig(),
             external_resource_config=ExternalResourceConfig(),
-            ip_address_config=IPAddressConfig(),
-            mac_address_config=MACAddressConfig(),
-            iban_config=IBANConfig(),
+            ip_address_config=IPAddressConfig(scopes=all_scopes),
+            mac_address_config=MACAddressConfig(scopes=all_scopes),
+            iban_config=IBANConfig(scopes=all_scopes),
             authorization_header_config=AuthorizationHeaderConfig(),
             connection_string_config=ConnectionStringConfig(),
             credential_assignment_config=CredentialAssignmentConfig(),
-            email_address_config=EmailAddressConfig(),
-            phone_number_config=PhoneNumberConfig(),
+            email_address_config=EmailAddressConfig(scopes=all_scopes),
+            phone_number_config=PhoneNumberConfig(scopes=all_scopes),
             repetition_config=RepetitionConfig(),
+            policy=policy,
             request_timeout_seconds=30.0,
         )
 

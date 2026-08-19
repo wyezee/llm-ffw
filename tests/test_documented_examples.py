@@ -20,7 +20,7 @@ class DocumentedExampleTests(unittest.TestCase):
     def test_readme_python_blocks_compile_and_use_public_root_imports(self) -> None:
         document = README.read_text(encoding="utf-8")
         blocks = PYTHON_BLOCK.findall(document)
-        self.assertEqual(len(blocks), 37)
+        self.assertEqual(len(blocks), 38)
         public_names = frozenset(llm_ffw.__all__)
 
         for index, code in enumerate(blocks, start=1):

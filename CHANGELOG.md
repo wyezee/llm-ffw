@@ -4,6 +4,15 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Changed
+
+- Make `FirewallConfig.all_text_rules()` a one-call full-coverage preset for
+  every self-contained text rule across all supported scopes, with an optional
+  deployment-owned banned substring catalog and explicit balanced, strict, or
+  audit policy selection.
+- Make `STRICT_POLICY` block every text finding in both directions and make
+  strict/audit handling cover opt-in repetition and banned-substring rules.
+
 ## 0.17.1 - 2026-08-19
 
 ### Fixed
