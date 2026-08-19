@@ -163,8 +163,8 @@ class ToolResultRule(StructuredRule[ToolResultBatch]):
         """Assemble a batch under this rule's aggregate limits."""
 
         return ToolResultBatch(
-            expected_calls,
-            results,
+            tuple(expected_calls),
+            tuple(results),
             limits=self._config,
         )
 

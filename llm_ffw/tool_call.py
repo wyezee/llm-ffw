@@ -22,11 +22,20 @@ _HARD_MAX_TOOLS = 1_024
 
 
 class _JSONLimits(Protocol):
-    max_depth: int
-    max_nodes: int
-    max_total_string_chars: int
-    max_object_properties: int
-    max_array_items: int
+    @property
+    def max_depth(self) -> int: ...
+
+    @property
+    def max_nodes(self) -> int: ...
+
+    @property
+    def max_total_string_chars(self) -> int: ...
+
+    @property
+    def max_object_properties(self) -> int: ...
+
+    @property
+    def max_array_items(self) -> int: ...
 
 
 def _validate_name(value: object, field_name: str) -> str:

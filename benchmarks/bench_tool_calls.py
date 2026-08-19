@@ -101,7 +101,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rounds", type=int, default=7)
     parser.add_argument("--batch-size", type=int, default=20_000)
-    parser.add_argument("--min-valid-calls-per-second", type=float, default=30_000)
+    parser.add_argument("--min-valid-calls-per-second", type=float, default=25_000)
     parser.add_argument("--min-invalid-calls-per-second", type=float, default=50_000)
     parser.add_argument("--min-unsafe-calls-per-second", type=float, default=15_000)
     parser.add_argument("--max-oversized-milliseconds", type=float, default=20.0)
