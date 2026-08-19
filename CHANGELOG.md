@@ -4,6 +4,12 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Added
+
+- Add bounded exact and DNS-suffix hostname deny/allow policy to the opt-in
+  unsafe-URL rule, with construction-time normalization, disclosure-safe
+  capability counts, process propagation, and 8 MB performance coverage.
+
 ### Documentation
 
 - Add compile and public-import regression coverage for every README Python

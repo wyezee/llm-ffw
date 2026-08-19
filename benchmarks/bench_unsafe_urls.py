@@ -39,7 +39,10 @@ def benchmark(
     concurrency: int,
     process_requests: int,
 ) -> dict[str, float]:
-    url_config = UnsafeURLConfig()
+    url_config = UnsafeURLConfig(
+        denied_hostname_suffixes=("blocked.example",),
+        allowed_hostname_suffixes=("example.com", "google.internal"),
+    )
     scanner_config = RuleScannerConfig(max_input_chars=size)
     firewall = RuleEngine(
         scanner=RuleScanner(
@@ -69,14 +72,17 @@ def benchmark(
             Action.REDACT,
         ),
         (
+            "denied_host_at_end",
+            _sized_suffix(size, " https://api.blocked.example/path"),
+            Action.REDACT,
+        ),
+        (
             "overlapping_schemes",
             _sized_suffix(size, "", "http://"),
             Action.REDACT,
         ),
     )
-    durations: dict[str, list[float]] = {
-        name: [] for name, _, _ in workloads
-    }
+    durations: dict[str, list[float]] = {name: [] for name, _, _ in workloads}
     for round_number in range(rounds):
         ordered = (
             workloads[round_number % len(workloads) :]
@@ -163,24 +169,28 @@ def main() -> None:
     )
     for key, value in result.items():
         print(f"{key}={value:.6f}")
-    if min(
-        result["clean_mib_per_second"],
-        result["near_miss_mib_per_second"],
-        result["safe_at_end_mib_per_second"],
-    ) < args.min_throughput_mib_s:
+    if (
+        min(
+            result["clean_mib_per_second"],
+            result["near_miss_mib_per_second"],
+            result["safe_at_end_mib_per_second"],
+        )
+        < args.min_throughput_mib_s
+    ):
         raise SystemExit("unsafe URL throughput gate failed")
-    if min(
-        result["unsafe_at_end_mib_per_second"],
-        result["metadata_host_at_end_mib_per_second"],
-        result["overlapping_schemes_mib_per_second"],
-    ) < args.min_unsafe_throughput_mib_s:
+    if (
+        min(
+            result["unsafe_at_end_mib_per_second"],
+            result["metadata_host_at_end_mib_per_second"],
+            result["denied_host_at_end_mib_per_second"],
+            result["overlapping_schemes_mib_per_second"],
+        )
+        < args.min_unsafe_throughput_mib_s
+    ):
         raise SystemExit("unsafe URL redaction throughput gate failed")
     if result["unsafe_peak_mib"] > args.max_peak_mib:
         raise SystemExit("unsafe URL memory gate failed")
-    if (
-        result["process_requests_per_second"]
-        < args.min_process_requests_per_second
-    ):
+    if result["process_requests_per_second"] < args.min_process_requests_per_second:
         raise SystemExit("unsafe URL process gate failed")
 
 

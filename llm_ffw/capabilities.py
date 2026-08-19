@@ -113,12 +113,25 @@ class UnsafeURLCapability:
 
     max_candidates: int
     max_url_chars: int
+    denied_hostname_count: int = 0
+    denied_hostname_suffix_count: int = 0
+    allowed_hostname_count: int = 0
+    allowed_hostname_suffix_count: int = 0
 
     def __post_init__(self) -> None:
         for field_name in ("max_candidates", "max_url_chars"):
             value = getattr(self, field_name)
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 raise ValueError(f"{field_name} must be a positive integer")
+        for field_name in (
+            "denied_hostname_count",
+            "denied_hostname_suffix_count",
+            "allowed_hostname_count",
+            "allowed_hostname_suffix_count",
+        ):
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"{field_name} must be a non-negative integer")
 
 
 @dataclass(frozen=True, slots=True)

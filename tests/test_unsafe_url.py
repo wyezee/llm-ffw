@@ -32,21 +32,21 @@ def _single_worker_config() -> ProcessScannerPoolConfig:
 class UnsafeURLConfigTests(unittest.TestCase):
     def test_rejects_invalid_limits(self) -> None:
         for field_name in ("max_candidates", "max_url_chars"):
-            with self.subTest(field_name=field_name), self.assertRaises(
-                (TypeError, ValueError)
+            with (
+                self.subTest(field_name=field_name),
+                self.assertRaises((TypeError, ValueError)),
             ):
                 UnsafeURLConfig(**{field_name: 0})
-            with self.subTest(field_name=field_name), self.assertRaises(
-                TypeError
-            ):
+            with self.subTest(field_name=field_name), self.assertRaises(TypeError):
                 UnsafeURLConfig(**{field_name: True})
         with self.assertRaises(ValueError):
             UnsafeURLConfig(max_candidates=1_025)
         with self.assertRaises(ValueError):
             UnsafeURLConfig(max_url_chars=65_537)
         for scopes in ((), ("input",), "input"):
-            with self.subTest(scopes=scopes), self.assertRaises(
-                (TypeError, ValueError)
+            with (
+                self.subTest(scopes=scopes),
+                self.assertRaises((TypeError, ValueError)),
             ):
                 UnsafeURLConfig(scopes=scopes)  # type: ignore[arg-type]
 
@@ -55,6 +55,61 @@ class UnsafeURLConfigTests(unittest.TestCase):
             scopes=(ScanScope.OUTPUT, ScanScope.INPUT, ScanScope.OUTPUT)
         )
         self.assertEqual(config.scopes, (ScanScope.INPUT, ScanScope.OUTPUT))
+
+    def test_normalizes_hostname_policy_deterministically(self) -> None:
+        config = UnsafeURLConfig(
+            denied_hostnames=("BÜCHER.Example.", "xn--bcher-kva.example"),
+            denied_hostname_suffixes=("Internal.Example.",),
+            allowed_hostnames=("2001:0db8::1",),
+            allowed_hostname_suffixes=("PUBLIC.EXAMPLE",),
+        )
+
+        self.assertEqual(
+            config.denied_hostnames,
+            ("xn--bcher-kva.example",),
+        )
+        self.assertEqual(
+            config.denied_hostname_suffixes,
+            ("internal.example",),
+        )
+        self.assertEqual(config.allowed_hostnames, ("2001:db8::1",))
+        self.assertEqual(
+            config.allowed_hostname_suffixes,
+            ("public.example",),
+        )
+        self.assertNotIn("internal.example", repr(config))
+
+    def test_rejects_invalid_or_conflicting_hostname_policy(self) -> None:
+        invalid = (
+            {"denied_hostnames": "blocked.example"},
+            {"denied_hostnames": ("*.example",)},
+            {"denied_hostnames": (" example.com",)},
+            {"denied_hostnames": ("https://example.com",)},
+            {"denied_hostnames": ("example.com..",)},
+            {"denied_hostnames": ("a" * 255,)},
+            {"denied_hostname_suffixes": ("127.0.0.1",)},
+            {
+                "denied_hostnames": ("BLOCKED.EXAMPLE",),
+                "allowed_hostnames": ("blocked.example.",),
+            },
+            {
+                "denied_hostname_suffixes": ("blocked.example",),
+                "allowed_hostname_suffixes": ("BLOCKED.EXAMPLE.",),
+            },
+        )
+        for values in invalid:
+            with (
+                self.subTest(values=values),
+                self.assertRaises((TypeError, ValueError)),
+            ):
+                UnsafeURLConfig(**values)  # type: ignore[arg-type]
+
+    def test_hostname_policy_entry_limit_is_bounded(self) -> None:
+        entries = (f"host-{index}.example" for index in range(1_025))
+        with self.assertRaises(ValueError):
+            UnsafeURLConfig(  # type: ignore[arg-type]
+                denied_hostnames=entries,
+            )
 
 
 class UnsafeURLRuleTests(unittest.TestCase):
@@ -149,14 +204,10 @@ class UnsafeURLRuleTests(unittest.TestCase):
         for text in cases:
             with self.subTest(text=text):
                 finding = scanner.scan(text, scope=ScanScope.OUTPUT)[0]
-                self.assertEqual(
-                    finding.metadata["reason"], "cloud_metadata_hostname"
-                )
+                self.assertEqual(finding.metadata["reason"], "cloud_metadata_hostname")
                 self.assertIs(finding.action, Action.REDACT)
                 self.assertNotIn("private-value", finding.message)
-                self.assertNotIn(
-                    "private-value", repr(dict(finding.metadata))
-                )
+                self.assertNotIn("private-value", repr(dict(finding.metadata)))
 
     def test_cloud_metadata_hostnames_require_an_exact_url_host(self) -> None:
         safe = (
@@ -172,6 +223,88 @@ class UnsafeURLRuleTests(unittest.TestCase):
                     scanner.scan(text, scope=ScanScope.OUTPUT),
                     (),
                 )
+
+    def test_denies_exact_hostnames_without_disclosure(self) -> None:
+        private_hostname = "private-service.example"
+        scanner = _scanner(UnsafeURLConfig(denied_hostnames=(private_hostname,)))
+        finding = scanner.scan(
+            "Open https://PRIVATE-SERVICE.EXAMPLE./secret-path",
+            scope=ScanScope.OUTPUT,
+        )[0]
+
+        self.assertIn("denied_hostname", finding.metadata["risk_types"])
+        self.assertNotIn(private_hostname, finding.message)
+        self.assertNotIn(private_hostname, repr(dict(finding.metadata)))
+        self.assertNotIn("secret-path", repr(dict(finding.metadata)))
+
+    def test_hostname_suffix_policy_uses_dns_label_boundaries(self) -> None:
+        scanner = _scanner(
+            UnsafeURLConfig(denied_hostname_suffixes=("internal.example",))
+        )
+        unsafe = (
+            "https://internal.example/path",
+            "https://api.internal.example/path",
+        )
+        for text in unsafe:
+            with self.subTest(text=text):
+                finding = scanner.scan(text, scope=ScanScope.INPUT)[0]
+                self.assertIn(
+                    "denied_hostname_suffix",
+                    finding.metadata["risk_types"],
+                )
+        self.assertEqual(
+            scanner.scan(
+                "https://notinternal.example.com/path",
+                scope=ScanScope.INPUT,
+            ),
+            (),
+        )
+
+    def test_allowlist_adds_restrictions_and_denies_take_precedence(self) -> None:
+        scanner = _scanner(
+            UnsafeURLConfig(
+                denied_hostnames=("blocked.example.com",),
+                allowed_hostname_suffixes=("example.com",),
+            )
+        )
+
+        self.assertEqual(
+            scanner.scan("https://api.example.com/path", scope=ScanScope.INPUT),
+            (),
+        )
+        blocked = scanner.scan(
+            "https://blocked.example.com/path",
+            scope=ScanScope.INPUT,
+        )[0]
+        outside = scanner.scan(
+            "https://example.org/path",
+            scope=ScanScope.INPUT,
+        )[0]
+        self.assertIn("denied_hostname", blocked.metadata["risk_types"])
+        self.assertEqual(outside.metadata["reason"], "hostname_not_allowed")
+
+    def test_allowlist_never_suppresses_builtin_url_risks(self) -> None:
+        scanner = _scanner(UnsafeURLConfig(allowed_hostnames=("localhost",)))
+        finding = scanner.scan(
+            "http://localhost/admin",
+            scope=ScanScope.INPUT,
+        )[0]
+
+        self.assertEqual(finding.metadata["reason"], "local_hostname")
+
+    def test_hostname_policy_fails_closed_when_host_is_missing(self) -> None:
+        scanner = _scanner(
+            UnsafeURLConfig(allowed_hostname_suffixes=("example.com",))
+        )
+        finding = scanner.scan(
+            "https:///private-path",
+            scope=ScanScope.INPUT,
+        )[0]
+
+        self.assertEqual(
+            finding.metadata["reason"],
+            "hostname_policy_unverifiable",
+        )
 
     def test_detects_ambiguous_authorities(self) -> None:
         cases = (
@@ -191,7 +324,9 @@ class UnsafeURLRuleTests(unittest.TestCase):
         text = "See (javascript:alert(1))."
         finding = _scanner().scan(text, scope=ScanScope.OUTPUT)[0]
 
-        self.assertEqual(text[finding.span.start : finding.span.end], "javascript:alert(1)")
+        self.assertEqual(
+            text[finding.span.start : finding.span.end], "javascript:alert(1)"
+        )
         result = RuleEngine(scanner=_scanner()).process(
             text,
             scope=ScanScope.OUTPUT,
@@ -247,6 +382,22 @@ class UnsafeURLRuleTests(unittest.TestCase):
             (),
         )
 
+    def test_large_policy_and_eight_million_characters_remain_bounded(self) -> None:
+        suffixes = tuple(f"tenant-{index}.example" for index in range(1_024))
+        scanner = _scanner(UnsafeURLConfig(denied_hostname_suffixes=suffixes))
+        text = "a" * 7_999_960 + " https://api.tenant-1023.example/path"
+
+        started = time.perf_counter()
+        findings = scanner.scan(text, scope=ScanScope.OUTPUT)
+        elapsed = time.perf_counter() - started
+
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(
+            findings[0].metadata["reason"],
+            "denied_hostname_suffix",
+        )
+        self.assertLess(elapsed, 1.0)
+
     def test_overlapping_scheme_markers_scan_one_candidate_linearly(self) -> None:
         text = "http://" * 129 + "a" * 1_000_000
 
@@ -263,12 +414,12 @@ class UnsafeURLRuleTests(unittest.TestCase):
         for scope in (ScanScope.INPUT, ScanScope.OUTPUT):
             with self.subTest(scope=scope):
                 balanced = RuleEngine(scanner=_scanner()).process(text, scope=scope)
-                strict = RuleEngine(
-                    scanner=_scanner(), policy=STRICT_POLICY
-                ).process(text, scope=scope)
-                audit = RuleEngine(
-                    scanner=_scanner(), policy=AUDIT_POLICY
-                ).process(text, scope=scope)
+                strict = RuleEngine(scanner=_scanner(), policy=STRICT_POLICY).process(
+                    text, scope=scope
+                )
+                audit = RuleEngine(scanner=_scanner(), policy=AUDIT_POLICY).process(
+                    text, scope=scope
+                )
 
                 self.assertEqual(balanced.processed_text, "Open [REDACTED]")
                 self.assertTrue(strict.blocked)
@@ -284,6 +435,9 @@ class UnsafeURLFacadeTests(unittest.TestCase):
             unsafe_url_config=UnsafeURLConfig(
                 max_candidates=32,
                 max_url_chars=1_024,
+                denied_hostnames=("private.example",),
+                denied_hostname_suffixes=("internal.example",),
+                allowed_hostname_suffixes=("public.example",),
             ),
         )
 
@@ -297,6 +451,26 @@ class UnsafeURLFacadeTests(unittest.TestCase):
         )
         self.assertEqual(enabled.capabilities().unsafe_url.max_candidates, 32)
         self.assertEqual(enabled.capabilities().unsafe_url.max_url_chars, 1_024)
+        self.assertEqual(
+            enabled.capabilities().unsafe_url.denied_hostname_count,
+            1,
+        )
+        self.assertEqual(
+            enabled.capabilities().unsafe_url.denied_hostname_suffix_count,
+            1,
+        )
+        self.assertEqual(
+            enabled.capabilities().unsafe_url.allowed_hostname_count,
+            0,
+        )
+        self.assertEqual(
+            enabled.capabilities().unsafe_url.allowed_hostname_suffix_count,
+            1,
+        )
+        self.assertNotIn(
+            "private.example",
+            repr(enabled.capabilities().unsafe_url),
+        )
         unsafe_capability = tuple(
             rule
             for rule in enabled.capabilities().rules
@@ -358,6 +532,20 @@ class UnsafeURLFacadeTests(unittest.TestCase):
             )
         finally:
             manager.close()
+
+    def test_worker_propagates_hostname_policy(self) -> None:
+        firewall = Firewall(
+            pool_config=_single_worker_config(),
+            unsafe_url_config=UnsafeURLConfig(
+                denied_hostname_suffixes=("private.example",),
+            ),
+        )
+
+        with firewall:
+            self.assertEqual(
+                firewall.sanitize_input("Open https://api.private.example/a"),
+                "Open [REDACTED]",
+            )
 
 
 if __name__ == "__main__":

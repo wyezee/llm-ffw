@@ -10,6 +10,7 @@ from llm_ffw import (
     RuleCapability,
     ScanScope,
     SecretCatalogCapability,
+    UnsafeURLCapability,
 )
 
 
@@ -105,6 +106,19 @@ class CapabilityValueTests(unittest.TestCase):
             PhoneNumberCapability(0)
         with self.assertRaises(ValueError):
             PhoneNumberCapability(True)
+
+    def test_unsafe_url_policy_counts_are_bounded_and_compatible(self) -> None:
+        capability = UnsafeURLCapability(128, 2_048)
+        self.assertEqual(capability.denied_hostname_count, 0)
+        configured = UnsafeURLCapability(
+            128,
+            2_048,
+            denied_hostname_count=1,
+            allowed_hostname_suffix_count=2,
+        )
+        self.assertEqual(configured.allowed_hostname_suffix_count, 2)
+        with self.assertRaises(ValueError):
+            UnsafeURLCapability(128, 2_048, denied_hostname_count=-1)
 
 
 if __name__ == "__main__":

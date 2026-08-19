@@ -18,6 +18,7 @@ from llm_ffw import (
     ToolCall,
     ToolCallRule,
     ToolDefinition,
+    UnsafeURLConfig,
 )
 
 
@@ -25,6 +26,9 @@ config = FirewallConfig(
     email_address_config=EmailAddressConfig(),
     ip_address_config=IPAddressConfig(),
     phone_number_config=PhoneNumberConfig(),
+    unsafe_url_config=UnsafeURLConfig(
+        denied_hostname_suffixes=("internal.example",),
+    ),
 )
 firewall = Firewall.from_config(config)
 assert_type(firewall.sanitize_input("synthetic@example.com"), str)

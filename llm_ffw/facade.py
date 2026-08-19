@@ -249,6 +249,18 @@ class Firewall:
                         self._pool.unsafe_url_config.max_candidates
                     ),
                     max_url_chars=self._pool.unsafe_url_config.max_url_chars,
+                    denied_hostname_count=len(
+                        self._pool.unsafe_url_config.denied_hostnames
+                    ),
+                    denied_hostname_suffix_count=len(
+                        self._pool.unsafe_url_config.denied_hostname_suffixes
+                    ),
+                    allowed_hostname_count=len(
+                        self._pool.unsafe_url_config.allowed_hostnames
+                    ),
+                    allowed_hostname_suffix_count=len(
+                        self._pool.unsafe_url_config.allowed_hostname_suffixes
+                    ),
                 )
                 if self._pool.unsafe_url_config is not None
                 else None

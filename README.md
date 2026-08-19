@@ -900,7 +900,13 @@ enable bounded structural URL inspection:
 ```python
 from llm_ffw import Firewall, UnsafeURLConfig
 
-firewall = Firewall(unsafe_url_config=UnsafeURLConfig())
+firewall = Firewall(
+    unsafe_url_config=UnsafeURLConfig(
+        denied_hostnames=("blocked.example",),
+        denied_hostname_suffixes=("internal.example",),
+        allowed_hostname_suffixes=("public.example",),
+    )
+)
 ```
 
 `UnsafeURLRule` redacts dangerous schemes, embedded URL user-info, local or
@@ -908,6 +914,14 @@ non-public IP targets, exact documented cloud metadata hostnames, and ambiguous
 authorities under balanced policy. It checks input and output by default;
 deployments can restrict its `scopes`. It performs no DNS, HTTP, reputation,
 model, or other network call.
+
+Hostname policy is normalized once when configuration is constructed. Exact
+fields accept DNS names or IP literals. Suffix fields accept DNS names only;
+`internal.example` matches both the apex and its subdomains, but not
+`notinternal.example`. Supplying either allow field enables a restrictive
+allowlist. Denies and built-in unsafe-URL findings always take precedence over
+allows. The four policy fields together accept at most 1,024 entries. Runtime
+capabilities disclose only policy entry counts, never configured hostnames.
 
 ### Opt-in IP-address inspection
 

@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 
 from ..findings import Action, Severity, Span
 from ..inspection import Inspection, ScanScope
-from ..unsafe_url import UnsafeURLConfig
+from ..unsafe_url import UnsafeURLConfig, _normalize_hostname
 from .base import Rule, RuleMatch
 
 
@@ -100,8 +100,35 @@ def _find_candidates(
     return tuple(candidates), None
 
 
-def _host_risks(candidate: str) -> tuple[str, ...]:
+def _matches_hostname_suffix(
+    hostname: str,
+    suffixes: frozenset[str],
+) -> bool:
+    if hostname in suffixes:
+        return True
+    boundary = hostname.find(".")
+    while boundary >= 0:
+        if hostname[boundary + 1 :] in suffixes:
+            return True
+        boundary = hostname.find(".", boundary + 1)
+    return False
+
+
+def _host_risks(
+    candidate: str,
+    *,
+    denied_hostnames: frozenset[str],
+    denied_hostname_suffixes: frozenset[str],
+    allowed_hostnames: frozenset[str],
+    allowed_hostname_suffixes: frozenset[str],
+) -> tuple[str, ...]:
     risks: list[str] = []
+    policy_enabled = bool(
+        denied_hostnames
+        or denied_hostname_suffixes
+        or allowed_hostnames
+        or allowed_hostname_suffixes
+    )
     try:
         parsed = urlsplit(candidate)
         hostname = parsed.hostname
@@ -117,6 +144,8 @@ def _host_risks(candidate: str) -> tuple[str, ...]:
     if username is not None or password is not None:
         risks.append("embedded_userinfo")
     if hostname is None:
+        if policy_enabled:
+            risks.append("hostname_policy_unverifiable")
         return tuple(risks)
 
     lowered = hostname.lower().rstrip(".")
@@ -136,6 +165,39 @@ def _host_risks(candidate: str) -> tuple[str, ...]:
     else:
         if not address.is_global or address.is_multicast:
             risks.append("non_public_ip_literal")
+
+    if policy_enabled:
+        try:
+            policy_hostname = _normalize_hostname(hostname, allow_ip=True)
+        except (TypeError, ValueError):
+            risks.append("hostname_policy_unverifiable")
+        else:
+            try:
+                ipaddress.ip_address(policy_hostname)
+            except ValueError:
+                policy_hostname_is_ip = False
+            else:
+                policy_hostname_is_ip = True
+            if policy_hostname in denied_hostnames:
+                risks.append("denied_hostname")
+            if not policy_hostname_is_ip and _matches_hostname_suffix(
+                policy_hostname,
+                denied_hostname_suffixes,
+            ):
+                risks.append("denied_hostname_suffix")
+            allowlist_enabled = bool(
+                allowed_hostnames or allowed_hostname_suffixes
+            )
+            allowed = policy_hostname in allowed_hostnames or (
+                not policy_hostname_is_ip
+                and
+                _matches_hostname_suffix(
+                    policy_hostname,
+                    allowed_hostname_suffixes,
+                )
+            )
+            if allowlist_enabled and not allowed:
+                risks.append("hostname_not_allowed")
     return tuple(dict.fromkeys(risks))
 
 
@@ -150,6 +212,14 @@ class UnsafeURLRule(Rule):
         if config is not None and not isinstance(config, UnsafeURLConfig):
             raise TypeError("config must be an UnsafeURLConfig or None")
         self._config = config if config is not None else UnsafeURLConfig()
+        self._denied_hostnames = frozenset(self._config.denied_hostnames)
+        self._denied_hostname_suffixes = frozenset(
+            self._config.denied_hostname_suffixes
+        )
+        self._allowed_hostnames = frozenset(self._config.allowed_hostnames)
+        self._allowed_hostname_suffixes = frozenset(
+            self._config.allowed_hostname_suffixes
+        )
 
     @property
     def rule_id(self) -> str:
@@ -195,7 +265,17 @@ class UnsafeURLRule(Rule):
             risks = (
                 ("dangerous_scheme",)
                 if candidate.scheme in _DANGEROUS_SCHEMES
-                else _host_risks(text[candidate.start : candidate.end])
+                else _host_risks(
+                    text[candidate.start : candidate.end],
+                    denied_hostnames=self._denied_hostnames,
+                    denied_hostname_suffixes=(
+                        self._denied_hostname_suffixes
+                    ),
+                    allowed_hostnames=self._allowed_hostnames,
+                    allowed_hostname_suffixes=(
+                        self._allowed_hostname_suffixes
+                    ),
+                )
             )
             if not risks:
                 continue
