@@ -28,7 +28,11 @@ class InspectionFeature(str, Enum):
 
 @dataclass(frozen=True, slots=True)
 class UnicodeSecurityCandidates:
-    """Bounded candidates and overflow state from one shared search."""
+    """Bounded candidates and overflow state from one shared search.
+
+    The zero-width-space field names are retained for source compatibility;
+    they now contain every selected contextual invisible-character run.
+    """
 
     tag_runs: tuple[Span, ...]
     zero_width_space_runs: tuple[Span, ...]
@@ -38,6 +42,18 @@ class UnicodeSecurityCandidates:
     zero_width_space_runs_overflowed: bool
     bidi_override_runs_overflowed: bool
     bidi_format_runs_overflowed: bool
+
+    @property
+    def contextual_invisible_runs(self) -> tuple[Span, ...]:
+        """Return selected contextual invisible-character runs."""
+
+        return self.zero_width_space_runs
+
+    @property
+    def contextual_invisible_runs_overflowed(self) -> bool:
+        """Return whether the contextual candidate budget was exhausted."""
+
+        return self.zero_width_space_runs_overflowed
 
 
 class InspectionFeatureUnavailableError(RuntimeError):
@@ -139,7 +155,10 @@ _RGI_FLAG_ALTERNATION = "|".join(
 _ASCII_TOKEN_CHARS = frozenset(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
 )
-_ZERO_WIDTH_SPACE_RUN = re.compile("\u200b+")
+_CONTEXTUAL_INVISIBLE_CHARACTERS = "\u200b\u200c\u200d\u2060\ufeff"
+_CONTEXTUAL_INVISIBLE_RUN = re.compile(
+    f"[{_CONTEXTUAL_INVISIBLE_CHARACTERS}]+"
+)
 _TAG_RUN = re.compile(_TAG_PAYLOAD)
 _INVALID_FLAG_TAG_RUN = re.compile(
     f"(?<!{_TAG_RUN_START_CLASS})"
@@ -151,10 +170,10 @@ _INVALID_FLAG_TAG_RUN = re.compile(
     f")"
 )
 _UNICODE_SECURITY_RUN = re.compile(
-    f"\u200b+|{_TAG_PAYLOAD}"
+    f"[{_CONTEXTUAL_INVISIBLE_CHARACTERS}]+|{_TAG_PAYLOAD}"
 )
 _UNICODE_SECURITY_RUN_EXCLUDING_RGI = re.compile(
-    f"\u200b+|{_INVALID_FLAG_TAG_RUN.pattern}"
+    f"[{_CONTEXTUAL_INVISIBLE_CHARACTERS}]+|{_INVALID_FLAG_TAG_RUN.pattern}"
 )
 _BIDI_CONTROL_RUN = re.compile(
     "(?P<override>[\u202d\u202e]+)"
@@ -190,16 +209,17 @@ def _compute_unicode_security(text: str) -> UnicodeSecurityCandidates:
 
     # Every U+E0000..U+E0FFF code point begins with F3 A0 in UTF-8. This
     # allocation is short-lived and avoids a much slower range regex for the
-    # overwhelmingly common non-tag path, including text containing U+200B.
+    # overwhelmingly common non-tag path, including text containing contextual
+    # invisible characters.
     search_tags = b"\xf3\xa0" in text.encode("utf-8", "surrogatepass")
     tag_runs: list[Span] = []
-    zero_width_space_runs: list[Span] = []
+    contextual_invisible_runs: list[Span] = []
     search_from = 0
     skip_rgi_in_matcher = False
     while search_from < len(text):
         if not search_tags or len(tag_runs) >= _MAX_UNICODE_RUNS_PER_KIND:
-            pattern = _ZERO_WIDTH_SPACE_RUN
-        elif len(zero_width_space_runs) >= _MAX_UNICODE_RUNS_PER_KIND:
+            pattern = _CONTEXTUAL_INVISIBLE_RUN
+        elif len(contextual_invisible_runs) >= _MAX_UNICODE_RUNS_PER_KIND:
             pattern = (
                 _INVALID_FLAG_TAG_RUN
                 if skip_rgi_in_matcher
@@ -215,7 +235,7 @@ def _compute_unicode_security(text: str) -> UnicodeSecurityCandidates:
         if match is None:
             break
         start, end = match.span()
-        if text[start] == "\u200b":
+        if text[start] in _CONTEXTUAL_INVISIBLE_CHARACTERS:
             if (
                 start == 0
                 or end == len(text)
@@ -224,7 +244,7 @@ def _compute_unicode_security(text: str) -> UnicodeSecurityCandidates:
             ):
                 search_from = end
                 continue
-            zero_width_space_runs.append(Span(start, end))
+            contextual_invisible_runs.append(Span(start, end))
         else:
             if start > 0 and text[start - 1] == _BLACK_FLAG and any(
                 end - start == len(rgi_run)
@@ -239,17 +259,17 @@ def _compute_unicode_security(text: str) -> UnicodeSecurityCandidates:
         search_from = end
         if (
             len(tag_runs) >= _MAX_UNICODE_RUNS_PER_KIND
-            and len(zero_width_space_runs) >= _MAX_UNICODE_RUNS_PER_KIND
+            and len(contextual_invisible_runs) >= _MAX_UNICODE_RUNS_PER_KIND
         ):
             break
     return UnicodeSecurityCandidates(
         tag_runs=tuple(tag_runs),
-        zero_width_space_runs=tuple(zero_width_space_runs),
+        zero_width_space_runs=tuple(contextual_invisible_runs),
         bidi_override_runs=(),
         bidi_format_runs=(),
         tag_runs_overflowed=len(tag_runs) >= _MAX_UNICODE_RUNS_PER_KIND,
         zero_width_space_runs_overflowed=(
-            len(zero_width_space_runs) >= _MAX_UNICODE_RUNS_PER_KIND
+            len(contextual_invisible_runs) >= _MAX_UNICODE_RUNS_PER_KIND
         ),
         bidi_override_runs_overflowed=False,
         bidi_format_runs_overflowed=False,

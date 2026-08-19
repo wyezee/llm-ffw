@@ -6,10 +6,24 @@ from .base import Rule, RuleMatch
 
 
 _MAX_REMOVAL_RUNS = 64
+_CHARACTER_TYPES = {
+    "\u200b": "zero_width_space",
+    "\u200c": "zero_width_non_joiner",
+    "\u200d": "zero_width_joiner",
+    "\u2060": "word_joiner",
+    "\ufeff": "zero_width_no_break_space",
+}
+
+
+def _character_type(value: str) -> str:
+    types = {_CHARACTER_TYPES[character] for character in value}
+    if len(types) == 1:
+        return types.pop()
+    return "mixed_contextual_invisible"
 
 
 class InvisibleCharactersRule(Rule):
-    """Find U+200B runs used inside ASCII token-shaped text."""
+    """Find selected invisible-character runs inside ASCII token text."""
 
     RULE_ID = "unicode.invisible_characters"
     PURPOSE = "Detect removable invisible characters embedded in ASCII tokens."
@@ -35,8 +49,8 @@ class InvisibleCharactersRule(Rule):
         if not isinstance(inspection, Inspection):
             raise TypeError("inspection must be an Inspection")
         candidates = inspection.unicode_security
-        if candidates.zero_width_space_runs_overflowed:
-            run = candidates.zero_width_space_runs[-1]
+        if candidates.contextual_invisible_runs_overflowed:
+            run = candidates.contextual_invisible_runs[-1]
             return (
                 RuleMatch(
                     span=Span(run.start, run.end),
@@ -44,7 +58,9 @@ class InvisibleCharactersRule(Rule):
                     action=Action.BLOCK,
                     message="Invisible-character removal limit exceeded.",
                     metadata={
-                        "character_type": "zero_width_space",
+                        "character_type": _character_type(
+                            inspection.text[run.start : run.end]
+                        ),
                         "detector": "contextual_ascii_token",
                         "limit": str(_MAX_REMOVAL_RUNS),
                         "span_basis": "characters",
@@ -52,7 +68,7 @@ class InvisibleCharactersRule(Rule):
                 ),
             )
         matches: list[RuleMatch] = []
-        for run in candidates.zero_width_space_runs:
+        for run in candidates.contextual_invisible_runs:
             start, end = run.start, run.end
             matches.append(
                 RuleMatch(
@@ -62,7 +78,9 @@ class InvisibleCharactersRule(Rule):
                     message="Invisible character embedded in an ASCII token.",
                     redacted_preview="[REMOVED:invisible_character]",
                     metadata={
-                        "character_type": "zero_width_space",
+                        "character_type": _character_type(
+                            inspection.text[start:end]
+                        ),
                         "detector": "contextual_ascii_token",
                         "span_basis": "characters",
                     },

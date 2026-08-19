@@ -20,7 +20,7 @@ from llm_ffw import (
 )
 
 
-_ZWSP = "\u200b"
+_INVISIBLE_RUN = "\u200b\u200c\u200d\u2060\ufeff"
 
 
 def _firewall(size: int, *, enabled: bool) -> RuleEngine:
@@ -79,7 +79,7 @@ def benchmark(
     concurrency: int,
     process_requests: int,
 ) -> dict[str, float]:
-    marker = "sk-" + _ZWSP + "A" * 20
+    marker = "sk-" + _INVISIBLE_RUN + "A" * 20
     if size <= len(marker):
         raise ValueError("size must leave room for the benchmark marker")
     clean = "x" * size
@@ -102,7 +102,7 @@ def benchmark(
         if (
             result.decision is not Action.REDACT
             or result.processed_text is None
-            or _ZWSP in result.processed_text
+            or any(character in result.processed_text for character in _INVISIBLE_RUN)
             or not result.processed_text.endswith("[REDACTED]")
         ):
             raise RuntimeError("dirty request was not removed and rescanned")
@@ -146,7 +146,7 @@ def benchmark(
     if any(
         result.decision is not Action.REDACT
         or result.processed_text is None
-        or _ZWSP in result.processed_text
+        or any(character in result.processed_text for character in _INVISIBLE_RUN)
         for result in results
     ):
         raise RuntimeError("a concurrent process result was unsafe")

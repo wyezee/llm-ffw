@@ -23,6 +23,13 @@ from llm_ffw import (
 
 
 _ZWSP = "\u200b"
+_CONTEXTUAL_INVISIBLE_VARIANTS = (
+    ("zero_width_space", "\u200b"),
+    ("zero_width_non_joiner", "\u200c"),
+    ("zero_width_joiner", "\u200d"),
+    ("word_joiner", "\u2060"),
+    ("zero_width_no_break_space", "\ufeff"),
+)
 
 
 def _enabled_scanner(*, max_input_chars: int = 8_000_000) -> RuleScanner:
@@ -36,21 +43,40 @@ def _enabled_scanner(*, max_input_chars: int = 8_000_000) -> RuleScanner:
 
 class InvisibleCharactersRuleTests(unittest.TestCase):
     def test_matches_contextual_run_with_safe_metadata(self) -> None:
-        text = "alpha" + _ZWSP * 2 + "beta"
+        scanner = RuleScanner(rules=(InvisibleCharactersRule(),))
 
-        finding = RuleScanner(rules=(InvisibleCharactersRule(),)).scan(text)[0]
+        for character_type, character in _CONTEXTUAL_INVISIBLE_VARIANTS:
+            with self.subTest(character_type=character_type):
+                text = "alpha" + character * 2 + "beta"
+                finding = scanner.scan(text)[0]
 
-        self.assertEqual(finding.rule_id, "unicode.invisible_characters")
-        self.assertEqual(finding.severity.value, "high")
-        self.assertEqual(finding.action, Action.REMOVE)
-        self.assertEqual((finding.span.start, finding.span.end), (5, 7))
-        self.assertEqual(
-            finding.redacted_preview,
-            "[REMOVED:invisible_character]",
+                self.assertEqual(finding.rule_id, "unicode.invisible_characters")
+                self.assertEqual(finding.severity.value, "high")
+                self.assertEqual(finding.action, Action.REMOVE)
+                self.assertEqual((finding.span.start, finding.span.end), (5, 7))
+                self.assertEqual(
+                    finding.redacted_preview,
+                    "[REMOVED:invisible_character]",
+                )
+                self.assertEqual(
+                    finding.metadata["character_type"],
+                    character_type,
+                )
+                self.assertNotIn(character, finding.message)
+                self.assertNotIn(character, tuple(finding.metadata.values()))
+
+    def test_mixed_contextual_run_has_bounded_category_metadata(self) -> None:
+        invisible_run = "".join(
+            character for _, character in _CONTEXTUAL_INVISIBLE_VARIANTS
         )
-        self.assertEqual(finding.metadata["character_type"], "zero_width_space")
-        self.assertNotIn(_ZWSP, finding.message)
-        self.assertNotIn(_ZWSP, tuple(finding.metadata.values()))
+
+        finding = RuleScanner(rules=(InvisibleCharactersRule(),)).scan(
+            "alpha" + invisible_run + "beta"
+        )[0]
+
+        self.assertEqual(finding.metadata["character_type"], "mixed_contextual_invisible")
+        self.assertEqual((finding.span.start, finding.span.end), (5, 10))
+        self.assertFalse(any(character in finding.message for character in invisible_run))
 
     def test_ignores_non_contextual_and_legitimate_unicode_controls(self) -> None:
         scanner = RuleScanner(rules=(InvisibleCharactersRule(),))
@@ -64,8 +90,11 @@ class InvisibleCharactersRuleTests(unittest.TestCase):
             "က" + _ZWSP + "ခ",
             "ក" + _ZWSP + "ខ",
             "emoji 👩\u200d💻",
-            "join\u200cer",
-            "bom\ufeffmarker",
+            "क\u200cष",
+            "क\u200dष",
+            "\u200cprefix joiner",
+            "word\u2060 boundary",
+            "\ufeffbom marker",
             "private\ue000use",
         )
 
@@ -88,7 +117,10 @@ class InvisibleCharactersRuleTests(unittest.TestCase):
             config=RuleScannerConfig(max_input_chars=8_000_000),
         )
         ascii_text = "x" * 8_000_000
-        hostile_non_match = ("a" + _ZWSP + " ") * 333_333
+        invisible_run = "".join(
+            character for _, character in _CONTEXTUAL_INVISIBLE_VARIANTS
+        )
+        hostile_non_match = ("a" + invisible_run + " ") * 142_857
 
         started = time.perf_counter()
         self.assertEqual(scanner.scan(ascii_text), ())
@@ -162,32 +194,40 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
     def test_balanced_policy_removes_then_rescans_secrets(self) -> None:
         firewall = RuleEngine(scanner=_enabled_scanner())
         secret = "sk-" + "A" * 20
-        obfuscated = secret[:3] + _ZWSP + secret[3:]
 
-        result = firewall.process(obfuscated)
+        for character_type, character in _CONTEXTUAL_INVISIBLE_VARIANTS:
+            with self.subTest(character_type=character_type):
+                obfuscated = secret[:3] + character + secret[3:]
+                result = firewall.process(obfuscated)
 
-        self.assertEqual(result.decision, Action.REDACT)
-        self.assertEqual(result.processed_text, "[REDACTED]")
-        self.assertEqual(
-            frozenset(finding.rule_id for finding in result.findings),
-            frozenset(("unicode.invisible_characters", "secrets.detected")),
-        )
-        invisible_finding = tuple(
-            finding
-            for finding in result.findings
-            if finding.rule_id == "unicode.invisible_characters"
-        )[0]
-        self.assertEqual(invisible_finding.action, Action.REMOVE)
-        secret_finding = tuple(
-            finding
-            for finding in result.findings
-            if finding.rule_id == "secrets.detected"
-        )[0]
-        self.assertEqual(
-            (secret_finding.span.start, secret_finding.span.end),
-            (0, len(obfuscated)),
-        )
-        self.assertNotIn(secret, result.processed_text or "")
+                self.assertEqual(result.decision, Action.REDACT)
+                self.assertEqual(result.processed_text, "[REDACTED]")
+                self.assertEqual(
+                    frozenset(finding.rule_id for finding in result.findings),
+                    frozenset(
+                        ("unicode.invisible_characters", "secrets.detected")
+                    ),
+                )
+                invisible_finding = tuple(
+                    finding
+                    for finding in result.findings
+                    if finding.rule_id == "unicode.invisible_characters"
+                )[0]
+                self.assertEqual(invisible_finding.action, Action.REMOVE)
+                self.assertEqual(
+                    invisible_finding.metadata["character_type"],
+                    character_type,
+                )
+                secret_finding = tuple(
+                    finding
+                    for finding in result.findings
+                    if finding.rule_id == "secrets.detected"
+                )[0]
+                self.assertEqual(
+                    (secret_finding.span.start, secret_finding.span.end),
+                    (0, len(obfuscated)),
+                )
+                self.assertNotIn(secret, result.processed_text or "")
 
     def test_compact_mapping_handles_removals_before_and_inside_match(self) -> None:
         firewall = RuleEngine(scanner=_enabled_scanner())
@@ -215,18 +255,20 @@ class InvisibleCharacterEnforcementTests(unittest.TestCase):
 
     def test_remove_is_idempotent_and_output_scope_is_unchanged(self) -> None:
         firewall = RuleEngine(scanner=_enabled_scanner())
-        text = "hello" + _ZWSP + "world"
 
-        first = firewall.process(text)
-        second = firewall.process(first.processed_text or "")
-        output = firewall.process(text, scope=ScanScope.OUTPUT)
+        for character_type, character in _CONTEXTUAL_INVISIBLE_VARIANTS:
+            with self.subTest(character_type=character_type):
+                text = "hello" + character + "world"
+                first = firewall.process(text)
+                second = firewall.process(first.processed_text or "")
+                output = firewall.process(text, scope=ScanScope.OUTPUT)
 
-        self.assertEqual(first.decision, Action.REMOVE)
-        self.assertEqual(first.processed_text, "helloworld")
-        self.assertEqual(second.decision, Action.ALLOW)
-        self.assertEqual(second.processed_text, first.processed_text)
-        self.assertEqual(output.decision, Action.ALLOW)
-        self.assertEqual(output.processed_text, text)
+                self.assertEqual(first.decision, Action.REMOVE)
+                self.assertEqual(first.processed_text, "helloworld")
+                self.assertEqual(second.decision, Action.ALLOW)
+                self.assertEqual(second.processed_text, first.processed_text)
+                self.assertEqual(output.decision, Action.ALLOW)
+                self.assertEqual(output.processed_text, text)
 
     def test_policy_can_block_instead_of_removing(self) -> None:
         policy = FirewallPolicy(

@@ -8,7 +8,7 @@ The default scanner ships a secure baseline: `SecretsRule`, input-only
 both-scope `BidiControlRule`, `PaymentCardRule`, `PrivateKeyRule`, and
 `JWTTokenRule`. It detects constrained
 credential formats, armored private-key blocks, and structurally credible
-compact JWTs; canonicalizes contextual U+200B token obfuscation and non-RGI
+compact JWTs; canonicalizes contextual invisible-character token obfuscation and non-RGI
 Unicode tag runs; removes directional overrides while reporting other explicit
 bidi controls; and redacts Luhn-valid payment-card candidates. Findings
 retain original-text spans and safe category metadata rather than matched
@@ -829,10 +829,13 @@ finding tuple for hosts that apply enforcement themselves.
 
 ### Default invisible-character canonicalization
 
-`InvisibleCharactersRule` removes a U+200B zero-width-space
-run only when it is embedded between ASCII token characters, then rescans the
-cleaned input through every enabled rule. Clean ASCII requests retain a single
-scan. The rule is input-only and enabled by default. Applications can opt out:
+`InvisibleCharactersRule` removes runs of U+200B zero-width space, U+200C
+zero-width non-joiner, U+200D zero-width joiner, U+2060 word joiner, and U+FEFF
+zero-width no-break space only when embedded between ASCII token characters.
+It then rescans the cleaned input through every enabled rule. Clean ASCII
+requests retain a single scan. The rule is input-only and enabled by default.
+Because contextual joiners can be intentional inside source-code identifiers,
+code-preserving deployments can opt out:
 
 ```python
 from llm_ffw import Firewall, RuleScannerConfig

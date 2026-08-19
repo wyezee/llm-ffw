@@ -11,6 +11,12 @@ All notable changes are recorded here before a tagged release.
   controlled field-name extensions, disclosure-safe capabilities, fail-closed
   limits, process propagation, adversarial tests, and an 8 MB benchmark.
 
+### Changed
+
+- Expand default contextual invisible-character canonicalization beyond U+200B
+  to U+200C, U+200D, U+2060, and U+FEFF inside ASCII token-shaped input, then
+  rescan so those characters cannot bypass deterministic secret detection.
+
 ## 0.16.0 - 2026-08-19
 
 ### Changed
