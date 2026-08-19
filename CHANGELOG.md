@@ -4,6 +4,8 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.16.0 - 2026-08-19
+
 ### Changed
 
 - Make opt-in `ExternalResourceRule` a deterministic hostname allowlist:
