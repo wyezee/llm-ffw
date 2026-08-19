@@ -11,6 +11,7 @@ from .mac_address import MACAddressRule
 from .iban import IBANRule
 from .authorization_header import AuthorizationHeaderRule
 from .connection_string import ConnectionStringRule
+from .credential_assignment import CredentialAssignmentRule
 from .email_address import EmailAddressRule
 from .external_resource import ExternalResourceRule
 from .phone_number import PhoneNumberRule
@@ -34,6 +35,7 @@ __all__ = [
     "IBANRule",
     "AuthorizationHeaderRule",
     "ConnectionStringRule",
+    "CredentialAssignmentRule",
     "EmailAddressRule",
     "ExternalResourceRule",
     "PhoneNumberRule",

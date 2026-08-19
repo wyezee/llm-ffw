@@ -3,6 +3,7 @@ import unittest
 
 from llm_ffw import (
     FirewallCapabilities,
+    CredentialAssignmentCapability,
     EmailAddressCapability,
     IPAddressCapability,
     MACAddressCapability,
@@ -119,6 +120,13 @@ class CapabilityValueTests(unittest.TestCase):
         self.assertEqual(configured.allowed_hostname_suffix_count, 2)
         with self.assertRaises(ValueError):
             UnsafeURLCapability(128, 2_048, denied_hostname_count=-1)
+
+    def test_credential_assignment_capability_is_bounded(self) -> None:
+        capability = CredentialAssignmentCapability(128, 8_192, 12)
+        self.assertEqual(capability.keyword_count, 12)
+        for values in ((0, 8_192, 12), (128, 0, 12), (128, 8_192, 0)):
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                CredentialAssignmentCapability(*values)
 
 
 if __name__ == "__main__":

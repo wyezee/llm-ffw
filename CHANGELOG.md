@@ -4,6 +4,13 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Added
+
+- Add opt-in `CredentialAssignmentRule` for bounded value-only redaction in
+  env, shell, YAML-like, and object-style credential assignments, with exact
+  controlled field-name extensions, disclosure-safe capabilities, fail-closed
+  limits, process propagation, adversarial tests, and an 8 MB benchmark.
+
 ## 0.16.0 - 2026-08-19
 
 ### Changed

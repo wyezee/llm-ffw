@@ -16,6 +16,7 @@ from .rules.mac_address import MACAddressRule
 from .rules.iban import IBANRule
 from .rules.authorization_header import AuthorizationHeaderRule
 from .rules.connection_string import ConnectionStringRule
+from .rules.credential_assignment import CredentialAssignmentRule
 from .rules.email_address import EmailAddressRule
 from .rules.phone_number import PhoneNumberRule
 from .rules.json_output import JSONOutputRule
@@ -118,6 +119,7 @@ class RuleScanner:
             IBANRule,
             AuthorizationHeaderRule,
             ConnectionStringRule,
+            CredentialAssignmentRule,
             EmailAddressRule,
             PhoneNumberRule,
             JSONOutputRule,

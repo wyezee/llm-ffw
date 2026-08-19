@@ -22,7 +22,9 @@ and `ToolResultRule` validate bounded typed tool traffic before execution and
 before results return to the model. `AuthorizationHeaderRule` redacts exact
 Basic and Bearer credentials, `ConnectionStringRule` redacts credentials from
 explicit URI and ADO/ODBC connection-string forms, and `RepetitionRule` reviews
-conservative exact character, token, and line runs. Output-only
+conservative exact character, token, and line runs. `CredentialAssignmentRule`
+redacts values assigned to high-confidence credential field names in env,
+shell, YAML-like, and object-style forms. Output-only
 `ExternalResourceRule` can redact non-allowlisted external Markdown/HTML image
 URLs before a host renders them.
 
@@ -50,7 +52,7 @@ URLs before a host renders them.
 `BALANCED_POLICY` is the default. Scope below means the scope selected by the
 normal configuration or `FirewallConfig.all_text_rules()`; configurable rules
 can be narrowed, and the input-only PII defaults can explicitly enable output
-inspection. The library exposes 19 text rules plus two structured validators:
+inspection. The library exposes 20 text rules plus two structured validators:
 
 | Rule | Activation | Default scope | Balanced handling | Policy choices |
 | --- | --- | --- | --- | --- |
@@ -70,6 +72,7 @@ inspection. The library exposes 19 text rules plus two structured validators:
 | `IBANRule` | Opt-in | Input; output configurable | Redact | Standard¹ |
 | `AuthorizationHeaderRule` | Opt-in | Both | Redact | Standard¹ |
 | `ConnectionStringRule` | Opt-in | Both | Redact | Standard¹ |
+| `CredentialAssignmentRule` | Opt-in | Both | Redact | Standard¹ |
 | `EmailAddressRule` | Opt-in | Input; output configurable | Redact | Standard¹ |
 | `PhoneNumberRule` | Opt-in | Input; output configurable | Redact | Standard¹ |
 | `RepetitionRule` | Opt-in | Both | Review² | Standard¹ |
@@ -584,7 +587,7 @@ with Firewall.from_config(config) as firewall:
 `default()` selects the seven-rule baseline, `privacy_input()` additionally
 enables conservative IP, MAC, IBAN, email, and phone input rules, and `json_api()`
 adds strict JSON-output and unsafe-URL inspection. `all_text_rules()` enables
-all 19 text rules, requires an explicit deployment-owned
+all 20 text rules, requires an explicit deployment-owned
 `BannedSubstringCatalog`, and uses a 30-second request timeout suitable for
 initial large-payload testing. Deployments must still tune that deadline from
 their own payload and latency measurements. Direct constructor parameters
@@ -606,6 +609,7 @@ by synchronous and asynchronous facades and managers.
 | `iban_config` | Enable registered-length and MOD-97 IBAN inspection |
 | `authorization_header_config` | Enable bounded Basic/Bearer Authorization-header inspection |
 | `connection_string_config` | Enable bounded URI and ADO/ODBC connection-string credential inspection |
+| `credential_assignment_config` | Enable bounded credential assignment inspection with optional exact field-name extensions |
 | `email_address_config` | Enable bounded conservative email inspection |
 | `phone_number_config` | Enable bounded conservative E.164-style phone inspection |
 | `payment_card_config` | Customize enabled payment-card limits and scopes |
@@ -617,7 +621,7 @@ by synchronous and asynchronous facades and managers.
 
 The two secret-catalog parameters are mutually exclusive. Passing `None` for
 the opt-in banned-substring, JSON, unsafe-URL, external-resource, IP-address, MAC-address, IBAN,
-Authorization-header, connection-string, email-address, phone-number, and repetition configurations leaves each corresponding
+Authorization-header, connection-string, credential-assignment, email-address, phone-number, and repetition configurations leaves each corresponding
 rule disabled. Payment-card,
 private-key, JWT, invisible-character, Unicode tag, and bidi-control rules are
 enabled by `RuleScannerConfig`
@@ -696,6 +700,7 @@ Strict and audit policies can change the effective action.
 | `pii.iban` | Opt-in | Input by default | Redact | `IBANConfig` |
 | `secrets.authorization_header` | Opt-in | Input/output | Redact | `AuthorizationHeaderConfig` |
 | `secrets.connection_string` | Opt-in | Input/output | Redact | `ConnectionStringConfig` |
+| `secrets.credential_assignment` | Opt-in | Input/output | Redact | `CredentialAssignmentConfig` |
 | `pii.email_address` | Opt-in | Input by default | Redact | `EmailAddressConfig` |
 | `pii.phone_number` | Opt-in | Input by default | Redact | `PhoneNumberConfig` |
 | `text.excessive_repetition` | Opt-in | Input/output | Review | `RepetitionConfig` |
@@ -1136,6 +1141,42 @@ The supported forms are pinned to the vendor specifications for
 [SQL Server connection strings](https://learn.microsoft.com/en-us/sql/connect/golang/connection-strings),
 and [MySQL keyword connection strings](https://dev.mysql.com/doc/connector-net/en/connector-net-connections-string.html).
 
+### Opt-in credential-assignment inspection
+
+Applications that send environment files, deployment configuration, generated
+code, or logs through a model can redact assigned credentials while preserving
+the field name and surrounding structure:
+
+```python
+from llm_ffw import CredentialAssignmentConfig, Firewall
+
+firewall = Firewall(
+    credential_assignment_config=CredentialAssignmentConfig(
+        additional_keywords=("tenant_signing_credential",),
+    )
+)
+
+safe = firewall.sanitize_input(
+    "tenant_signing_credential=synthetic-example-value-123"
+)
+```
+
+`CredentialAssignmentRule` recognizes line-start env, shell `export`, and
+YAML-like assignments plus quoted fields at object boundaries. Built-in
+high-confidence names include password, API-key, access-token, refresh-token,
+client-secret, private-token, and AWS secret-access-key forms; compound names
+such as `DB_PASSWORD` are recognized by a bounded suffix rule. Values shorter
+than four characters and explicit placeholders are ignored. Quoted and
+unquoted values are supported, and only the value span is redacted.
+
+The immutable configuration accepts at most 256 additional lowercase ASCII
+field names. Extensions are exact after normalizing `.`, `-`, and `_`
+separators; they are not regexes and do not create suffix matches. Candidate
+count and value length are bounded and fail closed. Findings and capabilities
+report only safe counts and syntax categories—never field names or assigned
+values. This rule detects assignment syntax; it does not determine whether a
+credential is active.
+
 ### Opt-in email-address inspection
 
 Applications that treat email addresses as personal data can enable bounded,
@@ -1427,6 +1468,7 @@ py -3.14 -m venv .venv
 .venv\Scripts\python benchmarks/bench_ibans.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_authorization_headers.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_connection_strings.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
+.venv\Scripts\python benchmarks/bench_credential_assignments.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_phone_numbers.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_repetition.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_bidi_controls.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
@@ -1462,7 +1504,7 @@ optional expanded JSONL corpus is written under the ignored
 `benchmarks/generated/` directory, while the compact seed, group counts, and
 expected digest remain version controlled.
 
-The all-rules harness enables all 19 text rules in every worker and exercises
+The all-rules harness enables all 20 text rules in every worker and exercises
 clean input, multilingual code/log-like input, valid JSON output, invalid JSON
 output, sparse positives for every rule, dense bounded matches, and adversarial
 near-misses. It verifies exact rule IDs, spans, and

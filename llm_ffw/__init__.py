@@ -12,6 +12,7 @@ from .capabilities import (
     IBANCapability,
     AuthorizationHeaderCapability,
     ConnectionStringCapability,
+    CredentialAssignmentCapability,
     RuleCapability,
     SecretCatalogCapability,
     UnsafeURLCapability,
@@ -47,6 +48,10 @@ from .mac_address import MACAddressConfig
 from .iban import IBANConfig
 from .authorization_header import AuthorizationHeaderConfig
 from .connection_string import ConnectionStringConfig
+from .credential_assignment import (
+    BUILTIN_CREDENTIAL_ASSIGNMENT_KEYWORDS,
+    CredentialAssignmentConfig,
+)
 from .email_address import EmailAddressConfig
 from .external_resource import ExternalResourceConfig
 from .phone_number import PhoneNumberConfig
@@ -111,6 +116,7 @@ from .rules.mac_address import MACAddressRule
 from .rules.iban import IBANRule
 from .rules.authorization_header import AuthorizationHeaderRule
 from .rules.connection_string import ConnectionStringRule
+from .rules.credential_assignment import CredentialAssignmentRule
 from .rules.email_address import EmailAddressRule
 from .rules.external_resource import ExternalResourceRule
 from .rules.phone_number import PhoneNumberRule
@@ -134,6 +140,7 @@ __all__ = [
     "BannedSubstringsRule",
     "BidiControlRule",
     "BUILTIN_SECRET_CATALOG",
+    "BUILTIN_CREDENTIAL_ASSIGNMENT_KEYWORDS",
     "ContentBlockedError",
     "EmailAddressCapability",
     "EmailAddressConfig",
@@ -175,6 +182,9 @@ __all__ = [
     "ConnectionStringCapability",
     "ConnectionStringConfig",
     "ConnectionStringRule",
+    "CredentialAssignmentCapability",
+    "CredentialAssignmentConfig",
+    "CredentialAssignmentRule",
     "MACAddressConfig",
     "MACAddressRule",
     "LiteralMatchMode",

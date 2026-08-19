@@ -6,6 +6,7 @@ from llm_ffw import (
     AsyncFirewall,
     BidiControlRule,
     ConnectionStringConfig,
+    CredentialAssignmentConfig,
     EmailAddressConfig,
     ExternalResourceConfig,
     Finding,
@@ -27,6 +28,9 @@ from llm_ffw import (
 
 config = FirewallConfig(
     connection_string_config=ConnectionStringConfig(),
+    credential_assignment_config=CredentialAssignmentConfig(
+        additional_keywords=("tenant_credential",),
+    ),
     email_address_config=EmailAddressConfig(),
     external_resource_config=ExternalResourceConfig(),
     ip_address_config=IPAddressConfig(),

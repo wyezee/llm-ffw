@@ -483,6 +483,7 @@ def _builtin_policy(
     iban_action: Action,
     authorization_header_action: Action,
     connection_string_action: Action,
+    credential_assignment_action: Action,
     email_address_action: Action,
     phone_number_action: Action,
     payment_card_action: Action,
@@ -525,7 +526,7 @@ def _builtin_policy(
     )
     return FirewallPolicy(
         policy_id=policy_id,
-        version="1.17.0",
+        version="1.18.0",
         overrides=(
             PolicyOverride("secrets.detected", ScanScope.INPUT, input_action),
             PolicyOverride("secrets.detected", ScanScope.OUTPUT, output_action),
@@ -603,6 +604,16 @@ def _builtin_policy(
                 connection_string_action,
             ),
             PolicyOverride(
+                "secrets.credential_assignment",
+                ScanScope.INPUT,
+                credential_assignment_action,
+            ),
+            PolicyOverride(
+                "secrets.credential_assignment",
+                ScanScope.OUTPUT,
+                credential_assignment_action,
+            ),
+            PolicyOverride(
                 "pii.email_address",
                 ScanScope.INPUT,
                 email_address_action,
@@ -671,6 +682,7 @@ BALANCED_POLICY = _builtin_policy(
     iban_action=Action.REDACT,
     authorization_header_action=Action.REDACT,
     connection_string_action=Action.REDACT,
+    credential_assignment_action=Action.REDACT,
     email_address_action=Action.REDACT,
     phone_number_action=Action.REDACT,
     payment_card_action=Action.REDACT,
@@ -692,6 +704,7 @@ STRICT_POLICY = _builtin_policy(
     iban_action=Action.BLOCK,
     authorization_header_action=Action.BLOCK,
     connection_string_action=Action.BLOCK,
+    credential_assignment_action=Action.BLOCK,
     email_address_action=Action.BLOCK,
     phone_number_action=Action.BLOCK,
     payment_card_action=Action.BLOCK,
@@ -713,6 +726,7 @@ AUDIT_POLICY = _builtin_policy(
     iban_action=Action.REVIEW,
     authorization_header_action=Action.REVIEW,
     connection_string_action=Action.REVIEW,
+    credential_assignment_action=Action.REVIEW,
     email_address_action=Action.REVIEW,
     phone_number_action=Action.REVIEW,
     payment_card_action=Action.REVIEW,
@@ -751,6 +765,7 @@ class RuleEngine:
                     "pii.iban",
                     "secrets.authorization_header",
                     "secrets.connection_string",
+                    "secrets.credential_assignment",
                     "pii.email_address",
                     "pii.phone_number",
                     "pii.payment_card",

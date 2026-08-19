@@ -31,6 +31,7 @@ ALL_TEXT_RULE_IDS = frozenset(
         "pii.iban",
         "secrets.authorization_header",
         "secrets.connection_string",
+        "secrets.credential_assignment",
         "pii.email_address",
         "pii.phone_number",
         "text.excessive_repetition",
@@ -182,6 +183,13 @@ def _positive_input(size: int) -> TextScenario:
         prefix="postgres://benchmark.user:",
         suffix="@db.example/prod\n",
     )
+    _append(
+        parts,
+        expected,
+        "secrets.credential_assignment",
+        "synthetic-assigned-credential-123",
+        prefix="service_api_key=",
+    )
     _append(parts, expected, "pii.email_address", "benchmark.user@example.com", prefix="email=")
     _append(parts, expected, "pii.phone_number", "+999000000000001", prefix="phone=")
     repeated = "repeat " * 64
@@ -218,6 +226,7 @@ def _near_miss_input(size: int) -> TextScenario:
         "MAC 00:11:22:33:44\n",
         "IBAN GB29NWBK60161331926818\n",
         "Authorization: Bearer <token>\n",
+        "password=<password>\n",
         "https://example.com/safe\n",
         "repeat " * 63 + "different\n",
     ]

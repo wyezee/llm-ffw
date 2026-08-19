@@ -72,7 +72,7 @@ class FirewallConfigTests(unittest.TestCase):
                 "output.external_resource",
                 {item.rule_id for item in all_rules.capabilities().rules},
             )
-            self.assertEqual(len(all_rules.capabilities().rules), 19)
+            self.assertEqual(len(all_rules.capabilities().rules), 20)
             self.assertEqual(all_rules_config.request_timeout_seconds, 30.0)
         finally:
             privacy.close()

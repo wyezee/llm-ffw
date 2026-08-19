@@ -295,6 +295,21 @@ class ConnectionStringCapability:
 
 
 @dataclass(frozen=True, slots=True)
+class CredentialAssignmentCapability:
+    """Disclosure-safe credential-assignment inspection limits."""
+
+    max_candidates: int
+    max_value_chars: int
+    keyword_count: int
+
+    def __post_init__(self) -> None:
+        for field_name in ("max_candidates", "max_value_chars", "keyword_count"):
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{field_name} must be a positive integer")
+
+
+@dataclass(frozen=True, slots=True)
 class EmailAddressCapability:
     """Disclosure-safe email-address inspection configuration."""
 
@@ -397,6 +412,7 @@ class FirewallCapabilities:
     iban: IBANCapability | None = None
     authorization_header: AuthorizationHeaderCapability | None = None
     connection_string: ConnectionStringCapability | None = None
+    credential_assignment: CredentialAssignmentCapability | None = None
     email_address: EmailAddressCapability | None = None
     phone_number: PhoneNumberCapability | None = None
     payment_card: PaymentCardCapability | None = None
@@ -474,6 +490,13 @@ class FirewallCapabilities:
             raise TypeError(
                 "connection_string must be a ConnectionStringCapability or None"
             )
+        if self.credential_assignment is not None and not isinstance(
+            self.credential_assignment, CredentialAssignmentCapability
+        ):
+            raise TypeError(
+                "credential_assignment must be a "
+                "CredentialAssignmentCapability or None"
+            )
         if self.phone_number is not None and not isinstance(
             self.phone_number, PhoneNumberCapability
         ):
@@ -523,6 +546,7 @@ __all__ = [
     "IBANCapability",
     "AuthorizationHeaderCapability",
     "ConnectionStringCapability",
+    "CredentialAssignmentCapability",
     "PaymentCardCapability",
     "PrivateKeyCapability",
     "JWTTokenCapability",

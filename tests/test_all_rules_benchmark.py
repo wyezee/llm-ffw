@@ -130,7 +130,7 @@ class AllRulesBenchmarkTests(unittest.TestCase):
             request_timeout=30,
         )
 
-        self.assertEqual(result.enabled_text_rules, 19)
+        self.assertEqual(result.enabled_text_rules, 20)
         self.assertEqual(
             set(result.finding_counts),
             {"output.external_resource"},
@@ -151,7 +151,7 @@ class AllRulesBenchmarkTests(unittest.TestCase):
             request_timeout=30,
         )
 
-        self.assertEqual(result.enabled_text_rules, 19)
+        self.assertEqual(result.enabled_text_rules, 20)
         self.assertEqual(result.completed, 1)
         self.assertEqual(result.rejected + result.timed_out + result.failed, 0)
         self.assertEqual(set(result.finding_counts), {item.rule_id for item in sparse.expected})

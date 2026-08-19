@@ -6,6 +6,7 @@ from typing import TypedDict
 
 from .authorization_header import AuthorizationHeaderConfig
 from .connection_string import ConnectionStringConfig
+from .credential_assignment import CredentialAssignmentConfig
 from .banned_substring_catalog import BannedSubstringCatalog
 from .config import RuleScannerConfig
 from .email_address import EmailAddressConfig
@@ -39,6 +40,7 @@ class _FacadeKwargs(TypedDict):
     iban_config: IBANConfig | None
     authorization_header_config: AuthorizationHeaderConfig | None
     connection_string_config: ConnectionStringConfig | None
+    credential_assignment_config: CredentialAssignmentConfig | None
     email_address_config: EmailAddressConfig | None
     phone_number_config: PhoneNumberConfig | None
     payment_card_config: PaymentCardConfig | None
@@ -77,6 +79,7 @@ class FirewallConfig:
     iban_config: IBANConfig | None = None
     authorization_header_config: AuthorizationHeaderConfig | None = None
     connection_string_config: ConnectionStringConfig | None = None
+    credential_assignment_config: CredentialAssignmentConfig | None = None
     email_address_config: EmailAddressConfig | None = None
     phone_number_config: PhoneNumberConfig | None = None
     payment_card_config: PaymentCardConfig | None = None
@@ -130,6 +133,11 @@ class FirewallConfig:
                 "connection_string_config",
                 self.connection_string_config,
                 ConnectionStringConfig,
+            ),
+            (
+                "credential_assignment_config",
+                self.credential_assignment_config,
+                CredentialAssignmentConfig,
             ),
             ("email_address_config", self.email_address_config, EmailAddressConfig),
             ("phone_number_config", self.phone_number_config, PhoneNumberConfig),
@@ -232,6 +240,7 @@ class FirewallConfig:
             iban_config=IBANConfig(),
             authorization_header_config=AuthorizationHeaderConfig(),
             connection_string_config=ConnectionStringConfig(),
+            credential_assignment_config=CredentialAssignmentConfig(),
             email_address_config=EmailAddressConfig(),
             phone_number_config=PhoneNumberConfig(),
             repetition_config=RepetitionConfig(),
@@ -255,6 +264,7 @@ class FirewallConfig:
             "iban_config": self.iban_config,
             "authorization_header_config": self.authorization_header_config,
             "connection_string_config": self.connection_string_config,
+            "credential_assignment_config": self.credential_assignment_config,
             "email_address_config": self.email_address_config,
             "phone_number_config": self.phone_number_config,
             "payment_card_config": self.payment_card_config,

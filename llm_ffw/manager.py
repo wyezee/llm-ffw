@@ -19,6 +19,7 @@ from .mac_address import MACAddressConfig
 from .iban import IBANConfig
 from .authorization_header import AuthorizationHeaderConfig
 from .connection_string import ConnectionStringConfig
+from .credential_assignment import CredentialAssignmentConfig
 from .email_address import EmailAddressConfig
 from .external_resource import ExternalResourceConfig
 from .phone_number import PhoneNumberConfig
@@ -82,6 +83,7 @@ class FirewallManager:
         iban_config: IBANConfig | None = None,
         authorization_header_config: AuthorizationHeaderConfig | None = None,
         connection_string_config: ConnectionStringConfig | None = None,
+        credential_assignment_config: CredentialAssignmentConfig | None = None,
         email_address_config: EmailAddressConfig | None = None,
         phone_number_config: PhoneNumberConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
@@ -104,6 +106,7 @@ class FirewallManager:
         self._iban_config = iban_config
         self._authorization_header_config = authorization_header_config
         self._connection_string_config = connection_string_config
+        self._credential_assignment_config = credential_assignment_config
         self._email_address_config = email_address_config
         self._phone_number_config = phone_number_config
         self._payment_card_config = payment_card_config
@@ -149,6 +152,7 @@ class FirewallManager:
             iban_config=self._iban_config,
             authorization_header_config=self._authorization_header_config,
             connection_string_config=self._connection_string_config,
+            credential_assignment_config=self._credential_assignment_config,
             email_address_config=self._email_address_config,
             phone_number_config=self._phone_number_config,
             payment_card_config=self._payment_card_config,

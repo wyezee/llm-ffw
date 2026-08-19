@@ -15,6 +15,7 @@ from .capabilities import (
     IBANCapability,
     AuthorizationHeaderCapability,
     ConnectionStringCapability,
+    CredentialAssignmentCapability,
     EmailAddressCapability,
     ExternalResourceCapability,
     PhoneNumberCapability,
@@ -42,6 +43,10 @@ from .authorization_header import AuthorizationHeaderConfig
 from .connection_string import (
     ConnectionStringConfig,
     SUPPORTED_CONNECTION_STRING_SCHEMES,
+)
+from .credential_assignment import (
+    BUILTIN_CREDENTIAL_ASSIGNMENT_KEYWORDS,
+    CredentialAssignmentConfig,
 )
 from .email_address import EmailAddressConfig
 from .external_resource import ExternalResourceConfig
@@ -146,6 +151,7 @@ class Firewall:
         iban_config: IBANConfig | None = None,
         authorization_header_config: AuthorizationHeaderConfig | None = None,
         connection_string_config: ConnectionStringConfig | None = None,
+        credential_assignment_config: CredentialAssignmentConfig | None = None,
         email_address_config: EmailAddressConfig | None = None,
         phone_number_config: PhoneNumberConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
@@ -178,6 +184,7 @@ class Firewall:
             iban_config=iban_config,
             authorization_header_config=authorization_header_config,
             connection_string_config=connection_string_config,
+            credential_assignment_config=credential_assignment_config,
             email_address_config=email_address_config,
             phone_number_config=phone_number_config,
             payment_card_config=payment_card_config,
@@ -403,6 +410,24 @@ class Firewall:
                     schemes=SUPPORTED_CONNECTION_STRING_SCHEMES,
                 )
                 if self._pool.connection_string_config is not None
+                else None
+            ),
+            credential_assignment=(
+                CredentialAssignmentCapability(
+                    max_candidates=(
+                        self._pool.credential_assignment_config.max_candidates
+                    ),
+                    max_value_chars=(
+                        self._pool.credential_assignment_config.max_value_chars
+                    ),
+                    keyword_count=(
+                        len(BUILTIN_CREDENTIAL_ASSIGNMENT_KEYWORDS)
+                        + len(
+                            self._pool.credential_assignment_config.additional_keywords
+                        )
+                    ),
+                )
+                if self._pool.credential_assignment_config is not None
                 else None
             ),
             phone_number=(
