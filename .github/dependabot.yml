@@ -5,3 +5,14 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+
+  # Dependabot's graph image can lag the exact Python patch required by the
+  # package. Scan the mirrored build requirements instead; CI guarantees that
+  # this remains safe only while the package has no runtime dependencies.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    exclude-paths:
+      - pyproject.toml

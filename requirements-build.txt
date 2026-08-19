@@ -1,0 +1,3 @@
+# Dependency-graph mirror for [build-system].requires in pyproject.toml.
+# tests/test_dependency_graph_policy.py prevents this file from drifting.
+setuptools==84.0.0
