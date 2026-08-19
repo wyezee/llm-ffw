@@ -10,6 +10,7 @@ from .mac_address import MACAddressRule
 from .iban import IBANRule
 from .authorization_header import AuthorizationHeaderRule
 from .email_address import EmailAddressRule
+from .phone_number import PhoneNumberRule
 from .payment_card import PaymentCardRule
 from .private_key import PrivateKeyRule
 from .jwt_token import JWTTokenRule
@@ -29,6 +30,7 @@ __all__ = [
     "IBANRule",
     "AuthorizationHeaderRule",
     "EmailAddressRule",
+    "PhoneNumberRule",
     "PaymentCardRule",
     "PrivateKeyRule",
     "JWTTokenRule",

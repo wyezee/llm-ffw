@@ -11,6 +11,7 @@ from llm_ffw import (
     FirewallResult,
     FirewallStream,
     IPAddressConfig,
+    PhoneNumberConfig,
     RuleEngine,
     SanitizationResult,
     StreamMode,
@@ -23,6 +24,7 @@ from llm_ffw import (
 config = FirewallConfig(
     email_address_config=EmailAddressConfig(),
     ip_address_config=IPAddressConfig(),
+    phone_number_config=PhoneNumberConfig(),
 )
 firewall = Firewall.from_config(config)
 assert_type(firewall.sanitize_input("synthetic@example.com"), str)

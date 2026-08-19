@@ -13,7 +13,7 @@ retain original-text spans and safe category metadata rather than matched
 values.
 
 LLM FFW also provides opt-in `IPAddressRule`, `EmailAddressRule`,
-`MACAddressRule`, and `IBANRule` privacy controls. They use bounded
+`MACAddressRule`, `IBANRule`, and `PhoneNumberRule` privacy controls. They use bounded
 deterministic parsing, default to input-only redaction under the balanced
 policy, and remain disabled until configured. Provider-neutral `ToolCallRule`
 and `ToolResultRule` validate bounded typed tool traffic before execution and
@@ -26,7 +26,7 @@ character, token, and line runs.
 `BALANCED_POLICY` is the default. Scope below means the scope selected by the
 normal configuration or `FirewallConfig.all_text_rules()`; configurable rules
 can be narrowed, and the input-only PII defaults can explicitly enable output
-inspection. The library exposes 15 text rules plus two structured validators:
+inspection. The library exposes 16 text rules plus two structured validators:
 
 | Rule | Activation | Default scope | Balanced handling | Policy choices |
 | --- | --- | --- | --- | --- |
@@ -44,6 +44,7 @@ inspection. The library exposes 15 text rules plus two structured validators:
 | `IBANRule` | Opt-in | Input; output configurable | Redact | Standard¹ |
 | `AuthorizationHeaderRule` | Opt-in | Both | Redact | Standard¹ |
 | `EmailAddressRule` | Opt-in | Input; output configurable | Redact | Standard¹ |
+| `PhoneNumberRule` | Opt-in | Input; output configurable | Redact | Standard¹ |
 | `RepetitionRule` | Opt-in | Both | Review² | Standard¹ |
 | `ToolCallRule` | Explicit structured API | Tool call | Block finding | Outside text policy; host enforces |
 | `ToolResultRule` | Explicit structured API | Tool result | Block finding | Outside text policy; host enforces |
@@ -91,17 +92,17 @@ hooks instead of constructing a facade per request.
 
 ## Common recipes
 
-Use the privacy preset when email, IP, MAC, and IBAN values must not leave the
+Use the privacy preset when email, IP, MAC, IBAN, and phone values must not leave the
 application in prompts:
 
 ```python
 from llm_ffw import Firewall, FirewallConfig
 
 def main() -> None:
-    text = "Contact alex@example.com from 192.0.2.10."
+    text = "Contact alex@example.com from +999000000000001 at 192.0.2.10."
     with Firewall.from_config(FirewallConfig.privacy_input()) as firewall:
         safe_text = firewall.sanitize_input(text)
-    assert safe_text == "Contact [REDACTED] from [REDACTED]."
+    assert safe_text == "Contact [REDACTED] from [REDACTED] at [REDACTED]."
 
 if __name__ == "__main__":
     main()
@@ -436,9 +437,9 @@ with Firewall.from_config(config) as firewall:
 ```
 
 `default()` selects the six-rule baseline, `privacy_input()` additionally
-enables conservative IP, MAC, IBAN, and email input rules, and `json_api()`
+enables conservative IP, MAC, IBAN, email, and phone input rules, and `json_api()`
 adds strict JSON-output and unsafe-URL inspection. `all_text_rules()` enables
-all 15 text rules, requires an explicit deployment-owned
+all 16 text rules, requires an explicit deployment-owned
 `BannedSubstringCatalog`, and uses a 30-second request timeout suitable for
 initial large-payload testing. Deployments must still tune that deadline from
 their own payload and latency measurements. Direct constructor parameters
@@ -459,6 +460,7 @@ by synchronous and asynchronous facades and managers.
 | `iban_config` | Enable registered-length and MOD-97 IBAN inspection |
 | `authorization_header_config` | Enable bounded Basic/Bearer Authorization-header inspection |
 | `email_address_config` | Enable bounded conservative email inspection |
+| `phone_number_config` | Enable bounded conservative E.164-style phone inspection |
 | `payment_card_config` | Customize enabled payment-card limits and scopes |
 | `private_key_config` | Customize enabled private-key limits and scopes |
 | `jwt_token_config` | Customize enabled JWT limits and scopes |
@@ -468,7 +470,7 @@ by synchronous and asynchronous facades and managers.
 
 The two secret-catalog parameters are mutually exclusive. Passing `None` for
 the opt-in banned-substring, JSON, unsafe-URL, IP-address, MAC-address, IBAN,
-Authorization-header, email-address, and repetition configurations leaves each corresponding
+Authorization-header, email-address, phone-number, and repetition configurations leaves each corresponding
 rule disabled. Payment-card,
 private-key, JWT,
 invisible-character, and Unicode tag rules are enabled by `RuleScannerConfig`
@@ -545,6 +547,7 @@ Strict and audit policies can change the effective action.
 | `pii.iban` | Opt-in | Input by default | Redact | `IBANConfig` |
 | `secrets.authorization_header` | Opt-in | Input/output | Redact | `AuthorizationHeaderConfig` |
 | `pii.email_address` | Opt-in | Input by default | Redact | `EmailAddressConfig` |
+| `pii.phone_number` | Opt-in | Input by default | Redact | `PhoneNumberConfig` |
 | `text.excessive_repetition` | Opt-in | Input/output | Review | `RepetitionConfig` |
 | `tools.call.validity` | Opt-in | Tool call | Block | `ToolDefinition`, `ToolCallConfig` |
 | `tools.result.validity` | Opt-in | Tool result | Block | `ToolResultConfig` |
@@ -901,6 +904,37 @@ does not attempt RFC-complete quoted local parts, comments, address literals,
 Unicode mailbox syntax, DNS ownership checks, or obfuscation repair. These
 limits deliberately favor predictable high-precision privacy protection.
 
+### Opt-in phone-number inspection
+
+Applications that treat global phone numbers as personal data can enable
+bounded, deterministic inspection:
+
+```python
+from llm_ffw import Firewall, PhoneNumberConfig, ScanScope
+
+firewall = Firewall(
+    phone_number_config=PhoneNumberConfig(
+        scopes=(ScanScope.INPUT, ScanScope.OUTPUT),
+    )
+)
+```
+
+`PhoneNumberRule` recognizes a conservative E.164-style subset: `+`, followed
+by 7–15 ASCII digits, with a nonzero first digit and no separators or extension.
+The 15-digit ceiling comes from ITU-T E.164; the 7-digit floor is a product
+heuristic that reduces collisions with short numeric identifiers. ASCII
+identifier boundaries prevent matches embedded in larger identifiers, and
+formatted numbers such as `+44 20 7946 0958` are deliberately excluded rather
+than partially redacted. The rule defaults to input-only redaction and can be
+enabled for output through `scopes`.
+
+This is syntax-and-length detection, not proof that a country code, subscriber
+number, or assignment is valid. It does not normalize local numbers, formatted
+numbers, extensions, vanity numbers, or Unicode digits. See
+[ITU-T E.164](https://www.itu.int/rec/T-REC-E.164/en) and
+[RFC 3966](https://www.rfc-editor.org/rfc/rfc3966.html) for the broader
+standards.
+
 ### Opt-in excessive-repetition inspection
 
 Applications that want a deterministic signal for degenerate prompts or model
@@ -1135,6 +1169,7 @@ py -3.14 -m venv .venv
 .venv\Scripts\python benchmarks/bench_mac_addresses.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_ibans.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_authorization_headers.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
+.venv\Scripts\python benchmarks/bench_phone_numbers.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_repetition.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_tool_calls.py
 .venv\Scripts\python benchmarks/bench_tool_results.py
@@ -1155,19 +1190,19 @@ expected spans and a digest, not corpus values. Benchmarks report only duration,
 throughput, and finding counts; they never print scanned content. A release is
 not approved until the exact candidate commit passes both Windows and Linux CI.
 
-The PII accuracy gate deterministically evaluates 601 generated and curated
-email-address, IP-address, MAC-address, and IBAN scenarios. It requires exact
+The PII accuracy gate deterministically evaluates 697 generated and curated
+email-address, IP-address, MAC-address, IBAN, and phone-number scenarios. It requires exact
 rule ownership, character spans, redaction output, precision, and recall, with
 per-category confusion counts. Values use reserved example domains and
 documentation or special-purpose IP ranges, locally administered synthetic
 MAC values, and checksum-valid synthetic IBAN values for every registered
-country length;
+country length, plus conservative E.164-style synthetic phone values;
 corpus creation makes no LLM or network calls. The
 optional expanded JSONL corpus is written under the ignored
 `benchmarks/generated/` directory, while the compact seed, group counts, and
 expected digest remain version controlled.
 
-The all-rules harness enables all 15 text rules in every worker and exercises
+The all-rules harness enables all 16 text rules in every worker and exercises
 clean input, multilingual code/log-like input, valid JSON output, invalid JSON
 output, sparse positives for every rule, dense bounded matches, and adversarial
 near-misses. It verifies exact rule IDs, spans, and

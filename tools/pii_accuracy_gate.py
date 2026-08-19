@@ -20,11 +20,13 @@ _EXPECTED_CATEGORIES = {
     "curated_iban_negative",
     "curated_mac_positive",
     "curated_mac_negative",
+    "curated_phone_negative",
     "curated_negative",
     "email_positive",
     "ip_positive",
     "iban_positive",
     "mac_positive",
+    "phone_positive",
     "mixed_positive",
     "negative",
 }
@@ -70,6 +72,7 @@ def run_gate(
         "pii.ip_address",
         "pii.iban",
         "pii.mac_address",
+        "pii.phone_number",
     }:
         raise AssertionError("PII accuracy gate rule coverage is incomplete")
     if any(item.expected_findings <= 0 for item in report.rules):

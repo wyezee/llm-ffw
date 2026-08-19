@@ -160,6 +160,19 @@ jobs:
           --max-peak-mib 128
           --min-process-requests-per-second 0.5
 
+      - name: Run phone-number production envelope
+        run: >-
+          python benchmarks/bench_phone_numbers.py
+          --size 8000000
+          --rounds 3
+          --workers 2
+          --concurrency 4
+          --process-requests 8
+          --min-throughput-mib-s 3
+          --min-phone-throughput-mib-s 2.5
+          --max-peak-mib 128
+          --min-process-requests-per-second 0.5
+
       - name: Run IBAN production envelope
         run: >-
           python benchmarks/bench_ibans.py

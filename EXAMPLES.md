@@ -36,13 +36,13 @@ if __name__ == "__main__":
 ## Activate the privacy preset
 
 The baseline rules remain enabled. The preset additionally enables input-side
-email, IP-address, MAC-address, and IBAN inspection.
+email, IP-address, MAC-address, IBAN, and phone-number inspection.
 
 ```python
 from llm_ffw import Firewall, FirewallConfig
 
 def main() -> None:
-    prompt = "Contact alex@example.com from 192.0.2.10."
+    prompt = "Contact alex@example.com from +999000000000001."
 
     with Firewall.from_config(FirewallConfig.privacy_input()) as firewall:
         result = firewall.sanitize_input_result(prompt)
@@ -50,7 +50,7 @@ def main() -> None:
     assert result.text == "Contact [REDACTED] from [REDACTED]."
     assert {finding.rule_id for finding in result.findings} == {
         "pii.email_address",
-        "pii.ip_address",
+        "pii.phone_number",
     }
 
 if __name__ == "__main__":

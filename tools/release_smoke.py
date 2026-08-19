@@ -39,6 +39,8 @@ from llm_ffw import (
     LLMFirewall,
     LLMFirewallManager,
     PaymentCardRule,
+    PhoneNumberConfig,
+    PhoneNumberRule,
     RepetitionConfig,
     RepetitionRule,
     ScanScope,
@@ -98,6 +100,7 @@ assert "iban_config" in facade_parameters
 assert "authorization_header_config" in facade_parameters
 assert "repetition_config" in facade_parameters
 assert "email_address_config" in facade_parameters
+assert "phone_number_config" in facade_parameters
 capabilities = Firewall().capabilities()
 assert capabilities.rule_count == 6
 assert tuple(rule.rule_id for rule in capabilities.rules) == (
@@ -192,6 +195,13 @@ assert any(
     for rule in email_firewall.capabilities().rules
 )
 email_firewall.close()
+phone_firewall = Firewall(phone_number_config=PhoneNumberConfig())
+assert phone_firewall.capabilities().phone_number.max_candidates == 128
+assert any(
+    rule.rule_id == PhoneNumberRule.RULE_ID
+    for rule in phone_firewall.capabilities().rules
+)
+phone_firewall.close()
 tool_definition = ToolDefinition(
     "lookup",
     {

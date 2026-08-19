@@ -14,6 +14,7 @@ from .rules.mac_address import MACAddressRule
 from .rules.iban import IBANRule
 from .rules.authorization_header import AuthorizationHeaderRule
 from .rules.email_address import EmailAddressRule
+from .rules.phone_number import PhoneNumberRule
 from .rules.json_output import JSONOutputRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.payment_card import PaymentCardRule
@@ -106,6 +107,7 @@ class RuleScanner:
             IBANRule,
             AuthorizationHeaderRule,
             EmailAddressRule,
+            PhoneNumberRule,
             JSONOutputRule,
             JWTTokenRule,
             PaymentCardRule,

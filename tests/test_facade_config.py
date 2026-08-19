@@ -55,6 +55,7 @@ class FirewallConfigTests(unittest.TestCase):
                     "pii.mac_address",
                     "pii.iban",
                     "pii.email_address",
+                    "pii.phone_number",
                 }.issubset(privacy_rule_ids)
             )
             self.assertTrue(
@@ -62,7 +63,7 @@ class FirewallConfigTests(unittest.TestCase):
                     json_rule_ids
                 )
             )
-            self.assertEqual(len(all_rules.capabilities().rules), 15)
+            self.assertEqual(len(all_rules.capabilities().rules), 16)
             self.assertEqual(all_rules_config.request_timeout_seconds, 30.0)
         finally:
             privacy.close()

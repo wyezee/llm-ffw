@@ -19,6 +19,7 @@ from .mac_address import MACAddressConfig
 from .iban import IBANConfig
 from .authorization_header import AuthorizationHeaderConfig
 from .email_address import EmailAddressConfig
+from .phone_number import PhoneNumberConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
 from .private_key import PrivateKeyConfig
@@ -78,6 +79,7 @@ class FirewallManager:
         iban_config: IBANConfig | None = None,
         authorization_header_config: AuthorizationHeaderConfig | None = None,
         email_address_config: EmailAddressConfig | None = None,
+        phone_number_config: PhoneNumberConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
         jwt_token_config: JWTTokenConfig | None = None,
@@ -97,6 +99,7 @@ class FirewallManager:
         self._iban_config = iban_config
         self._authorization_header_config = authorization_header_config
         self._email_address_config = email_address_config
+        self._phone_number_config = phone_number_config
         self._payment_card_config = payment_card_config
         self._private_key_config = private_key_config
         self._jwt_token_config = jwt_token_config
@@ -139,6 +142,7 @@ class FirewallManager:
             iban_config=self._iban_config,
             authorization_header_config=self._authorization_header_config,
             email_address_config=self._email_address_config,
+            phone_number_config=self._phone_number_config,
             payment_card_config=self._payment_card_config,
             private_key_config=self._private_key_config,
             jwt_token_config=self._jwt_token_config,

@@ -12,6 +12,7 @@ from llm_ffw import (
     IPAddressRule,
     MACAddressConfig,
     MACAddressRule,
+    PhoneNumberRule,
     IBANConfig,
     IBANRule,
     ScanScope,
@@ -26,6 +27,7 @@ _RULE_IDS = (
     IPAddressRule.RULE_ID,
     MACAddressRule.RULE_ID,
     IBANRule.RULE_ID,
+    PhoneNumberRule.RULE_ID,
 )
 
 
@@ -165,7 +167,7 @@ def _load_manifest(path: Path) -> dict[str, object]:
     }
     if set(manifest) != expected_keys:
         raise ValueError("PII accuracy manifest fields are invalid")
-    if manifest["schema_version"] != 4:
+    if manifest["schema_version"] != 5:
         raise ValueError("unsupported PII accuracy manifest schema")
     if not isinstance(manifest["dataset_id"], str):
         raise TypeError("dataset_id must be a string")
@@ -186,6 +188,7 @@ def _load_manifest(path: Path) -> dict[str, object]:
         "ip_positive",
         "mac_positive",
         "iban_positive",
+        "phone_positive",
         "mixed_positive",
         "negative",
         "curated_email_positive",
@@ -193,6 +196,7 @@ def _load_manifest(path: Path) -> dict[str, object]:
         "curated_mac_positive",
         "curated_mac_negative",
         "curated_iban_negative",
+        "curated_phone_negative",
         "curated_negative",
     }
     if not isinstance(groups, dict) or set(groups) != expected_groups:
@@ -347,6 +351,30 @@ def _iban_scenarios(count: int) -> list[PIIAccuracyScenario]:
                 category="iban_positive",
                 text=text,
                 expected=(_finding(IBANRule.RULE_ID, text, value),),
+            )
+        )
+    return scenarios
+
+
+def _phone_scenarios(count: int) -> list[PIIAccuracyScenario]:
+    """Return deterministic E.164-style values in a synthetic +999 namespace."""
+
+    contexts = (
+        "phone={value}",
+        "contact [{value}]",
+        'record={{"phone":"{value}"}}',
+        "tel:{value}",
+    )
+    scenarios: list[PIIAccuracyScenario] = []
+    for index in range(count):
+        value = f"+999{index + 1:012d}"
+        text = contexts[index % len(contexts)].format(value=value)
+        scenarios.append(
+            PIIAccuracyScenario(
+                scenario_id=f"phone-positive-{index:04d}",
+                category="phone_positive",
+                text=text,
+                expected=(_finding(PhoneNumberRule.RULE_ID, text, value),),
             )
         )
     return scenarios
@@ -656,6 +684,58 @@ def _curated_iban_negative_scenarios(
     ]
 
 
+def _curated_phone_negative_scenarios(
+    count: int,
+) -> list[PIIAccuracyScenario]:
+    """Return local, formatted, embedded, and numeric phone lookalikes."""
+
+    texts = (
+        "local number 4155552671",
+        "short global +1",
+        "below conservative floor +123456",
+        "leading zero +0123456789",
+        "too long +1234567890123456",
+        "spaced +1 415 555 2671",
+        "spaced +44 20 7946 0958",
+        "hyphenated +44-20-7946-0958",
+        "dotted +44.20.7946.0958",
+        "parenthesized +44 (0)20 7946 0958",
+        "identifier customer+14155552671",
+        "identifier phone_+14155552671",
+        "numeric expression 1+14155552671",
+        "double plus ++14155552671",
+        "fullwidth +１４１５５５５２６７１",
+        "Arabic digits +١٤١٥٥٥٥٢٦٧١",
+        "zero width +1415\u200b5552671",
+        "extension only x14155552671",
+        "service code 911",
+        "emergency +911",
+        "clock +12:34:56",
+        "semantic version +12.3.4",
+        "temperature +120000 C",
+        "small signed value +12345",
+        "UUID +550e8400-e29b-41d4-a716-446655440000",
+        "template {{phone_number}}",
+        "template <e164-number>",
+        "documentation says E.164 without a value",
+        "empty phone=",
+        "plus only +",
+        "ordinary prose without a phone number",
+        "country code label +CCNNNNNN",
+    )
+    if len(texts) != count:
+        raise ValueError("curated phone negative count does not match manifest")
+    return [
+        PIIAccuracyScenario(
+            scenario_id=f"curated-phone-negative-{index:04d}",
+            category="curated_phone_negative",
+            text=text,
+            expected=(),
+        )
+        for index, text in enumerate(texts)
+    ]
+
+
 def _curated_negative_scenarios(count: int) -> list[PIIAccuracyScenario]:
     """Return explicit realistic lookalikes that must remain unchanged."""
 
@@ -754,6 +834,7 @@ def build_corpus(
         *_ip_scenarios(groups["ip_positive"]),
         *_mac_scenarios(groups["mac_positive"]),
         *_iban_scenarios(groups["iban_positive"]),
+        *_phone_scenarios(groups["phone_positive"]),
         *_mixed_scenarios(groups["mixed_positive"]),
         *_negative_scenarios(groups["negative"]),
         *_curated_email_scenarios(groups["curated_email_positive"]),
@@ -761,6 +842,7 @@ def build_corpus(
         *_curated_mac_scenarios(groups["curated_mac_positive"]),
         *_curated_mac_negative_scenarios(groups["curated_mac_negative"]),
         *_curated_iban_negative_scenarios(groups["curated_iban_negative"]),
+        *_curated_phone_negative_scenarios(groups["curated_phone_negative"]),
         *_curated_negative_scenarios(groups["curated_negative"]),
     ]
     seed = manifest["seed"]
@@ -812,6 +894,7 @@ def evaluate_corpus(
             IPAddressRule(),
             MACAddressRule(MACAddressConfig()),
             IBANRule(IBANConfig()),
+            PhoneNumberRule(),
         )
     )
     expected_by_rule: Counter[str] = Counter()

@@ -23,6 +23,7 @@ from .mac_address import MACAddressConfig
 from .iban import IBANConfig
 from .authorization_header import AuthorizationHeaderConfig
 from .email_address import EmailAddressConfig
+from .phone_number import PhoneNumberConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
 from .private_key import PrivateKeyConfig
@@ -40,6 +41,7 @@ from .rules.mac_address import MACAddressRule
 from .rules.iban import IBANRule
 from .rules.authorization_header import AuthorizationHeaderRule
 from .rules.email_address import EmailAddressRule
+from .rules.phone_number import PhoneNumberRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
 from .rules.private_key import PrivateKeyRule
@@ -160,6 +162,7 @@ def _initialize_worker(
     iban_config: IBANConfig | None,
     authorization_header_config: AuthorizationHeaderConfig | None,
     email_address_config: EmailAddressConfig | None,
+    phone_number_config: PhoneNumberConfig | None,
     payment_card_config: PaymentCardConfig | None,
     private_key_config: PrivateKeyConfig | None,
     jwt_token_config: JWTTokenConfig | None,
@@ -180,6 +183,7 @@ def _initialize_worker(
         and iban_config is None
         and authorization_header_config is None
         and email_address_config is None
+        and phone_number_config is None
         and payment_card_config is None
         and private_key_config is None
         and jwt_token_config is None
@@ -210,6 +214,8 @@ def _initialize_worker(
             rules.append(AuthorizationHeaderRule(authorization_header_config))
         if email_address_config is not None:
             rules.append(EmailAddressRule(email_address_config))
+        if phone_number_config is not None:
+            rules.append(PhoneNumberRule(phone_number_config))
         if payment_card_config is not None:
             rules.append(PaymentCardRule(payment_card_config))
         if private_key_config is not None:
@@ -352,6 +358,7 @@ class ProcessScannerPool:
         iban_config: IBANConfig | None = None,
         authorization_header_config: AuthorizationHeaderConfig | None = None,
         email_address_config: EmailAddressConfig | None = None,
+        phone_number_config: PhoneNumberConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
         jwt_token_config: JWTTokenConfig | None = None,
@@ -415,6 +422,12 @@ class ProcessScannerPool:
         ):
             raise TypeError(
                 "email_address_config must be an EmailAddressConfig or None"
+            )
+        if phone_number_config is not None and not isinstance(
+            phone_number_config, PhoneNumberConfig
+        ):
+            raise TypeError(
+                "phone_number_config must be a PhoneNumberConfig or None"
             )
         if payment_card_config is not None and not isinstance(
             payment_card_config, PaymentCardConfig
@@ -528,6 +541,11 @@ class ProcessScannerPool:
                         else ()
                     ),
                     *(
+                        ("pii.phone_number",)
+                        if phone_number_config is not None
+                        else ()
+                    ),
+                    *(
                         ("pii.payment_card",)
                         if resolved_payment_card_config is not None
                         else ()
@@ -562,6 +580,7 @@ class ProcessScannerPool:
                     "pii.iban",
                     "secrets.authorization_header",
                     "pii.email_address",
+                    "pii.phone_number",
                     "pii.payment_card",
                     "secrets.private_key",
                     "secrets.jwt_token",
@@ -581,6 +600,7 @@ class ProcessScannerPool:
         self._iban_config = iban_config
         self._authorization_header_config = authorization_header_config
         self._email_address_config = email_address_config
+        self._phone_number_config = phone_number_config
         self._payment_card_config = resolved_payment_card_config
         self._private_key_config = resolved_private_key_config
         self._jwt_token_config = resolved_jwt_token_config
@@ -656,6 +676,10 @@ class ProcessScannerPool:
         return self._email_address_config
 
     @property
+    def phone_number_config(self) -> PhoneNumberConfig | None:
+        return self._phone_number_config
+
+    @property
     def payment_card_config(self) -> PaymentCardConfig | None:
         return self._payment_card_config
 
@@ -698,6 +722,7 @@ class ProcessScannerPool:
                         self._iban_config,
                         self._authorization_header_config,
                         self._email_address_config,
+                        self._phone_number_config,
                         self._payment_card_config,
                         self._private_key_config,
                         self._jwt_token_config,

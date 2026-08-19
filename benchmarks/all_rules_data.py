@@ -29,6 +29,7 @@ ALL_TEXT_RULE_IDS = frozenset(
         "pii.iban",
         "secrets.authorization_header",
         "pii.email_address",
+        "pii.phone_number",
         "text.excessive_repetition",
     }
 )
@@ -162,6 +163,7 @@ def _positive_input(size: int) -> TextScenario:
         prefix="Authorization: Bearer ",
     )
     _append(parts, expected, "pii.email_address", "benchmark.user@example.com", prefix="email=")
+    _append(parts, expected, "pii.phone_number", "+999000000000001", prefix="phone=")
     repeated = "repeat " * 64
     _append(
         parts,
@@ -191,6 +193,7 @@ def _near_miss_input(size: int) -> TextScenario:
         "sk-AAAAAAAAAAAAAAAAAAA\n",
         "Card 4242424242424241\n",
         "email user_at_example_dot_com\n",
+        "phone +44 20 7946 0958\n",
         "IP 999.1.1.1\n",
         "MAC 00:11:22:33:44\n",
         "IBAN GB29NWBK60161331926818\n",

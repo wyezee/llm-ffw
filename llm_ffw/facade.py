@@ -15,6 +15,7 @@ from .capabilities import (
     IBANCapability,
     AuthorizationHeaderCapability,
     EmailAddressCapability,
+    PhoneNumberCapability,
     RuleCapability,
     SecretCatalogCapability,
     UnsafeURLCapability,
@@ -37,6 +38,7 @@ from .iban import (
 )
 from .authorization_header import AuthorizationHeaderConfig
 from .email_address import EmailAddressConfig
+from .phone_number import PhoneNumberConfig
 from .facade_config import FirewallConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
@@ -61,6 +63,7 @@ from .rules.mac_address import MACAddressRule
 from .rules.iban import IBANRule
 from .rules.authorization_header import AuthorizationHeaderRule
 from .rules.email_address import EmailAddressRule
+from .rules.phone_number import PhoneNumberRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
 from .rules.private_key import PrivateKeyRule
@@ -147,6 +150,7 @@ class Firewall:
         iban_config: IBANConfig | None = None,
         authorization_header_config: AuthorizationHeaderConfig | None = None,
         email_address_config: EmailAddressConfig | None = None,
+        phone_number_config: PhoneNumberConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
         jwt_token_config: JWTTokenConfig | None = None,
@@ -176,6 +180,7 @@ class Firewall:
             iban_config=iban_config,
             authorization_header_config=authorization_header_config,
             email_address_config=email_address_config,
+            phone_number_config=phone_number_config,
             payment_card_config=payment_card_config,
             private_key_config=private_key_config,
             jwt_token_config=jwt_token_config,
@@ -293,6 +298,14 @@ class Firewall:
                     rule_id=JWTTokenRule.RULE_ID,
                     purpose=JWTTokenRule.PURPOSE,
                     scopes=tuple(self._pool.jwt_token_config.scopes),
+                )
+            )
+        if self._pool.phone_number_config is not None:
+            rule_capabilities.append(
+                RuleCapability(
+                    rule_id=PhoneNumberRule.RULE_ID,
+                    purpose=PhoneNumberRule.PURPOSE,
+                    scopes=tuple(self._pool.phone_number_config.scopes),
                 )
             )
         if self._pool.repetition_config is not None:
@@ -437,6 +450,15 @@ class Firewall:
                     ),
                 )
                 if self._pool.jwt_token_config is not None
+                else None
+            ),
+            phone_number=(
+                PhoneNumberCapability(
+                    max_candidates=(
+                        self._pool.phone_number_config.max_candidates
+                    ),
+                )
+                if self._pool.phone_number_config is not None
                 else None
             ),
             repetition=(

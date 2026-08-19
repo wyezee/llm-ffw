@@ -21,13 +21,14 @@ from llm_ffw import (
     IBANRule,
     IPAddressRule,
     MACAddressRule,
+    PhoneNumberRule,
     RuleScanner,
 )
 from tools import pii_accuracy_gate
 
 
 EXPECTED_DIGEST = (
-    "481dd64f626e744b1b21c7c39438f2bdbbce5ef8fbee55b6f970048bb9e6af6c"
+    "2fff0b029bcf6f2e73d5b8cf5fdb13cebc444e4f2ba3d8b711c71a1129cb9838"
 )
 
 
@@ -38,7 +39,7 @@ class PIIAccuracyCorpusTests(unittest.TestCase):
 
         self.assertEqual(first, second)
         self.assertEqual(first.sha256, EXPECTED_DIGEST)
-        self.assertEqual(len(first.scenarios), 601)
+        self.assertEqual(len(first.scenarios), 697)
         self.assertFalse(first.uses_llm)
         self.assertFalse(first.uses_network)
         self.assertTrue(first.synthetic_examples_only)
@@ -99,6 +100,11 @@ class PIIAccuracyCorpusTests(unittest.TestCase):
                         for character in compact[4:] + compact[:4]
                     )
                     self.assertEqual(int(converted) % 97, 1)
+                elif finding.rule_id == PhoneNumberRule.RULE_ID:
+                    self.assertTrue(value.startswith("+999"))
+                    self.assertTrue(value[1:].isascii())
+                    self.assertTrue(value[1:].isdigit())
+                    self.assertLessEqual(len(value) - 1, 15)
                 else:
                     self.fail(f"unexpected rule_id: {finding.rule_id}")
 
@@ -121,7 +127,7 @@ class PIIAccuracyCorpusTests(unittest.TestCase):
                 manifest_path.read_text(encoding="utf-8")
             )
 
-        self.assertEqual(len(lines), 601)
+        self.assertEqual(len(lines), 697)
         self.assertEqual(generated_manifest["sha256"], EXPECTED_DIGEST)
         self.assertTrue(generated_manifest["synthetic_examples_only"])
         self.assertEqual(
@@ -133,12 +139,14 @@ class PIIAccuracyCorpusTests(unittest.TestCase):
                 "curated_mac_positive": 20,
                 "curated_mac_negative": 32,
                 "curated_negative": 64,
+                "curated_phone_negative": 32,
                 "email_positive": 64,
                 "ip_positive": 64,
                 "iban_positive": 89,
                 "mac_positive": 64,
                 "mixed_positive": 32,
                 "negative": 96,
+                "phone_positive": 64,
             },
         )
         self.assertNotIn("text", generated_manifest)
@@ -186,10 +194,10 @@ class PIIAccuracyEvaluationTests(unittest.TestCase):
     def test_current_rules_pass_exact_accuracy_and_redaction(self) -> None:
         report = evaluate_corpus(build_corpus())
 
-        self.assertEqual(report.expected_findings, 409)
-        self.assertEqual(report.actual_findings, 409)
-        self.assertEqual(report.true_positives, 409)
-        self.assertEqual(report.true_negative_scenarios, 224)
+        self.assertEqual(report.expected_findings, 473)
+        self.assertEqual(report.actual_findings, 473)
+        self.assertEqual(report.true_positives, 473)
+        self.assertEqual(report.true_negative_scenarios, 256)
         self.assertEqual(report.false_positives, 0)
         self.assertEqual(report.false_negatives, 0)
         self.assertEqual(report.redaction_failures, 0)
@@ -211,6 +219,7 @@ class PIIAccuracyEvaluationTests(unittest.TestCase):
                 IBANRule.RULE_ID: (89, 89, 0, 0),
                 IPAddressRule.RULE_ID: (120, 120, 0, 0),
                 MACAddressRule.RULE_ID: (84, 84, 0, 0),
+                PhoneNumberRule.RULE_ID: (64, 64, 0, 0),
             },
         )
         self.assertEqual(
@@ -230,12 +239,14 @@ class PIIAccuracyEvaluationTests(unittest.TestCase):
                 "curated_mac_positive": (20, 0, 0, 0),
                 "curated_mac_negative": (32, 0, 0, 0),
                 "curated_negative": (64, 0, 0, 0),
+                "curated_phone_negative": (32, 0, 0, 0),
                 "email_positive": (64, 0, 0, 0),
                 "ip_positive": (64, 0, 0, 0),
                 "iban_positive": (89, 0, 0, 0),
                 "mac_positive": (64, 0, 0, 0),
                 "mixed_positive": (32, 0, 0, 0),
                 "negative": (96, 0, 0, 0),
+                "phone_positive": (64, 0, 0, 0),
             },
         )
 

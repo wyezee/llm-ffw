@@ -8,6 +8,7 @@ from .authorization_header import AuthorizationHeaderConfig
 from .banned_substring_catalog import BannedSubstringCatalog
 from .config import RuleScannerConfig
 from .email_address import EmailAddressConfig
+from .phone_number import PhoneNumberConfig
 from .iban import IBANConfig
 from .ip_address import IPAddressConfig
 from .json_output import JSONOutputConfig
@@ -35,6 +36,7 @@ class _FacadeKwargs(TypedDict):
     iban_config: IBANConfig | None
     authorization_header_config: AuthorizationHeaderConfig | None
     email_address_config: EmailAddressConfig | None
+    phone_number_config: PhoneNumberConfig | None
     payment_card_config: PaymentCardConfig | None
     private_key_config: PrivateKeyConfig | None
     jwt_token_config: JWTTokenConfig | None
@@ -70,6 +72,7 @@ class FirewallConfig:
     iban_config: IBANConfig | None = None
     authorization_header_config: AuthorizationHeaderConfig | None = None
     email_address_config: EmailAddressConfig | None = None
+    phone_number_config: PhoneNumberConfig | None = None
     payment_card_config: PaymentCardConfig | None = None
     private_key_config: PrivateKeyConfig | None = None
     jwt_token_config: JWTTokenConfig | None = None
@@ -113,6 +116,7 @@ class FirewallConfig:
                 AuthorizationHeaderConfig,
             ),
             ("email_address_config", self.email_address_config, EmailAddressConfig),
+            ("phone_number_config", self.phone_number_config, PhoneNumberConfig),
             ("payment_card_config", self.payment_card_config, PaymentCardConfig),
             ("private_key_config", self.private_key_config, PrivateKeyConfig),
             ("jwt_token_config", self.jwt_token_config, JWTTokenConfig),
@@ -155,6 +159,7 @@ class FirewallConfig:
             mac_address_config=MACAddressConfig(),
             iban_config=IBANConfig(),
             email_address_config=EmailAddressConfig(),
+            phone_number_config=PhoneNumberConfig(),
         )
 
     @classmethod
@@ -187,6 +192,7 @@ class FirewallConfig:
             iban_config=IBANConfig(),
             authorization_header_config=AuthorizationHeaderConfig(),
             email_address_config=EmailAddressConfig(),
+            phone_number_config=PhoneNumberConfig(),
             repetition_config=RepetitionConfig(),
             request_timeout_seconds=30.0,
         )
@@ -207,6 +213,7 @@ class FirewallConfig:
             "iban_config": self.iban_config,
             "authorization_header_config": self.authorization_header_config,
             "email_address_config": self.email_address_config,
+            "phone_number_config": self.phone_number_config,
             "payment_card_config": self.payment_card_config,
             "private_key_config": self.private_key_config,
             "jwt_token_config": self.jwt_token_config,

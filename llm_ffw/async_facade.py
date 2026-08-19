@@ -19,6 +19,7 @@ from .mac_address import MACAddressConfig
 from .iban import IBANConfig
 from .authorization_header import AuthorizationHeaderConfig
 from .email_address import EmailAddressConfig
+from .phone_number import PhoneNumberConfig
 from .facade_config import FirewallConfig
 from .json_output import JSONOutputConfig
 from .jwt_token import JWTTokenConfig
@@ -209,6 +210,7 @@ class AsyncFirewall:
         iban_config: IBANConfig | None = None,
         authorization_header_config: AuthorizationHeaderConfig | None = None,
         email_address_config: EmailAddressConfig | None = None,
+        phone_number_config: PhoneNumberConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
         jwt_token_config: JWTTokenConfig | None = None,
@@ -234,6 +236,7 @@ class AsyncFirewall:
             iban_config=iban_config,
             authorization_header_config=authorization_header_config,
             email_address_config=email_address_config,
+            phone_number_config=phone_number_config,
             payment_card_config=payment_card_config,
             private_key_config=private_key_config,
             jwt_token_config=jwt_token_config,
@@ -397,6 +400,7 @@ class AsyncFirewallManager:
         iban_config: IBANConfig | None = None,
         authorization_header_config: AuthorizationHeaderConfig | None = None,
         email_address_config: EmailAddressConfig | None = None,
+        phone_number_config: PhoneNumberConfig | None = None,
         payment_card_config: PaymentCardConfig | None = None,
         private_key_config: PrivateKeyConfig | None = None,
         jwt_token_config: JWTTokenConfig | None = None,
@@ -422,6 +426,7 @@ class AsyncFirewallManager:
             iban_config=iban_config,
             authorization_header_config=authorization_header_config,
             email_address_config=email_address_config,
+            phone_number_config=phone_number_config,
             payment_card_config=payment_card_config,
             private_key_config=private_key_config,
             jwt_token_config=jwt_token_config,

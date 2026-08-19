@@ -4,6 +4,13 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Added
+
+- Added opt-in, input-default `PhoneNumberRule` inspection for a conservative
+  E.164-style subset, with bounded candidates, disclosure-safe findings,
+  privacy/all-rules preset integration, deterministic accuracy coverage, and
+  an 8 MB performance gate.
+
 ## 0.12.0 - 2026-08-19
 
 - Detect lowercase and mixed-case IBAN representations without changing their
