@@ -80,6 +80,8 @@ class AuthorizationHeaderRuleTests(unittest.TestCase):
     def test_detects_basic_and_bearer_with_exact_credential_spans(self) -> None:
         cases = (
             (f"Authorization: Bearer {_BEARER}", _BEARER, "bearer"),
+            (f"    Authorization: Bearer {_BEARER}", _BEARER, "bearer"),
+            (f"\tAuthorization: Basic {_BASIC}", _BASIC, "basic"),
             (f"authorization:\tBASIC\t{_BASIC}\t", _BASIC, "basic"),
             (f"AUTHORIZATION: bearer {_BEARER}\r\nNext: value", _BEARER, "bearer"),
             (f"Authorization: Bearer {_BEARER}\rNext: value", _BEARER, "bearer"),
@@ -97,7 +99,7 @@ class AuthorizationHeaderRuleTests(unittest.TestCase):
                     "[REDACTED:authorization_credential]",
                 )
 
-    def test_rejects_nonheaders_unsupported_schemes_and_malformed_values(self) -> None:
+    def test_rejects_nonheaders_unsupported_schemes_and_placeholders(self) -> None:
         cases = (
             f"prefix Authorization: Bearer {_BEARER}",
             f" Proxy-Authorization: Bearer {_BEARER}",
@@ -106,18 +108,38 @@ class AuthorizationHeaderRuleTests(unittest.TestCase):
             "Authorization: Digest abcdef",
             "Authorization: Bearer <token>",
             "Authorization: Bearer your token",
-            "Authorization: Bearer abc=def",
             "Authorization: Bearer",
-            "Authorization: Basic not-base64",
-            "Authorization: Basic dXNlcg==",
-            "Authorization: Basic Og=",
-            "Authorization: Basic Oh==",
             f"authorization： bearer {_BEARER}",
         )
         scanner = _scanner()
         for text in cases:
             with self.subTest(text=text[:40]):
                 self.assertEqual(scanner.scan(text), ())
+
+    def test_redacts_malformed_credentials_in_unambiguous_headers(self) -> None:
+        cases = (
+            ("Authorization: Bearer abc=def", "bearer"),
+            ("Authorization: Bearer AAAA=BBBB", "bearer"),
+            ("Authorization: Basic not-base64", "basic"),
+            ("Authorization: Basic dXNlcg==", "basic"),
+            ("Authorization: Basic Og=", "basic"),
+            ("Authorization: Basic Oh==", "basic"),
+            ("Authorization: Bearer secret value", "bearer"),
+        )
+        scanner = _scanner()
+        for text, scheme in cases:
+            with self.subTest(text=text):
+                finding = scanner.scan(text)[0]
+                self.assertEqual(
+                    finding.metadata["reason"],
+                    "malformed_authorization_credential",
+                )
+                self.assertEqual(finding.metadata["scheme"], scheme)
+                self.assertIs(finding.action, Action.REDACT)
+                self.assertNotIn(
+                    text[finding.span.start : finding.span.end],
+                    repr(finding),
+                )
 
     def test_multiple_headers_are_ordered_and_redacted_without_disclosure(self) -> None:
         text = (

@@ -6,6 +6,8 @@ All notable changes are recorded here before a tagged release.
 
 - Detect lowercase and mixed-case IBAN representations without changing their
   original redaction spans.
+- Recognize indented Authorization headers and redact malformed,
+  non-placeholder Basic and Bearer credentials instead of failing open.
 
 ## 0.11.1 - 2026-08-19
 

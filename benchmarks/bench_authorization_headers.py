@@ -64,8 +64,8 @@ def benchmark(
         ),
         (
             "malformed_at_end",
-            _sized_suffix(size, "\nAuthorization: Bearer <token>"),
-            Action.ALLOW,
+            _sized_suffix(size, "\n    Authorization: Bearer AAAA=BBBB"),
+            Action.REDACT,
         ),
         ("bearer_at_end", valid_text, Action.REDACT),
         (

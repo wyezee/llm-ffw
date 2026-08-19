@@ -833,7 +833,8 @@ firewall = Firewall(
 )
 ```
 
-`AuthorizationHeaderRule` recognizes case-insensitive `Authorization:` headers
+`AuthorizationHeaderRule` recognizes optionally indented, case-insensitive
+`Authorization:` headers
 only at the start of a normalized line. The field name must be followed
 immediately by `:`. Bearer values use the token68 alphabet with any padding
 confined to the end. Basic values must be canonical base64, decode successfully,
@@ -843,7 +844,9 @@ redacted; the header name and authentication scheme remain.
 The rule is opt-in, scans input and output by default, and has hard bounds on
 candidate count and credential length. It deliberately excludes Digest,
 `Proxy-Authorization`, authentication parameters, header folding, inline prose,
-and placeholder syntax such as `<token>`. Syntactic validity does not prove
+and placeholder syntax such as `<token>`. Non-placeholder values are redacted
+even when malformed, because an unambiguous credential header must not fail
+open. Syntactic validity does not prove
 that a credential is active or accepted by any server, and the rule makes no
 network call.
 

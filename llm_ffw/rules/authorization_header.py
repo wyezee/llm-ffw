@@ -13,7 +13,7 @@ from .base import Rule, RuleMatch
 # Fixed literals and bounded alternatives anchored to the start of a line.
 # Credential parsing is performed by explicit bounded character checks.
 _HEADER_PREFIX = re.compile(
-    r"^authorization:[ \t]*(?P<scheme>basic|bearer)[ \t]+",
+    r"^[ \t]*authorization:[ \t]*(?P<scheme>basic|bearer)[ \t]+",
     re.ASCII | re.IGNORECASE | re.MULTILINE,
 )
 _BEARER_CHARS = frozenset(
@@ -22,6 +22,7 @@ _BEARER_CHARS = frozenset(
 _BASIC_CHARS = frozenset(
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
 )
+_PLACEHOLDERS = frozenset(("<token>", "your token"))
 
 
 def _credential_end(text: str, start: int) -> tuple[int, int]:
@@ -58,6 +59,10 @@ def _valid_basic(value: str) -> bool:
     except (Base64Error, ValueError):
         return False
     return b":" in decoded and b64encode(decoded).decode("ascii") == value
+
+
+def _is_placeholder(value: str) -> bool:
+    return value.lower() in _PLACEHOLDERS
 
 
 class AuthorizationHeaderRule(Rule):
@@ -149,8 +154,13 @@ class AuthorizationHeaderRule(Rule):
                 if scheme == "basic"
                 else _valid_bearer(value)
             )
-            if not valid:
+            if not valid and _is_placeholder(value):
                 continue
+            reason = (
+                "authorization_credential"
+                if valid
+                else "malformed_authorization_credential"
+            )
             matches.append(
                 RuleMatch(
                     span=Span(start, end),
@@ -159,7 +169,7 @@ class AuthorizationHeaderRule(Rule):
                     message="Authorization-header credential detected.",
                     redacted_preview="[REDACTED:authorization_credential]",
                     metadata={
-                        "reason": "authorization_credential",
+                        "reason": reason,
                         "scheme": scheme,
                         "detector": "bounded_authorization_header",
                         "span_basis": "characters",
