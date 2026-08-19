@@ -9,6 +9,7 @@ from .connection_string import ConnectionStringConfig
 from .banned_substring_catalog import BannedSubstringCatalog
 from .config import RuleScannerConfig
 from .email_address import EmailAddressConfig
+from .external_resource import ExternalResourceConfig
 from .phone_number import PhoneNumberConfig
 from .iban import IBANConfig
 from .ip_address import IPAddressConfig
@@ -32,6 +33,7 @@ class _FacadeKwargs(TypedDict):
     banned_substring_catalog: BannedSubstringCatalog | None
     json_output_config: JSONOutputConfig | None
     unsafe_url_config: UnsafeURLConfig | None
+    external_resource_config: ExternalResourceConfig | None
     ip_address_config: IPAddressConfig | None
     mac_address_config: MACAddressConfig | None
     iban_config: IBANConfig | None
@@ -69,6 +71,7 @@ class FirewallConfig:
     )
     json_output_config: JSONOutputConfig | None = None
     unsafe_url_config: UnsafeURLConfig | None = None
+    external_resource_config: ExternalResourceConfig | None = None
     ip_address_config: IPAddressConfig | None = None
     mac_address_config: MACAddressConfig | None = None
     iban_config: IBANConfig | None = None
@@ -110,6 +113,11 @@ class FirewallConfig:
             ),
             ("json_output_config", self.json_output_config, JSONOutputConfig),
             ("unsafe_url_config", self.unsafe_url_config, UnsafeURLConfig),
+            (
+                "external_resource_config",
+                self.external_resource_config,
+                ExternalResourceConfig,
+            ),
             ("ip_address_config", self.ip_address_config, IPAddressConfig),
             ("mac_address_config", self.mac_address_config, MACAddressConfig),
             ("iban_config", self.iban_config, IBANConfig),
@@ -218,6 +226,7 @@ class FirewallConfig:
             banned_substring_catalog=banned_substring_catalog,
             json_output_config=JSONOutputConfig(),
             unsafe_url_config=UnsafeURLConfig(),
+            external_resource_config=ExternalResourceConfig(),
             ip_address_config=IPAddressConfig(),
             mac_address_config=MACAddressConfig(),
             iban_config=IBANConfig(),
@@ -240,6 +249,7 @@ class FirewallConfig:
             "banned_substring_catalog": self.banned_substring_catalog,
             "json_output_config": self.json_output_config,
             "unsafe_url_config": self.unsafe_url_config,
+            "external_resource_config": self.external_resource_config,
             "ip_address_config": self.ip_address_config,
             "mac_address_config": self.mac_address_config,
             "iban_config": self.iban_config,

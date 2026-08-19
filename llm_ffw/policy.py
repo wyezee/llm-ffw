@@ -477,6 +477,7 @@ def _builtin_policy(
     unicode_tag_action: Action | None,
     json_output_action: Action,
     unsafe_url_action: Action,
+    external_resource_action: Action,
     ip_address_action: Action,
     mac_address_action: Action,
     iban_action: Action,
@@ -524,7 +525,7 @@ def _builtin_policy(
     )
     return FirewallPolicy(
         policy_id=policy_id,
-        version="1.15.0",
+        version="1.16.0",
         overrides=(
             PolicyOverride("secrets.detected", ScanScope.INPUT, input_action),
             PolicyOverride("secrets.detected", ScanScope.OUTPUT, output_action),
@@ -545,6 +546,11 @@ def _builtin_policy(
                 "url.unsafe",
                 ScanScope.OUTPUT,
                 unsafe_url_action,
+            ),
+            PolicyOverride(
+                "output.external_resource",
+                ScanScope.OUTPUT,
+                external_resource_action,
             ),
             PolicyOverride(
                 "pii.ip_address",
@@ -659,6 +665,7 @@ BALANCED_POLICY = _builtin_policy(
     unicode_tag_action=None,
     json_output_action=Action.BLOCK,
     unsafe_url_action=Action.REDACT,
+    external_resource_action=Action.REDACT,
     ip_address_action=Action.REDACT,
     mac_address_action=Action.REDACT,
     iban_action=Action.REDACT,
@@ -679,6 +686,7 @@ STRICT_POLICY = _builtin_policy(
     unicode_tag_action=Action.BLOCK,
     json_output_action=Action.BLOCK,
     unsafe_url_action=Action.BLOCK,
+    external_resource_action=Action.BLOCK,
     ip_address_action=Action.BLOCK,
     mac_address_action=Action.BLOCK,
     iban_action=Action.BLOCK,
@@ -699,6 +707,7 @@ AUDIT_POLICY = _builtin_policy(
     unicode_tag_action=Action.REVIEW,
     json_output_action=Action.REVIEW,
     unsafe_url_action=Action.REVIEW,
+    external_resource_action=Action.REVIEW,
     ip_address_action=Action.REVIEW,
     mac_address_action=Action.REVIEW,
     iban_action=Action.REVIEW,
@@ -736,6 +745,7 @@ class RuleEngine:
                     "unicode.tag_smuggling",
                     "output.json.validity",
                     "url.unsafe",
+                    "output.external_resource",
                     "pii.ip_address",
                     "pii.mac_address",
                     "pii.iban",

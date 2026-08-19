@@ -25,6 +25,7 @@ ALL_TEXT_RULE_IDS = frozenset(
         "content.banned_substrings",
         "output.json.validity",
         "url.unsafe",
+        "output.external_resource",
         "pii.ip_address",
         "pii.mac_address",
         "pii.iban",
@@ -320,6 +321,42 @@ def _invalid_output(size: int) -> TextScenario:
     )
 
 
+def _external_resource_output(size: int) -> TextScenario:
+    url = "https://outside.example/pixel.png?payload=synthetic"
+    prefix = '{"image":"![status]('
+    suffix = ')","padding":"'
+    ending = '"}'
+    fixed = len(prefix) + len(url) + len(suffix) + len(ending)
+    if size < fixed:
+        raise ValueError("size is too small for an external-resource output")
+    target = size - fixed
+    chunks: list[str] = []
+    current = 0
+    index = 0
+    while current < target:
+        chunk = f"ordinary{index:08d}-"
+        fragment = chunk[: target - current]
+        chunks.append(fragment)
+        current += len(fragment)
+        index += 1
+    text = prefix + url + suffix + "".join(chunks) + ending
+    json.loads(text)
+    start = len(prefix)
+    return TextScenario(
+        "sparse-output-external-resource",
+        "sparse",
+        ScanScope.OUTPUT,
+        text,
+        (
+            ExpectedFinding(
+                "output.external_resource",
+                start,
+                start + len(url),
+            ),
+        ),
+    )
+
+
 def build_text_scenarios(size: int) -> tuple[TextScenario, ...]:
     """Build exact-size clean, positive, and adversarial text profiles."""
 
@@ -330,6 +367,7 @@ def build_text_scenarios(size: int) -> tuple[TextScenario, ...]:
         _clean_code_log_input(size),
         _clean_output(size),
         _invalid_output(size),
+        _external_resource_output(size),
         _positive_input(size),
         _dense_input(size),
         _near_miss_input(size),

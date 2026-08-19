@@ -20,6 +20,7 @@ from .iban import IBANConfig
 from .authorization_header import AuthorizationHeaderConfig
 from .connection_string import ConnectionStringConfig
 from .email_address import EmailAddressConfig
+from .external_resource import ExternalResourceConfig
 from .phone_number import PhoneNumberConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
@@ -75,6 +76,7 @@ class FirewallManager:
         banned_substring_catalog: BannedSubstringCatalog | None = None,
         json_output_config: JSONOutputConfig | None = None,
         unsafe_url_config: UnsafeURLConfig | None = None,
+        external_resource_config: ExternalResourceConfig | None = None,
         ip_address_config: IPAddressConfig | None = None,
         mac_address_config: MACAddressConfig | None = None,
         iban_config: IBANConfig | None = None,
@@ -96,6 +98,7 @@ class FirewallManager:
         self._banned_substring_catalog = banned_substring_catalog
         self._json_output_config = json_output_config
         self._unsafe_url_config = unsafe_url_config
+        self._external_resource_config = external_resource_config
         self._ip_address_config = ip_address_config
         self._mac_address_config = mac_address_config
         self._iban_config = iban_config
@@ -140,6 +143,7 @@ class FirewallManager:
             banned_substring_catalog=self._banned_substring_catalog,
             json_output_config=self._json_output_config,
             unsafe_url_config=self._unsafe_url_config,
+            external_resource_config=self._external_resource_config,
             ip_address_config=self._ip_address_config,
             mac_address_config=self._mac_address_config,
             iban_config=self._iban_config,

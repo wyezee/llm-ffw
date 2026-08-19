@@ -4,6 +4,7 @@ from .capabilities import (
     BannedSubstringCatalogCapability,
     FirewallCapabilities,
     EmailAddressCapability,
+    ExternalResourceCapability,
     PhoneNumberCapability,
     JSONOutputCapability,
     IPAddressCapability,
@@ -47,6 +48,7 @@ from .iban import IBANConfig
 from .authorization_header import AuthorizationHeaderConfig
 from .connection_string import ConnectionStringConfig
 from .email_address import EmailAddressConfig
+from .external_resource import ExternalResourceConfig
 from .phone_number import PhoneNumberConfig
 from .unsafe_url import UnsafeURLConfig
 from .payment_card import PaymentCardConfig
@@ -110,6 +112,7 @@ from .rules.iban import IBANRule
 from .rules.authorization_header import AuthorizationHeaderRule
 from .rules.connection_string import ConnectionStringRule
 from .rules.email_address import EmailAddressRule
+from .rules.external_resource import ExternalResourceRule
 from .rules.phone_number import PhoneNumberRule
 from .rules.unsafe_url import UnsafeURLRule
 from .rules.payment_card import PaymentCardRule
@@ -135,6 +138,9 @@ __all__ = [
     "EmailAddressCapability",
     "EmailAddressConfig",
     "EmailAddressRule",
+    "ExternalResourceCapability",
+    "ExternalResourceConfig",
+    "ExternalResourceRule",
     "PhoneNumberCapability",
     "PhoneNumberConfig",
     "PhoneNumberRule",

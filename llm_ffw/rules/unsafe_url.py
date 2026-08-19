@@ -7,7 +7,11 @@ from urllib.parse import urlsplit
 
 from ..findings import Action, Severity, Span
 from ..inspection import Inspection, ScanScope
-from ..unsafe_url import UnsafeURLConfig, _normalize_hostname
+from ..unsafe_url import (
+    UnsafeURLConfig,
+    _matches_hostname_suffix,
+    _normalize_hostname,
+)
 from .base import Rule, RuleMatch
 
 
@@ -98,20 +102,6 @@ def _find_candidates(
             )
         )
     return tuple(candidates), None
-
-
-def _matches_hostname_suffix(
-    hostname: str,
-    suffixes: frozenset[str],
-) -> bool:
-    if hostname in suffixes:
-        return True
-    boundary = hostname.find(".")
-    while boundary >= 0:
-        if hostname[boundary + 1 :] in suffixes:
-            return True
-        boundary = hostname.find(".", boundary + 1)
-    return False
 
 
 def _host_risks(

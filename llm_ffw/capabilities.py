@@ -135,6 +135,36 @@ class UnsafeURLCapability:
 
 
 @dataclass(frozen=True, slots=True)
+class ExternalResourceCapability:
+    """Disclosure-safe external-resource limits and allowlist counts."""
+
+    max_candidates: int
+    max_markup_chars: int
+    max_url_chars: int
+    opaque_path_segment_chars: int
+    allowed_hostname_count: int = 0
+    allowed_hostname_suffix_count: int = 0
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "max_candidates",
+            "max_markup_chars",
+            "max_url_chars",
+            "opaque_path_segment_chars",
+        ):
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{field_name} must be a positive integer")
+        for field_name in (
+            "allowed_hostname_count",
+            "allowed_hostname_suffix_count",
+        ):
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"{field_name} must be a non-negative integer")
+
+
+@dataclass(frozen=True, slots=True)
 class PaymentCardCapability:
     """Disclosure-safe payment-card inspection limits pinned to the facade."""
 
@@ -363,6 +393,7 @@ class FirewallCapabilities:
     banned_substring_catalog: BannedSubstringCatalogCapability | None = None
     json_output: JSONOutputCapability | None = None
     unsafe_url: UnsafeURLCapability | None = None
+    external_resource: ExternalResourceCapability | None = None
     ip_address: IPAddressCapability | None = None
     mac_address: MACAddressCapability | None = None
     iban: IBANCapability | None = None
@@ -406,6 +437,12 @@ class FirewallCapabilities:
             self.unsafe_url, UnsafeURLCapability
         ):
             raise TypeError("unsafe_url must be an UnsafeURLCapability or None")
+        if self.external_resource is not None and not isinstance(
+            self.external_resource, ExternalResourceCapability
+        ):
+            raise TypeError(
+                "external_resource must be an ExternalResourceCapability or None"
+            )
         if self.ip_address is not None and not isinstance(
             self.ip_address, IPAddressCapability
         ):
@@ -480,6 +517,7 @@ __all__ = [
     "BannedSubstringCatalogCapability",
     "FirewallCapabilities",
     "EmailAddressCapability",
+    "ExternalResourceCapability",
     "PhoneNumberCapability",
     "JSONOutputCapability",
     "IPAddressCapability",

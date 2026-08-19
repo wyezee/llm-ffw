@@ -22,7 +22,9 @@ and `ToolResultRule` validate bounded typed tool traffic before execution and
 before results return to the model. `AuthorizationHeaderRule` redacts exact
 Basic and Bearer credentials, `ConnectionStringRule` redacts credentials from
 explicit URI and ADO/ODBC connection-string forms, and `RepetitionRule` reviews
-conservative exact character, token, and line runs.
+conservative exact character, token, and line runs. Output-only
+`ExternalResourceRule` can redact suspicious external Markdown/HTML image URLs
+before a host renders them.
 
 ## Contents
 
@@ -48,7 +50,7 @@ conservative exact character, token, and line runs.
 `BALANCED_POLICY` is the default. Scope below means the scope selected by the
 normal configuration or `FirewallConfig.all_text_rules()`; configurable rules
 can be narrowed, and the input-only PII defaults can explicitly enable output
-inspection. The library exposes 18 text rules plus two structured validators:
+inspection. The library exposes 19 text rules plus two structured validators:
 
 | Rule | Activation | Default scope | Balanced handling | Policy choices |
 | --- | --- | --- | --- | --- |
@@ -62,6 +64,7 @@ inspection. The library exposes 18 text rules plus two structured validators:
 | `BannedSubstringsRule` | Opt-in catalog | Both by default | Catalog action; redact by default² | Per-entry action and Standard¹ override |
 | `JSONOutputRule` | Opt-in | Output | Block | Review or block |
 | `UnsafeURLRule` | Opt-in | Both | Redact | Standard¹ |
+| `ExternalResourceRule` | Opt-in | Output | Redact | Standard¹ |
 | `IPAddressRule` | Opt-in | Input; output configurable | Redact | Standard¹ |
 | `MACAddressRule` | Opt-in | Input; output configurable | Redact | Standard¹ |
 | `IBANRule` | Opt-in | Input; output configurable | Redact | Standard¹ |
@@ -581,7 +584,7 @@ with Firewall.from_config(config) as firewall:
 `default()` selects the seven-rule baseline, `privacy_input()` additionally
 enables conservative IP, MAC, IBAN, email, and phone input rules, and `json_api()`
 adds strict JSON-output and unsafe-URL inspection. `all_text_rules()` enables
-all 18 text rules, requires an explicit deployment-owned
+all 19 text rules, requires an explicit deployment-owned
 `BannedSubstringCatalog`, and uses a 30-second request timeout suitable for
 initial large-payload testing. Deployments must still tune that deadline from
 their own payload and latency measurements. Direct constructor parameters
@@ -597,6 +600,7 @@ by synchronous and asynchronous facades and managers.
 | `banned_substring_catalog` | Enable a deployment-owned immutable literal catalog |
 | `json_output_config` | Enable bounded output-only JSON validation |
 | `unsafe_url_config` | Enable bounded input/output URL inspection |
+| `external_resource_config` | Enable bounded output image-resource inspection |
 | `ip_address_config` | Enable bounded canonical IP-address inspection |
 | `mac_address_config` | Enable bounded canonical 48-bit MAC-address inspection |
 | `iban_config` | Enable registered-length and MOD-97 IBAN inspection |
@@ -612,7 +616,7 @@ by synchronous and asynchronous facades and managers.
 | `request_timeout_seconds` | Positive per-request facade deadline; defaults to 30 seconds |
 
 The two secret-catalog parameters are mutually exclusive. Passing `None` for
-the opt-in banned-substring, JSON, unsafe-URL, IP-address, MAC-address, IBAN,
+the opt-in banned-substring, JSON, unsafe-URL, external-resource, IP-address, MAC-address, IBAN,
 Authorization-header, connection-string, email-address, phone-number, and repetition configurations leaves each corresponding
 rule disabled. Payment-card,
 private-key, JWT, invisible-character, Unicode tag, and bidi-control rules are
@@ -686,6 +690,7 @@ Strict and audit policies can change the effective action.
 | `content.banned_substrings` | Opt-in | Catalog-defined | Pattern action; redact by default | `BannedSubstringCatalog` |
 | `output.json.validity` | Opt-in | Output | Block | `JSONOutputConfig` |
 | `url.unsafe` | Opt-in | Input/output by default | Redact | `UnsafeURLConfig` |
+| `output.external_resource` | Opt-in | Output | Redact | `ExternalResourceConfig` |
 | `pii.ip_address` | Opt-in | Input by default | Redact | `IPAddressConfig` |
 | `pii.mac_address` | Opt-in | Input by default | Redact | `MACAddressConfig` |
 | `pii.iban` | Opt-in | Input by default | Redact | `IBANConfig` |
@@ -943,6 +948,42 @@ fields accept DNS names or IP literals. Suffix fields accept DNS names only;
 allowlist. Denies and built-in unsafe-URL findings always take precedence over
 allows. The four policy fields together accept at most 1,024 entries. Runtime
 capabilities disclose only policy entry counts, never configured hostnames.
+
+### Opt-in external image-resource inspection
+
+Applications that render model output as Markdown or HTML can inspect
+auto-loaded external images before rendering:
+
+```python
+from llm_ffw import ExternalResourceConfig, Firewall
+
+with Firewall(
+    external_resource_config=ExternalResourceConfig(
+        allowed_hostname_suffixes=("assets.example",),
+    )
+) as firewall:
+    safe = firewall.sanitize_output(
+        "![status](https://outside.example/pixel.png?payload=synthetic)"
+    )
+```
+
+`ExternalResourceRule` is output-only and recognizes bounded inline CommonMark
+image destinations and HTML `<img src>` attributes. It redacts only an external
+HTTP(S) URL when the host is outside the configured allowlist and the URL has a
+non-empty query string or a single opaque alphanumeric/base64url-like path
+segment of at least 64 characters. Scheme-relative URLs are included. Hostname
+normalization and label-boundary suffix matching are shared with
+`UnsafeURLRule`; an empty allowlist trusts no external hostname. Exact and
+suffix entries are bounded to 1,024 total, and capabilities disclose counts,
+never hostname values.
+
+The syntax boundary follows [CommonMark 0.31.2 images](https://spec.commonmark.org/0.31.2/#images)
+and the HTML Standard's [`img` resource model](https://html.spec.whatwg.org/multipage/embedded-content.html#the-img-element).
+This first bounded version deliberately excludes ordinary clickable links,
+reference-style Markdown images, `srcset`, CSS URLs, and other media elements.
+It is lexical inspection, not proof that data is secret or that a particular
+renderer will fetch the resource. Keep renderer-level remote-resource blocking
+as the primary control.
 
 ### Opt-in IP-address inspection
 
@@ -1388,6 +1429,7 @@ py -3.14 -m venv .venv
 .venv\Scripts\python benchmarks/bench_phone_numbers.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_repetition.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_bidi_controls.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
+.venv\Scripts\python benchmarks/bench_external_resources.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_tool_calls.py
 .venv\Scripts\python benchmarks/bench_tool_results.py
 .venv\Scripts\python tools/pii_accuracy_gate.py
@@ -1419,7 +1461,7 @@ optional expanded JSONL corpus is written under the ignored
 `benchmarks/generated/` directory, while the compact seed, group counts, and
 expected digest remain version controlled.
 
-The all-rules harness enables all 18 text rules in every worker and exercises
+The all-rules harness enables all 19 text rules in every worker and exercises
 clean input, multilingual code/log-like input, valid JSON output, invalid JSON
 output, sparse positives for every rule, dense bounded matches, and adversarial
 near-misses. It verifies exact rule IDs, spans, and

@@ -35,6 +35,8 @@ from llm_ffw import (
     FirewallStream,
     EmailAddressConfig,
     EmailAddressRule,
+    ExternalResourceConfig,
+    ExternalResourceRule,
     IPAddressConfig,
     IPAddressRule,
     IBANConfig,
@@ -114,6 +116,7 @@ assert "mac_address_config" in facade_parameters
 assert "iban_config" in facade_parameters
 assert "authorization_header_config" in facade_parameters
 assert "connection_string_config" in facade_parameters
+assert "external_resource_config" in facade_parameters
 assert "repetition_config" in facade_parameters
 assert "email_address_config" in facade_parameters
 assert "phone_number_config" in facade_parameters
@@ -150,6 +153,18 @@ assert any(
     for rule in url_firewall.capabilities().rules
 )
 url_firewall.close()
+resource_firewall = Firewall(
+    external_resource_config=ExternalResourceConfig(
+        allowed_hostname_suffixes=("assets.example",)
+    )
+)
+assert resource_firewall.capabilities().external_resource.max_candidates == 128
+assert any(
+    rule.rule_id == ExternalResourceRule.RULE_ID
+    for rule in resource_firewall.capabilities().rules
+)
+assert "assets.example" not in repr(resource_firewall.capabilities())
+resource_firewall.close()
 ip_firewall = Firewall(ip_address_config=IPAddressConfig())
 assert ip_firewall.capabilities().ip_address.max_candidates == 128
 assert any(

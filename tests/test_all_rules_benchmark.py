@@ -35,6 +35,7 @@ class AllRulesDatasetTests(unittest.TestCase):
                 "clean-code-log-input",
                 "clean-output-json",
                 "invalid-output-json",
+                "sparse-output-external-resource",
                 "sparse-input",
                 "dense-input",
                 "adversarial-near-miss-input",
@@ -113,6 +114,28 @@ class AllRulesDatasetTests(unittest.TestCase):
 
 
 class AllRulesBenchmarkTests(unittest.TestCase):
+    def test_process_harness_verifies_external_resource_output(self) -> None:
+        scenario = next(
+            item
+            for item in build_text_scenarios(8_192)
+            if item.scenario_id == "sparse-output-external-resource"
+        )
+
+        result = run_benchmark(
+            scenario,
+            workers=1,
+            concurrency=1,
+            requests=1,
+            max_tasks_per_child=10,
+            request_timeout=30,
+        )
+
+        self.assertEqual(result.enabled_text_rules, 19)
+        self.assertEqual(
+            set(result.finding_counts),
+            {"output.external_resource"},
+        )
+
     def test_process_harness_verifies_sparse_expectations_and_metrics(self) -> None:
         sparse = next(
             item
@@ -128,7 +151,7 @@ class AllRulesBenchmarkTests(unittest.TestCase):
             request_timeout=30,
         )
 
-        self.assertEqual(result.enabled_text_rules, 18)
+        self.assertEqual(result.enabled_text_rules, 19)
         self.assertEqual(result.completed, 1)
         self.assertEqual(result.rejected + result.timed_out + result.failed, 0)
         self.assertEqual(set(result.finding_counts), {item.rule_id for item in sparse.expected})

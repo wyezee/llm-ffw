@@ -12,6 +12,7 @@ from .iban import IBANRule
 from .authorization_header import AuthorizationHeaderRule
 from .connection_string import ConnectionStringRule
 from .email_address import EmailAddressRule
+from .external_resource import ExternalResourceRule
 from .phone_number import PhoneNumberRule
 from .payment_card import PaymentCardRule
 from .private_key import PrivateKeyRule
@@ -34,6 +35,7 @@ __all__ = [
     "AuthorizationHeaderRule",
     "ConnectionStringRule",
     "EmailAddressRule",
+    "ExternalResourceRule",
     "PhoneNumberRule",
     "PaymentCardRule",
     "PrivateKeyRule",

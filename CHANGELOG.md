@@ -6,6 +6,10 @@ All notable changes are recorded here before a tagged release.
 
 ### Added
 
+- Add opt-in output-only `ExternalResourceRule` for bounded inline Markdown
+  image and HTML `<img src>` inspection, exact URL-span redaction, normalized
+  hostname allowlists, disclosure-safe capabilities, and 8 MB process
+  performance coverage.
 - Add default `BidiControlRule` for both input and output: balanced policy
   removes Unicode directional overrides and reviews other explicit bidi
   formatting controls, with bounded findings, remove-and-rescan enforcement,

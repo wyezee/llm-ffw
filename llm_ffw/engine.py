@@ -9,6 +9,7 @@ from .redaction import sanitize_findings
 from .rules.base import Rule, RuleMatch
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.bidi_control import BidiControlRule
+from .rules.external_resource import ExternalResourceRule
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.ip_address import IPAddressRule
 from .rules.mac_address import MACAddressRule
@@ -110,6 +111,7 @@ class RuleScanner:
         staged_safe_types = (
             BannedSubstringsRule,
             BidiControlRule,
+            ExternalResourceRule,
             InvisibleCharactersRule,
             IPAddressRule,
             MACAddressRule,

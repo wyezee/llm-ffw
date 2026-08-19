@@ -7,6 +7,7 @@ from llm_ffw import (
     BannedSubstringCatalog,
     ConnectionStringConfig,
     EmailAddressConfig,
+    ExternalResourceConfig,
     IBANConfig,
     IPAddressConfig,
     JSONOutputConfig,
@@ -41,6 +42,7 @@ def _all_config_pairs() -> tuple[tuple[str, object], ...]:
         ),
         ("json_output_config", JSONOutputConfig()),
         ("unsafe_url_config", UnsafeURLConfig()),
+        ("external_resource_config", ExternalResourceConfig()),
         ("ip_address_config", IPAddressConfig()),
         ("mac_address_config", MACAddressConfig()),
         ("iban_config", IBANConfig()),
@@ -61,7 +63,7 @@ class RuleRegistryTests(unittest.TestCase):
         rules = build_registered_rules(configured)
         capabilities = registered_rule_capabilities(configured)
 
-        self.assertEqual(len(RULE_SPECS), 14)
+        self.assertEqual(len(RULE_SPECS), 15)
         self.assertEqual(
             tuple(field_name for field_name, _ in configured),
             tuple(spec.config_field for spec in RULE_SPECS),
@@ -80,6 +82,14 @@ class RuleRegistryTests(unittest.TestCase):
                 item.scopes
                 for item in capabilities
                 if item.rule_id == "output.json.validity"
+            ),
+            (ScanScope.OUTPUT,),
+        )
+        self.assertEqual(
+            next(
+                item.scopes
+                for item in capabilities
+                if item.rule_id == "output.external_resource"
             ),
             (ScanScope.OUTPUT,),
         )

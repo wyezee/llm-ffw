@@ -10,6 +10,7 @@ from .connection_string import ConnectionStringConfig
 from .banned_substring_catalog import BannedSubstringCatalog
 from .capabilities import RuleCapability
 from .email_address import EmailAddressConfig
+from .external_resource import ExternalResourceConfig
 from .iban import IBANConfig
 from .inspection import ScanScope
 from .ip_address import IPAddressConfig
@@ -25,6 +26,7 @@ from .rules.connection_string import ConnectionStringRule
 from .rules.banned_substrings import BannedSubstringsRule
 from .rules.base import Rule
 from .rules.email_address import EmailAddressRule
+from .rules.external_resource import ExternalResourceRule
 from .rules.iban import IBANRule
 from .rules.ip_address import IPAddressRule
 from .rules.json_output import JSONOutputRule
@@ -126,6 +128,15 @@ RULE_SPECS: tuple[RuleSpec, ...] = (
         UnsafeURLRule.RULE_ID,
         UnsafeURLRule.PURPOSE,
         UnsafeURLRule.SCOPES,
+    ),
+    RuleSpec(
+        "external_resource_config",
+        ExternalResourceConfig,
+        ExternalResourceRule,
+        ExternalResourceRule.RULE_ID,
+        ExternalResourceRule.PURPOSE,
+        ExternalResourceRule.SCOPES,
+        configured_scopes=False,
     ),
     RuleSpec(
         "ip_address_config",

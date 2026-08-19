@@ -67,7 +67,12 @@ class FirewallConfigTests(unittest.TestCase):
                     json_rule_ids
                 )
             )
-            self.assertEqual(len(all_rules.capabilities().rules), 18)
+            self.assertNotIn("output.external_resource", json_rule_ids)
+            self.assertIn(
+                "output.external_resource",
+                {item.rule_id for item in all_rules.capabilities().rules},
+            )
+            self.assertEqual(len(all_rules.capabilities().rules), 19)
             self.assertEqual(all_rules_config.request_timeout_seconds, 30.0)
         finally:
             privacy.close()

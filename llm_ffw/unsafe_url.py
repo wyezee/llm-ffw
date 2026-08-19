@@ -68,6 +68,22 @@ def _normalize_policy_entries(
     )
 
 
+def _matches_hostname_suffix(
+    hostname: str,
+    suffixes: frozenset[str],
+) -> bool:
+    """Return whether a normalized hostname equals or belongs to a suffix."""
+
+    if hostname in suffixes:
+        return True
+    boundary = hostname.find(".")
+    while boundary >= 0:
+        if hostname[boundary + 1 :] in suffixes:
+            return True
+        boundary = hostname.find(".", boundary + 1)
+    return False
+
+
 @dataclass(frozen=True, slots=True)
 class UnsafeURLConfig:
     """Directions and resource limits for URL candidates."""

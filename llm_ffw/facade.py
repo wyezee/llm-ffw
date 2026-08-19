@@ -16,6 +16,7 @@ from .capabilities import (
     AuthorizationHeaderCapability,
     ConnectionStringCapability,
     EmailAddressCapability,
+    ExternalResourceCapability,
     PhoneNumberCapability,
     RuleCapability,
     SecretCatalogCapability,
@@ -43,6 +44,7 @@ from .connection_string import (
     SUPPORTED_CONNECTION_STRING_SCHEMES,
 )
 from .email_address import EmailAddressConfig
+from .external_resource import ExternalResourceConfig
 from .phone_number import PhoneNumberConfig
 from .facade_config import FirewallConfig
 from .unsafe_url import UnsafeURLConfig
@@ -138,6 +140,7 @@ class Firewall:
         banned_substring_catalog: BannedSubstringCatalog | None = None,
         json_output_config: JSONOutputConfig | None = None,
         unsafe_url_config: UnsafeURLConfig | None = None,
+        external_resource_config: ExternalResourceConfig | None = None,
         ip_address_config: IPAddressConfig | None = None,
         mac_address_config: MACAddressConfig | None = None,
         iban_config: IBANConfig | None = None,
@@ -169,6 +172,7 @@ class Firewall:
             banned_substring_catalog=banned_substring_catalog,
             json_output_config=json_output_config,
             unsafe_url_config=unsafe_url_config,
+            external_resource_config=external_resource_config,
             ip_address_config=ip_address_config,
             mac_address_config=mac_address_config,
             iban_config=iban_config,
@@ -362,6 +366,30 @@ class Firewall:
                     ),
                 )
                 if self._pool.jwt_token_config is not None
+                else None
+            ),
+            external_resource=(
+                ExternalResourceCapability(
+                    max_candidates=(
+                        self._pool.external_resource_config.max_candidates
+                    ),
+                    max_markup_chars=(
+                        self._pool.external_resource_config.max_markup_chars
+                    ),
+                    max_url_chars=(
+                        self._pool.external_resource_config.max_url_chars
+                    ),
+                    opaque_path_segment_chars=(
+                        self._pool.external_resource_config.opaque_path_segment_chars
+                    ),
+                    allowed_hostname_count=len(
+                        self._pool.external_resource_config.allowed_hostnames
+                    ),
+                    allowed_hostname_suffix_count=len(
+                        self._pool.external_resource_config.allowed_hostname_suffixes
+                    ),
+                )
+                if self._pool.external_resource_config is not None
                 else None
             ),
             connection_string=(

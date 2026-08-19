@@ -7,6 +7,7 @@ from llm_ffw import (
     BidiControlRule,
     ConnectionStringConfig,
     EmailAddressConfig,
+    ExternalResourceConfig,
     Finding,
     Firewall,
     FirewallConfig,
@@ -27,6 +28,7 @@ from llm_ffw import (
 config = FirewallConfig(
     connection_string_config=ConnectionStringConfig(),
     email_address_config=EmailAddressConfig(),
+    external_resource_config=ExternalResourceConfig(),
     ip_address_config=IPAddressConfig(),
     phone_number_config=PhoneNumberConfig(),
     unsafe_url_config=UnsafeURLConfig(
