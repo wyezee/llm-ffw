@@ -20,7 +20,13 @@ _IPV4_CANDIDATE = re.compile(
     r"(?![A-Za-z0-9_-]|\.[A-Za-z0-9_-])",
     re.ASCII,
 )
-_IPV6_TOKEN_CHARS = frozenset("0123456789abcdefABCDEF:.")
+# The lookbehind permits one attempt per token run. Two required literal colons
+# and flat character classes avoid nested, attacker-controlled repetition.
+_IPV6_TOKEN_RUN = re.compile(
+    r"(?<![0-9A-Fa-f:.])"
+    r"(?P<token>[0-9A-Fa-f.]*:[0-9A-Fa-f:.]*:[0-9A-Fa-f:.]*)",
+    re.ASCII,
+)
 _MAX_IPV6_CHARS = 45
 
 
@@ -29,6 +35,7 @@ class _AddressCandidate:
     start: int
     end: int
     version: int
+    overflowed: bool = False
 
 
 def _is_ascii_identifier(character: str) -> bool:
@@ -59,32 +66,22 @@ def _ipv4_candidates(text: str) -> Iterator[_AddressCandidate]:
 
 
 def _ipv6_candidates(text: str) -> Iterator[_AddressCandidate]:
-    position = 0
-    text_length = len(text)
-    while position < text_length:
-        while (
-            position < text_length
-            and text[position] not in _IPV6_TOKEN_CHARS
-        ):
-            position += 1
-        start = position
-        while (
-            position < text_length
-            and text[position] in _IPV6_TOKEN_CHARS
-        ):
-            position += 1
-        end = position
+    for token_run in _IPV6_TOKEN_RUN.finditer(text):
+        start, end = token_run.span("token")
         while start < end and text[start] == ".":
             start += 1
         while start < end and text[end - 1] == ".":
             end -= 1
         if start < end and text[start] == ":" and not text.startswith("::", start):
             start += 1
-        if end <= start or end - start > _MAX_IPV6_CHARS:
+        if end <= start:
             continue
         if start and _is_ascii_identifier(text[start - 1]):
             continue
         if _has_right_identifier_boundary(text, end):
+            continue
+        if end - start > _MAX_IPV6_CHARS:
+            yield _AddressCandidate(start, end, 6, overflowed=True)
             continue
         candidate = text[start:end]
         colon_count = candidate.count(":")
@@ -213,6 +210,22 @@ class IPAddressRule(Rule):
                 )
                 break
             candidate_count += 1
+            if candidate.overflowed:
+                matches.append(
+                    RuleMatch(
+                        span=Span(candidate.start, candidate.end),
+                        severity=Severity.HIGH,
+                        action=Action.BLOCK,
+                        message="IPv6 candidate exceeds inspection limit.",
+                        metadata={
+                            "reason": "ipv6_candidate_length_exceeded",
+                            "limit": str(_MAX_IPV6_CHARS),
+                            "detector": "stdlib_ipaddress",
+                            "span_basis": "characters",
+                        },
+                    )
+                )
+                continue
             value = text[candidate.start : candidate.end]
             try:
                 address = ipaddress.ip_address(value)

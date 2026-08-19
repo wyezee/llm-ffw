@@ -173,6 +173,19 @@ class IPAddressRuleTests(unittest.TestCase):
             "192.168.1.1",
         )
 
+    def test_oversized_ipv6_candidate_fails_closed(self) -> None:
+        candidate = "2001:db8:" + "a" * 40
+        finding = _scanner().scan(candidate)[0]
+        self.assertIs(finding.action, Action.BLOCK)
+        self.assertEqual(
+            finding.metadata["reason"],
+            "ipv6_candidate_length_exceeded",
+        )
+        self.assertEqual(finding.metadata["limit"], "45")
+        self.assertEqual(finding.span.start, 0)
+        self.assertEqual(finding.span.end, len(candidate))
+        self.assertNotIn(candidate, repr(finding))
+
     def test_finding_and_redaction_do_not_disclose_address(self) -> None:
         address = "203.0.113.42"
         text = f"customer address {address}"
@@ -234,8 +247,15 @@ class IPAddressRuleTests(unittest.TestCase):
             ("999." * 2_000_000)[:8_000_000],
         )
         started = time.perf_counter()
-        for text in workloads:
+        for text in workloads[:2]:
             self.assertEqual(scanner.scan(text, scope=ScanScope.INPUT), ())
+        dense = scanner.scan(workloads[2], scope=ScanScope.INPUT)
+        self.assertEqual(
+            dense[0].metadata["reason"],
+            "ipv6_candidate_length_exceeded",
+        )
+        self.assertIs(dense[0].action, Action.BLOCK)
+        self.assertEqual(scanner.scan(workloads[3], scope=ScanScope.INPUT), ())
         self.assertLess(time.perf_counter() - started, 4.0)
 
 

@@ -16,6 +16,8 @@ All notable changes are recorded here before a tagged release.
   default process-facade request deadline from 5 to 30 seconds.
 - Guarantee async worker cleanup across cancellation, cleanup failures, and
   shutdown calls made from a different event loop.
+- Accelerate IPv6 candidate discovery with a fixed linear prefilter and emit a
+  fail-closed finding for token runs beyond the 45-character parser bound.
 
 ## 0.11.1 - 2026-08-19
 

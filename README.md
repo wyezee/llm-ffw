@@ -766,7 +766,8 @@ firewall = Firewall(
 `IPAddressRule` recognizes standard IPv4 and IPv6 text using bounded candidate
 discovery followed by Python's `ipaddress` parser. It is input-only unless
 configured otherwise, redacts under balanced policy, and can independently
-disable either address family. It intentionally does not normalize obfuscated
+disable either address family. IPv6-shaped token runs beyond the 45-character
+parser bound fail closed instead of being silently skipped. It intentionally does not normalize obfuscated
 addresses or claim complete PII detection; the high-precision default targets
 accidental disclosure with predictable false-positive and performance bounds.
 

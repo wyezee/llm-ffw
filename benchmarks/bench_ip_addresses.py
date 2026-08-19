@@ -49,7 +49,12 @@ def benchmark(
     )
     workloads = (
         ("clean", "a" * size, Action.ALLOW),
-        ("colon_dense", ":" * size, Action.ALLOW),
+        ("colon_dense", ":" * size, Action.REDACT),
+        (
+            "two_colon_prose",
+            _sized_suffix(size, " first: middle :last"),
+            Action.ALLOW,
+        ),
         ("dot_dense", "." * size, Action.ALLOW),
         (
             "invalid_at_end",
@@ -161,6 +166,7 @@ def main() -> None:
     if min(
         result["clean_mib_per_second"],
         result["colon_dense_mib_per_second"],
+        result["two_colon_prose_mib_per_second"],
         result["dot_dense_mib_per_second"],
         result["invalid_at_end_mib_per_second"],
     ) < args.min_throughput_mib_s:
