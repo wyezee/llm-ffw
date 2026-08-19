@@ -50,7 +50,7 @@ def benchmark(
     workloads = (
         ("clean", "a" * size, Action.ALLOW),
         ("dot_dense", "." * size, Action.ALLOW),
-        ("marker_dense", "@" * size, Action.REDACT),
+        ("marker_dense", "@" * size, Action.ALLOW),
         (
             "overlong_local",
             _sized_suffix(size, "@example.com"),

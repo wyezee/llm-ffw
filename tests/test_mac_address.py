@@ -112,6 +112,20 @@ class MACAddressRuleTests(unittest.TestCase):
             (),
         )
 
+    def test_accepts_explicit_mac_label_without_ipv6_suffix_matches(self) -> None:
+        address = "00:1A:2B:3C:4D:5E"
+        for label in ("MAC:", "mac:", "Mac:"):
+            with self.subTest(label=label):
+                text = label + address
+                finding = _scanner().scan(text)[0]
+                self.assertEqual(
+                    text[finding.span.start : finding.span.end], address
+                )
+        self.assertEqual(
+            _scanner().scan("2001:00:1A:2B:3C:4D:5E"),
+            (),
+        )
+
     def test_finding_and_redaction_do_not_disclose_address(self) -> None:
         address = "02:1A:2B:3C:4D:5E"
         text = f"adapter {address}"

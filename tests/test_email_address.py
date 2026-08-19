@@ -109,11 +109,24 @@ class EmailAddressRuleTests(unittest.TestCase):
                     "alice@example.com",
                 )
 
+    def test_ascii_boundaries_and_leading_period_preserve_exact_span(self) -> None:
+        scanner = _scanner()
+        for text in (
+            "联系john.doe@example.com",
+            "john.doe@example.com中",
+            ".john.doe@example.com",
+        ):
+            with self.subTest(text=text):
+                finding = scanner.scan(text)[0]
+                self.assertEqual(
+                    text[finding.span.start : finding.span.end],
+                    "john.doe@example.com",
+                )
+
     def test_rejects_noncanonical_invalid_and_embedded_lookalikes(self) -> None:
         cases = (
             "alice@example",
             "alice@localhost",
-            ".alice@example.com",
             "alice.@example.com",
             "alice..smith@example.com",
             "alice@example..com",
@@ -123,8 +136,6 @@ class EmailAddressRuleTests(unittest.TestCase):
             "alice@example.123",
             "alice@exam_ple.com",
             "a@b.com@c.com",
-            "éAlice@example.com",
-            "alice@example.comé",
             "alice@example.com_suffix",
             '"alice smith"@example.com',
             "alice@[192.0.2.1]",
@@ -192,6 +203,11 @@ class EmailAddressRuleTests(unittest.TestCase):
             "not@valid then customer[REDACTED]",
         )
 
+    def test_social_mentions_do_not_consume_candidate_budget(self) -> None:
+        text = " ".join(f"@user{index}" for index in range(1_000))
+        scanner = _scanner(EmailAddressConfig(max_candidates=1))
+        self.assertEqual(scanner.scan(text), ())
+
     def test_builtin_policies_redact_block_and_review(self) -> None:
         text = "contact customer@example.com"
         balanced = RuleEngine(scanner=_scanner()).process(
@@ -223,12 +239,7 @@ class EmailAddressRuleTests(unittest.TestCase):
         )
         started = time.perf_counter()
         self.assertEqual(scanner.scan(workloads[0]), ())
-        dense = scanner.scan(workloads[1])
-        self.assertEqual(len(dense), 1)
-        self.assertEqual(
-            dense[0].metadata["reason"],
-            "candidate_limit_exceeded",
-        )
+        self.assertEqual(scanner.scan(workloads[1]), ())
         self.assertEqual(scanner.scan(workloads[2]), ())
         self.assertLess(time.perf_counter() - started, 4.0)
 

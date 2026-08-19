@@ -784,6 +784,8 @@ firewall = Firewall(
 
 `MACAddressRule` recognizes canonical 48-bit addresses written as six
 two-digit hexadecimal octets with one consistent colon or hyphen separator.
+An immediately preceding case-insensitive `MAC:` label is supported without
+matching MAC-shaped suffixes inside IPv6 text.
 It is input-only unless configured otherwise and redacts under balanced
 policy. Cisco dotted notation, mixed separators, EUI-64 values, obfuscation,
 and vendor ownership lookup are intentionally outside this narrow,
@@ -868,7 +870,9 @@ firewall = Firewall(
 `EmailAddressRule` recognizes a conservative ASCII mailbox subset with
 DNS-style domains and common dot, underscore, percent, plus, and hyphen local
 parts. It requires at least one domain dot, enforces standard local-part,
-label, domain, and total-length bounds, and redacts under balanced policy. It
+label, domain, and total-length bounds, uses ASCII identifier boundaries, and
+redacts under balanced policy. Leading sentence punctuation is excluded from
+the exact finding span. It
 does not attempt RFC-complete quoted local parts, comments, address literals,
 Unicode mailbox syntax, DNS ownership checks, or obfuscation repair. These
 limits deliberately favor predictable high-precision privacy protection.

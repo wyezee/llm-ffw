@@ -8,6 +8,8 @@ All notable changes are recorded here before a tagged release.
   original redaction spans.
 - Recognize indented Authorization headers and redact malformed,
   non-placeholder Basic and Bearer credentials instead of failing open.
+- Correct ASCII email boundaries, leading-period handling, email candidate
+  accounting, and explicit `MAC:` label detection.
 
 ## 0.11.1 - 2026-08-19
 

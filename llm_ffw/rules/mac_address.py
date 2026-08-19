@@ -12,7 +12,7 @@ from .base import Rule, RuleMatch
 # expression has only fixed bounded repetition, no ambiguous alternation, and
 # no attacker-controlled backtracking path.
 _MAC_ADDRESS = re.compile(
-    r"(?<![A-Za-z0-9_.:-])"
+    r"(?:(?<![A-Za-z0-9_.:-])|(?<=(?i:mac):))"
     r"(?P<address>[0-9A-Fa-f]{2}(?P<separator>[:-])"
     r"(?:[0-9A-Fa-f]{2}(?P=separator)){4}[0-9A-Fa-f]{2})"
     r"(?![A-Za-z0-9_:-]|\.[A-Za-z0-9_-])",

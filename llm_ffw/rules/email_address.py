@@ -1,6 +1,7 @@
 """Deterministic conservative ASCII email-address detection."""
 
 from dataclasses import dataclass
+import re
 
 from ..email_address import EmailAddressConfig
 from ..findings import Action, Severity, Span
@@ -18,12 +19,19 @@ _DOMAIN_CHARS = frozenset(
 _MAX_LOCAL_CHARS = 64
 _MAX_DOMAIN_CHARS = 253
 _MAX_ADDRESS_CHARS = 254
+_EMAIL_MARKER = re.compile(r"(?<=[A-Za-z0-9_%+.-])@", re.ASCII)
 
 
 @dataclass(frozen=True, slots=True)
 class _EmailCandidate:
     start: int
     end: int
+
+
+def _is_ascii_identifier_char(character: str) -> bool:
+    return character == "_" or (
+        character.isascii() and character.isalnum()
+    )
 
 
 def _candidate_at(text: str, marker: int) -> _EmailCandidate | None:
@@ -34,12 +42,13 @@ def _candidate_at(text: str, marker: int) -> _EmailCandidate | None:
         and text[start - 1] in _LOCAL_CHARS
     ):
         start -= 1
+    while start < marker and text[start] == ".":
+        start += 1
     if start == marker or (
         start > 0
         and (
             text[start - 1] == "@"
-            or text[start - 1] == "_"
-            or text[start - 1].isalnum()
+            or _is_ascii_identifier_char(text[start - 1])
         )
     ):
         return None
@@ -59,8 +68,7 @@ def _candidate_at(text: str, marker: int) -> _EmailCandidate | None:
         end < text_length
         and (
             text[end] == "@"
-            or text[end] == "_"
-            or text[end].isalnum()
+            or _is_ascii_identifier_char(text[end])
         )
     ):
         return None
@@ -143,13 +151,12 @@ class EmailAddressRule(Rule):
             return ()
 
         matches: list[RuleMatch] = []
-        position = 0
         candidate_count = 0
-        while True:
-            marker = text.find("@", position)
-            if marker < 0:
-                break
-            position = marker + 1
+        for marker_match in _EMAIL_MARKER.finditer(text):
+            marker = marker_match.start()
+            candidate = _candidate_at(text, marker)
+            if candidate is None:
+                continue
             if candidate_count >= self._config.max_candidates:
                 matches.append(
                     RuleMatch(
@@ -167,9 +174,6 @@ class EmailAddressRule(Rule):
                 )
                 break
             candidate_count += 1
-            candidate = _candidate_at(text, marker)
-            if candidate is None:
-                continue
             value = text[candidate.start : candidate.end]
             if len(value) > _MAX_ADDRESS_CHARS:
                 continue

@@ -27,7 +27,7 @@ from tools import pii_accuracy_gate
 
 
 EXPECTED_DIGEST = (
-    "0b62d20820a1efd7563c3759ddeea65c7b3cf3841812dbf5afd672bc4c029ee4"
+    "481dd64f626e744b1b21c7c39438f2bdbbce5ef8fbee55b6f970048bb9e6af6c"
 )
 
 

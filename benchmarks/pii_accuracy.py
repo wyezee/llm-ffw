@@ -379,7 +379,7 @@ def _negative_scenarios(count: int) -> list[PIIAccuracyScenario]:
         "semantic version {a}.{b}.{c}",
         "clock value 12:34:56",
         "mailbox user{n}@example",
-        "mailbox .user{n}@example.com",
+        "mailbox user{n}.@example.com",
         "mailbox user..{n}@example.com",
         "mailbox user{n}@example.1",
         "mailbox user{n}@exam_ple.com",
@@ -449,8 +449,8 @@ def _curated_email_scenarios(count: int) -> list[PIIAccuracyScenario]:
         ("x%y@example.invalid", "percent local {value}"),
         ("a" * 64 + "@example.com", "max local <{value}>"),
         ("a@" + "b" * 63 + ".example", "max label <{value}>"),
-        ("edge@example.com", "sentence starts {value}."),
-        ("final@example.org", "{value}"),
+        ("edge@example.com", "联系{value}"),
+        ("final@example.org", ".{value}"),
     )
     if len(cases) != count:
         raise ValueError("curated email count does not match manifest")
@@ -535,7 +535,7 @@ def _curated_mac_scenarios(count: int) -> list[PIIAccuracyScenario]:
         "0E-11-22-33-44-55",
     )
     templates = (
-        "adapter ({value})",
+        "MAC:{value}",
         "device={value};active=true",
         'record={{"address":"{value}"}}',
         "before\t{value}\tafter",
@@ -662,7 +662,7 @@ def _curated_negative_scenarios(count: int) -> list[PIIAccuracyScenario]:
     texts = (
         "mailbox alice@example",
         "mailbox alice@localhost",
-        "mailbox .alice@example.com",
+        "mailbox alice...smith@example.com",
         "mailbox alice.@example.com",
         "mailbox alice..smith@example.com",
         "mailbox alice@example..com",
@@ -672,8 +672,8 @@ def _curated_negative_scenarios(count: int) -> list[PIIAccuracyScenario]:
         "mailbox alice@example.123",
         "mailbox alice@exam_ple.com",
         "mailbox a@b.com@c.com",
-        "mailbox éAlice@example.com",
-        "mailbox alice@example.comé",
+        "mailbox éAlice@localhost",
+        "mailbox alice@example.cé",
         "mailbox alice@example.com_suffix",
         'mailbox "alice smith"@example.com',
         "mailbox alice@[999.0.2.1]",
