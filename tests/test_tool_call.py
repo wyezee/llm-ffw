@@ -142,6 +142,7 @@ class ToolCallRuleTests(unittest.TestCase):
                     "nothing": {"type": "null"},
                 },
                 "required": ["array", "number", "nothing"],
+                "additionalProperties": False,
             },
         )
         rule = ToolCallRule((definition,))
@@ -166,6 +167,7 @@ class ToolCallRuleTests(unittest.TestCase):
             {"type": "string", "pattern": ".*"},
             {"type": "array"},
             {"type": "object", "required": ["missing"]},
+            {"type": "object", "properties": {}},
             {"type": "object", "additionalProperties": {}},
             {"type": "string", "enum": [1]},
             {"type": "object", "enum": [None]},
@@ -178,7 +180,12 @@ class ToolCallRuleTests(unittest.TestCase):
 
     def test_resource_limits_include_allowed_additional_properties(self) -> None:
         rule = ToolCallRule(
-            (ToolDefinition("tool", {"type": "object"}),),
+            (
+                ToolDefinition(
+                    "tool",
+                    {"type": "object", "additionalProperties": True},
+                ),
+            ),
             ToolCallConfig(max_nodes=3, max_total_string_chars=100),
         )
         sensitive_key = "s3cr3t-leaf-key"
@@ -202,6 +209,7 @@ class ToolCallRuleTests(unittest.TestCase):
                             }
                         },
                         "required": ["values"],
+                        "additionalProperties": False,
                     },
                 ),
             ),

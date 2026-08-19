@@ -589,7 +589,9 @@ properties, and configured resource-limit violations. Its supported schema
 keywords are `type`, `properties`, `required`, `additionalProperties`, `items`,
 and scalar `enum`; each schema node must declare one of `object`, `array`,
 `string`, `number`, `integer`, `boolean`, or `null`. Regex, references,
-combinators, coercion, and defaults are deliberately unsupported.
+combinators, coercion, and defaults are deliberately unsupported. Every object
+node must explicitly set boolean `additionalProperties`; use `false` for the
+safe closed-object contract or deliberately choose `true` for an open object.
 
 `ToolCall` copies decoded built-in JSON values into an immutable bounded tree
 and excludes arguments and call IDs from `repr()`. The rule declares

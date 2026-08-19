@@ -122,6 +122,11 @@ def _compile_schema(schema: object) -> _CompiledSchema:
         additional_properties = True
         items = None
         if value_type == "object":
+            if "additionalProperties" not in value:
+                raise ValueError(
+                    f"object schema at {location} must explicitly declare "
+                    "additionalProperties"
+                )
             raw_properties = value.get("properties", {})
             if not isinstance(raw_properties, Mapping):
                 raise TypeError(f"properties at {location} must be an object")
@@ -143,7 +148,7 @@ def _compile_schema(schema: object) -> _CompiledSchema:
                 raise ValueError(
                     f"required at {location} must name declared properties"
                 )
-            raw_additional = value.get("additionalProperties", True)
+            raw_additional = value["additionalProperties"]
             if type(raw_additional) is not bool:
                 raise TypeError(f"additionalProperties at {location} must be a boolean")
             additional_properties = raw_additional
