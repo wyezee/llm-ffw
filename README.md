@@ -891,7 +891,9 @@ firewall = Firewall(repetition_config=RepetitionConfig())
 `RepetitionRule` reports non-whitespace character runs of 256 characters,
 identical whitespace-delimited tokens repeated 64 times, and identical non-empty
 lines repeated 32 times by default. It scans input and output, returns `REVIEW`,
-and never labels content as semantic "gibberish." Punctuation-only token runs,
+and treats every separator recognized by Python's `str.splitlines()`
+consistently, switching to bounded streaming inspection for separator-dense
+input. It never labels content as semantic "gibberish." Punctuation-only token runs,
 blank lines, tokens longer than 128 characters, and lines longer than 4,096
 characters are deliberately excluded to keep the signal conservative and memory
 bounded. Thresholds and the finding limit are immutable startup configuration;

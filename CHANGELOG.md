@@ -10,6 +10,8 @@ All notable changes are recorded here before a tagged release.
   non-placeholder Basic and Bearer credentials instead of failing open.
 - Correct ASCII email boundaries, leading-period handling, email candidate
   accounting, and explicit `MAC:` label detection.
+- Make excessive-line repetition detection consistent for every supported
+  Unicode line separator, including its bounded streaming fallback.
 
 ## 0.11.1 - 2026-08-19
 

@@ -15,6 +15,9 @@ _MAX_TRACKED_TOKEN_CHARS = 128
 _MAX_TRACKED_LINE_CHARS = 4_096
 _MAX_SPLIT_LINES = 1_000_000
 _MAX_SPLIT_SEPARATORS = 1_500_000
+_OTHER_LINE_SEPARATORS = "\v\f\x1c\x1d\x1e\x85\u2028\u2029"
+_LINE_SEPARATOR = re.compile(f"[\n{_OTHER_LINE_SEPARATORS}]")
+_OTHER_LINE_SEPARATOR = re.compile(f"[{_OTHER_LINE_SEPARATORS}]")
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,18 +172,22 @@ def _token_repeats(
             active = runs[run_index]
 
 
-def _many_line_repeats(text: str, threshold: int) -> Iterator[_Repeat]:
-    if "\n" not in text:
-        return
+def _line_segments(text: str) -> Iterator[tuple[int, int]]:
     position = 0
+    for separator in _LINE_SEPARATOR.finditer(text):
+        yield position, separator.start()
+        position = separator.end()
+    yield position, len(text)
+
+
+def _many_line_repeats(text: str, threshold: int) -> Iterator[_Repeat]:
+    if _LINE_SEPARATOR.search(text) is None:
+        return
     previous: str | None = None
     run_start = 0
     run_end = 0
     count = 0
-    while position <= len(text):
-        newline = text.find("\n", position)
-        end = len(text) if newline < 0 else newline
-        content_end = end - 1 if end > position and text[end - 1] == "\r" else end
+    for position, content_end in _line_segments(text):
         length = content_end - position
         line = (
             text[position:content_end]
@@ -201,18 +208,21 @@ def _many_line_repeats(text: str, threshold: int) -> Iterator[_Repeat]:
             run_start = position
             run_end = content_end
             count = 1 if line is not None else 0
-        if newline < 0:
-            break
-        position = newline + 1
     if previous is not None and count >= threshold:
         yield _Repeat(run_start, run_end, "line_run", count, len(previous))
 
 
 def _line_repeats(text: str, threshold: int) -> Iterator[_Repeat]:
     newline_count = text.count("\n")
-    if newline_count == 0:
+    has_other_separator = _OTHER_LINE_SEPARATOR.search(text) is not None
+    if newline_count == 0 and not has_other_separator:
         return
-    if newline_count > _MAX_SPLIT_LINES:
+    separator_count = newline_count
+    if has_other_separator:
+        separator_count += sum(
+            text.count(separator) for separator in _OTHER_LINE_SEPARATORS
+        )
+    if separator_count > _MAX_SPLIT_LINES:
         yield from _many_line_repeats(text, threshold)
         return
     lines = text.splitlines(keepends=True)
@@ -223,7 +233,7 @@ def _line_repeats(text: str, threshold: int) -> Iterator[_Repeat]:
     offset = 0
     for raw_line in lines:
         content_end = len(raw_line)
-        if content_end and raw_line[-1] == "\n":
+        if content_end and raw_line[-1] in "\n" + _OTHER_LINE_SEPARATORS:
             content_end -= 1
         if content_end and raw_line[content_end - 1] == "\r":
             content_end -= 1

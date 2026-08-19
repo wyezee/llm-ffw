@@ -36,6 +36,9 @@ def benchmark(
         "separator_dense": ("- " * ((size + 1) // 2))[:size],
         "word_dense": ("alpha beta " * ((size // 11) + 1))[:size],
         "line_dense": ("alpha beta\ngamma delta\n" * ((size // 23) + 1))[:size],
+        "alternate_line_dense": (
+            "alpha beta\vgamma delta\v" * ((size // 23) + 1)
+        )[:size],
         "near_character_run": (
             (("a" * 255) + "b") * ((size // 256) + 1)
         )[:size],
@@ -123,6 +126,7 @@ def main() -> None:
         result["separator_dense_mib_per_second"],
         result["word_dense_mib_per_second"],
         result["line_dense_mib_per_second"],
+        result["alternate_line_dense_mib_per_second"],
         result["near_character_run_mib_per_second"],
         result["character_run_mib_per_second"],
     ) < args.min_throughput_mib_s:

@@ -75,6 +75,30 @@ class RepetitionRuleTests(unittest.TestCase):
                 self.assertEqual(finding.redacted_preview, None)
                 self.assertNotIn(text[finding.span.start : finding.span.end], repr(finding))
 
+    def test_line_separators_are_consistent_across_bounded_paths(self) -> None:
+        scanner = _scanner(RepetitionConfig(line_repeat_threshold=3))
+        separators = (
+            "\n", "\v", "\f", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2029"
+        )
+        for separator in separators:
+            with self.subTest(separator=repr(separator)):
+                text = separator.join(("same", "same", "same"))
+                finding = next(
+                    item
+                    for item in scanner.scan(text)
+                    if item.metadata["reason"] == "line_run"
+                )
+                self.assertEqual(finding.metadata["repeat_count"], "3")
+                self.assertEqual(text[finding.span.start : finding.span.end], text)
+
+        dense = ("same\v" * 1_000_001) + "same"
+        finding = next(
+            item
+            for item in scanner.scan(dense)
+            if item.metadata["reason"] == "line_run"
+        )
+        self.assertEqual(finding.metadata["repeat_count"], "1000002")
+
     def test_ignores_normal_prose_code_logs_base64_separators_and_multilingual(self) -> None:
         samples = (
             "This is ordinary prose with no excessive exact repetition.",
