@@ -23,6 +23,8 @@ All notable changes are recorded here before a tagged release.
 - Add compile and public-import regression coverage for every README Python
   block, surface critical integration sections in Contents, clarify synchronous
   thread safety, and remove pre-adoption migration guidance.
+- Refresh the GitHub-hosted publication benchmark for the current six-rule
+  default and complete 16-rule text configuration on Ubuntu and Windows.
 
 ## 0.13.0 - 2026-08-19
 

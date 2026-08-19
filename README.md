@@ -203,21 +203,19 @@ reloads, and direct process-pool orchestration.
 
 ## Measured performance
 
-The table is the published 0.12.0 benchmark of its six-rule default and 15-rule
-all-text configurations. The development branch now contains another opt-in
-rule; its next publication benchmark will replace these results rather than
-silently relabeling old measurements. Tests ran on GitHub-hosted Ubuntu and
-Windows runners with Python 3.14.7. Each request contains 8,000,000 synthetic ASCII
-characters (about 7.63 MiB), representative of a million-token-scale prompt.
-This is a size comparison rather than an exact token count: tokenization varies
-by model, tokenizer, language, and content.
+The table is the publication-grade benchmark of the current six-rule default
+and 16-rule all-text configurations at commit `4f5941a`. Tests ran on
+GitHub-hosted Ubuntu and Windows runners with Python 3.14.7. Each request
+contains 8,000,000 synthetic ASCII characters (about 7.63 MiB), representative
+of a million-token-scale prompt. This is a size comparison rather than an exact
+token count: tokenization varies by model, tokenizer, language, and content.
 
 | Rules and payload | Ubuntu req/s / MiB/s / p95 | Windows req/s / MiB/s / p95 |
 | --- | ---: | ---: |
-| Default 6, clean input | 3.101 / 23.658 / 10.30 s | 3.692 / 28.167 / 8.65 s |
-| Default 6, valid JSON output | 3.337 / 25.461 / 9.41 s | 3.842 / 29.316 / 8.29 s |
-| All 15, clean input | 1.460 / 11.139 / 21.31 s | 1.473 / 11.240 / 21.61 s |
-| All 15, valid JSON output | 1.069 / 8.152 / 29.31 s | 1.031 / 7.867 / 30.96 s |
+| Default 6, clean input | 3.184 / 24.292 / 9.82 s | 5.113 / 39.009 / 6.25 s |
+| Default 6, valid JSON output | 3.427 / 26.144 / 9.26 s | 5.435 / 41.469 / 5.85 s |
+| All 16, clean input | 1.396 / 10.651 / 22.38 s | 2.065 / 15.756 / 15.47 s |
+| All 16, valid JSON output | 0.964 / 7.353 / 32.69 s | 1.466 / 11.184 / 21.80 s |
 
 Each row uses four workers, eight concurrent callers, and 32 requests per
 round for three rounds: 96 measured requests per row and 384 per operating
@@ -225,11 +223,12 @@ system. Throughput is the median of the three rounds. The pooled end-to-end
 p95 includes caller queueing from submitting 32 requests to eight caller
 slots; it is not single-request service time. All 768 measured requests across
 both operating systems completed with exact expected findings and no rejection,
-timeout, or failure. Peak process-tree RSS ranged from 263 to 608 MiB.
+timeout, or failure. Per-row maximum process-tree RSS ranged from 300 to
+609 MiB.
 
 These are reproducible CI measurements, not universal latency guarantees;
 performance varies with input, enabled rules, policy, CPU, and concurrency.
-See the [exact publication run](https://github.com/wyezee/llm-ffw/actions/runs/32179652076)
+See the [exact publication run](https://github.com/wyezee/llm-ffw/actions/runs/32234500783)
 and the commands under [Development and validation](#development-and-validation).
 
 ### Capacity starting point
