@@ -134,9 +134,9 @@ class UnicodeTagSmugglingRuleTests(unittest.TestCase):
         )
         compute.assert_called_once_with(text)
 
-    def test_output_scope_does_not_compute_unicode_inspection(self) -> None:
+    def test_input_only_rule_does_not_compute_inspection_for_output(self) -> None:
         with patch("llm_ffw.inspection._compute_unicode_security") as compute:
-            findings = RuleScanner().scan(
+            findings = RuleScanner(rules=(UnicodeTagSmugglingRule(),)).scan(
                 "visible" + _tagged("hidden"),
                 scope=ScanScope.OUTPUT,
             )
@@ -203,6 +203,7 @@ class UnicodeTagSmugglingEnforcementTests(unittest.TestCase):
                 "secrets.detected",
                 "secrets.jwt_token",
                 "secrets.private_key",
+                "unicode.bidi_controls",
                 "unicode.invisible_characters",
             ),
         )
@@ -218,7 +219,7 @@ class UnicodeTagSmugglingEnforcementTests(unittest.TestCase):
         )
         text = "visible" + _tagged("hidden")
 
-        self.assertEqual(firewall.capabilities().rule_count, 6)
+        self.assertEqual(firewall.capabilities().rule_count, 7)
         with firewall:
             self.assertEqual(firewall.sanitize_input(text), "visible")
             self.assertEqual(firewall.sanitize_input(text), "visible")

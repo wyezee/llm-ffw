@@ -26,6 +26,7 @@ from llm_ffw import (
     Action,
     AsyncFirewall,
     AsyncFirewallManager,
+    BidiControlRule,
     AuthorizationHeaderConfig,
     AuthorizationHeaderRule,
     ConnectionStringConfig,
@@ -117,12 +118,13 @@ assert "repetition_config" in facade_parameters
 assert "email_address_config" in facade_parameters
 assert "phone_number_config" in facade_parameters
 capabilities = Firewall().capabilities()
-assert capabilities.rule_count == 6
+assert capabilities.rule_count == 7
 assert tuple(rule.rule_id for rule in capabilities.rules) == (
     "pii.payment_card",
     "secrets.detected",
     "secrets.jwt_token",
     "secrets.private_key",
+    "unicode.bidi_controls",
     "unicode.invisible_characters",
     "unicode.tag_smuggling",
 )
@@ -189,6 +191,7 @@ authorization_firewall.close()
 connection_firewall = Firewall(
     connection_string_config=ConnectionStringConfig()
 )
+assert BidiControlRule().rule_id == "unicode.bidi_controls"
 assert connection_firewall.capabilities().connection_string.max_candidates == 128
 assert any(
     rule.rule_id == ConnectionStringRule.RULE_ID

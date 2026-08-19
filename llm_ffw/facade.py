@@ -59,6 +59,7 @@ from .process_pool import (
     ProcessScannerPoolConfig,
 )
 from .rules.secrets import SecretsRule
+from .rules.bidi_control import BidiControlRule
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .secret_catalog import (
@@ -189,6 +190,14 @@ class Firewall:
                 scopes=tuple(SecretsRule.SCOPES),
             )
         ]
+        if self._pool.scanner_config.enable_bidi_controls:
+            rule_capabilities.append(
+                RuleCapability(
+                    rule_id=BidiControlRule.RULE_ID,
+                    purpose=BidiControlRule.PURPOSE,
+                    scopes=tuple(BidiControlRule.SCOPES),
+                )
+            )
         if self._pool.scanner_config.enable_invisible_characters:
             rule_capabilities.append(
                 RuleCapability(

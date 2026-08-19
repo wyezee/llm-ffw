@@ -2,6 +2,7 @@
 
 from .base import Rule, RuleMatch, StructuredRule
 from .banned_substrings import BannedSubstringsRule
+from .bidi_control import BidiControlRule
 from .invisible_characters import InvisibleCharactersRule
 from .unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .json_output import JSONOutputRule
@@ -23,6 +24,7 @@ from .tool_result import ToolResultBlockedError, ToolResultRule
 
 __all__ = [
     "BannedSubstringsRule",
+    "BidiControlRule",
     "InvisibleCharactersRule",
     "UnicodeTagSmugglingRule",
     "JSONOutputRule",

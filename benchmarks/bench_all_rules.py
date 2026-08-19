@@ -49,6 +49,7 @@ from llm_ffw import (
 DEFAULT_TEXT_RULE_IDS = frozenset(
     {
         "secrets.detected",
+        "unicode.bidi_controls",
         "unicode.invisible_characters",
         "unicode.tag_smuggling",
         "pii.payment_card",

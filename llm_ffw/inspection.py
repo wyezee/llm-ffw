@@ -23,6 +23,7 @@ class InspectionFeature(str, Enum):
     ASCII = "ascii"
     PROMPT_CONTEXT = "prompt_context"
     UNICODE_SECURITY = "unicode_security"
+    BIDI_CONTROLS = "bidi_controls"
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,8 +32,12 @@ class UnicodeSecurityCandidates:
 
     tag_runs: tuple[Span, ...]
     zero_width_space_runs: tuple[Span, ...]
+    bidi_override_runs: tuple[Span, ...]
+    bidi_format_runs: tuple[Span, ...]
     tag_runs_overflowed: bool
     zero_width_space_runs_overflowed: bool
+    bidi_override_runs_overflowed: bool
+    bidi_format_runs_overflowed: bool
 
 
 class InspectionFeatureUnavailableError(RuntimeError):
@@ -90,7 +95,9 @@ class Inspection:
     def unicode_security(self) -> UnicodeSecurityCandidates:
         """Return bounded Unicode candidates requested by active rules."""
 
-        if InspectionFeature.UNICODE_SECURITY not in self._features:
+        if not self._features.intersection(
+            (InspectionFeature.UNICODE_SECURITY, InspectionFeature.BIDI_CONTROLS)
+        ):
             raise InspectionFeatureUnavailableError(
                 "Unicode security inspection was not requested for this scan"
             )
@@ -149,6 +156,33 @@ _UNICODE_SECURITY_RUN = re.compile(
 _UNICODE_SECURITY_RUN_EXCLUDING_RGI = re.compile(
     f"\u200b+|{_INVALID_FLAG_TAG_RUN.pattern}"
 )
+_BIDI_CONTROL_RUN = re.compile(
+    "(?P<override>[\u202d\u202e]+)"
+    "|(?P<format>[\u202a-\u202c\u2066-\u2069]+)"
+)
+
+
+def _compute_bidi_control_runs(
+    text: str,
+) -> tuple[tuple[Span, ...], tuple[Span, ...], bool, bool]:
+    override_runs: list[Span] = []
+    format_runs: list[Span] = []
+    for match in _BIDI_CONTROL_RUN.finditer(text):
+        destination = (
+            override_runs
+            if match.group("override") is not None
+            else format_runs
+        )
+        if len(destination) < _MAX_UNICODE_RUNS_PER_KIND:
+            destination.append(Span(*match.span()))
+        if len(destination) >= _MAX_UNICODE_RUNS_PER_KIND:
+            break
+    return (
+        tuple(override_runs),
+        tuple(format_runs),
+        len(override_runs) >= _MAX_UNICODE_RUNS_PER_KIND,
+        len(format_runs) >= _MAX_UNICODE_RUNS_PER_KIND,
+    )
 
 
 def _compute_unicode_security(text: str) -> UnicodeSecurityCandidates:
@@ -211,10 +245,14 @@ def _compute_unicode_security(text: str) -> UnicodeSecurityCandidates:
     return UnicodeSecurityCandidates(
         tag_runs=tuple(tag_runs),
         zero_width_space_runs=tuple(zero_width_space_runs),
+        bidi_override_runs=(),
+        bidi_format_runs=(),
         tag_runs_overflowed=len(tag_runs) >= _MAX_UNICODE_RUNS_PER_KIND,
         zero_width_space_runs_overflowed=(
             len(zero_width_space_runs) >= _MAX_UNICODE_RUNS_PER_KIND
         ),
+        bidi_override_runs_overflowed=False,
+        bidi_format_runs_overflowed=False,
     )
 
 
@@ -231,6 +269,7 @@ def build_inspection(
     needs_ascii = (
         InspectionFeature.ASCII in features
         or InspectionFeature.UNICODE_SECURITY in features
+        or InspectionFeature.BIDI_CONTROLS in features
     )
     computed_ascii = _compute_ascii(normalized.text) if needs_ascii else None
     is_ascii = (
@@ -243,12 +282,29 @@ def build_inspection(
         else None
     )
     unicode_security = None
-    if InspectionFeature.UNICODE_SECURITY in features:
-        unicode_security = (
-            UnicodeSecurityCandidates((), (), False, False)
-            if computed_ascii is True
-            else _compute_unicode_security(normalized.text)
-        )
+    needs_unicode_security = InspectionFeature.UNICODE_SECURITY in features
+    needs_bidi_controls = InspectionFeature.BIDI_CONTROLS in features
+    if needs_unicode_security or needs_bidi_controls:
+        base = UnicodeSecurityCandidates((), (), (), (), False, False, False, False)
+        if computed_ascii is not True and needs_unicode_security:
+            base = _compute_unicode_security(normalized.text)
+        if computed_ascii is not True and needs_bidi_controls:
+            overrides, formats, overrides_overflowed, formats_overflowed = (
+                _compute_bidi_control_runs(normalized.text)
+            )
+            base = UnicodeSecurityCandidates(
+                tag_runs=base.tag_runs,
+                zero_width_space_runs=base.zero_width_space_runs,
+                bidi_override_runs=overrides,
+                bidi_format_runs=formats,
+                tag_runs_overflowed=base.tag_runs_overflowed,
+                zero_width_space_runs_overflowed=(
+                    base.zero_width_space_runs_overflowed
+                ),
+                bidi_override_runs_overflowed=overrides_overflowed,
+                bidi_format_runs_overflowed=formats_overflowed,
+            )
+        unicode_security = base
     return Inspection(
         scope=scope,
         _normalized=normalized,

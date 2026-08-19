@@ -67,7 +67,7 @@ class FirewallConfigTests(unittest.TestCase):
                     json_rule_ids
                 )
             )
-            self.assertEqual(len(all_rules.capabilities().rules), 17)
+            self.assertEqual(len(all_rules.capabilities().rules), 18)
             self.assertEqual(all_rules_config.request_timeout_seconds, 30.0)
         finally:
             privacy.close()

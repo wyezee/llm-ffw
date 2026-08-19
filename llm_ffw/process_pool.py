@@ -42,6 +42,7 @@ from .repetition import RepetitionConfig
 from .policy import BALANCED_POLICY, FirewallPolicy, FirewallResult, PolicyOverride
 from .rules.secrets import SecretsRule
 from .rules.base import Rule
+from .rules.bidi_control import BidiControlRule
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.json_output import JSONOutputRule
@@ -165,6 +166,8 @@ def _initialize_worker(
         rules: list[Rule] = [
             SecretsRule(secret_catalog or BUILTIN_SECRET_CATALOG)
         ]
+        if scanner_config.enable_bidi_controls:
+            rules.append(BidiControlRule())
         if scanner_config.enable_invisible_characters:
             rules.append(InvisibleCharactersRule())
         if scanner_config.enable_unicode_tag_smuggling:
@@ -400,6 +403,8 @@ class ProcessScannerPool:
             )
         )
         active_rule_ids = {"secrets.detected"}
+        if resolved_scanner_config.enable_bidi_controls:
+            active_rule_ids.add("unicode.bidi_controls")
         if resolved_scanner_config.enable_invisible_characters:
             active_rule_ids.add("unicode.invisible_characters")
         if resolved_scanner_config.enable_unicode_tag_smuggling:
@@ -411,6 +416,7 @@ class ProcessScannerPool:
             | frozenset(
                 {
                     "secrets.detected",
+                    "unicode.bidi_controls",
                     "unicode.invisible_characters",
                     "unicode.tag_smuggling",
                 }

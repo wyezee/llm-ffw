@@ -58,7 +58,7 @@ class LLMFirewallTests(unittest.TestCase):
         capabilities = firewall.capabilities()
 
         self.assertIs(capabilities, firewall.capabilities())
-        self.assertEqual(capabilities.rule_count, 6)
+        self.assertEqual(capabilities.rule_count, 7)
         self.assertEqual(
             tuple(rule.rule_id for rule in capabilities.rules),
             (
@@ -66,6 +66,7 @@ class LLMFirewallTests(unittest.TestCase):
                 "secrets.detected",
                 "secrets.jwt_token",
                 "secrets.private_key",
+                "unicode.bidi_controls",
                 "unicode.invisible_characters",
                 "unicode.tag_smuggling",
             ),
@@ -273,6 +274,7 @@ class LLMFirewallTests(unittest.TestCase):
             scanner_config=RuleScannerConfig(
                 enable_invisible_characters=False,
                 enable_unicode_tag_smuggling=False,
+                enable_bidi_controls=False,
                 enable_payment_cards=False,
                 enable_private_keys=False,
                 enable_jwt_tokens=False,

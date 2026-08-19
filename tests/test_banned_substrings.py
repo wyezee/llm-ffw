@@ -127,7 +127,7 @@ class BannedSubstringsRuleTests(unittest.TestCase):
         )
 
         capabilities = firewall.capabilities()
-        self.assertEqual(capabilities.rule_count, 7)
+        self.assertEqual(capabilities.rule_count, 8)
         self.assertEqual(
             capabilities.banned_substring_catalog.pattern_count,
             1,

@@ -14,6 +14,7 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(RuleScannerConfig().max_input_chars, 8_000_000)
         self.assertTrue(RuleScannerConfig().enable_invisible_characters)
         self.assertTrue(RuleScannerConfig().enable_unicode_tag_smuggling)
+        self.assertTrue(RuleScannerConfig().enable_bidi_controls)
         self.assertTrue(RuleScannerConfig().enable_payment_cards)
         self.assertTrue(RuleScannerConfig().enable_private_keys)
         self.assertTrue(RuleScannerConfig().enable_jwt_tokens)
@@ -28,6 +29,7 @@ class ScannerTests(unittest.TestCase):
                 "secrets.detected",
                 "secrets.jwt_token",
                 "secrets.private_key",
+                "unicode.bidi_controls",
                 "unicode.invisible_characters",
                 "unicode.tag_smuggling",
             ),
@@ -46,6 +48,7 @@ class ScannerTests(unittest.TestCase):
             config=RuleScannerConfig(
                 enable_invisible_characters=False,
                 enable_unicode_tag_smuggling=False,
+                enable_bidi_controls=False,
                 enable_payment_cards=False,
                 enable_private_keys=False,
                 enable_jwt_tokens=False,
@@ -133,6 +136,7 @@ class ScannerTests(unittest.TestCase):
         for field_name in (
             "enable_invisible_characters",
             "enable_unicode_tag_smuggling",
+            "enable_bidi_controls",
             "enable_payment_cards",
             "enable_private_keys",
             "enable_jwt_tokens",

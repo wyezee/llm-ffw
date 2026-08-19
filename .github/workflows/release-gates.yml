@@ -82,6 +82,18 @@ jobs:
           --max-peak-mib 128
           --min-process-requests-per-second 0.7
 
+      - name: Run bidirectional-control production envelope
+        run: >-
+          python benchmarks/bench_bidi_controls.py
+          --size 8000000
+          --rounds 3
+          --workers 2
+          --concurrency 4
+          --process-requests 8
+          --min-throughput-mib-s 3
+          --max-peak-mib 128
+          --min-process-requests-per-second 0.5
+
       - name: Run JSON-output production envelope
         run: >-
           python benchmarks/bench_json_output.py

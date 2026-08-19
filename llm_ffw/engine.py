@@ -8,6 +8,7 @@ from .inspection import InspectionFeature, ScanScope, build_inspection
 from .redaction import sanitize_findings
 from .rules.base import Rule, RuleMatch
 from .rules.banned_substrings import BannedSubstringsRule
+from .rules.bidi_control import BidiControlRule
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.ip_address import IPAddressRule
 from .rules.mac_address import MACAddressRule
@@ -40,6 +41,8 @@ class RuleScanner:
 
         if rules is None:
             defaults: list[Rule] = [SecretsRule()]
+            if self._config.enable_bidi_controls:
+                defaults.append(BidiControlRule())
             if self._config.enable_invisible_characters:
                 defaults.append(InvisibleCharactersRule())
             if self._config.enable_unicode_tag_smuggling:
@@ -89,7 +92,11 @@ class RuleScanner:
             sorted(rule_contracts, key=lambda item: item[0].rule_id)
         )
         self._rules = tuple(item[0] for item in self._rule_contracts)
-        canonicalizer_types = (InvisibleCharactersRule, UnicodeTagSmugglingRule)
+        canonicalizer_types = (
+            BidiControlRule,
+            InvisibleCharactersRule,
+            UnicodeTagSmugglingRule,
+        )
         self._canonicalizer_contracts = tuple(
             contract
             for contract in self._rule_contracts
@@ -102,6 +109,7 @@ class RuleScanner:
         )
         staged_safe_types = (
             BannedSubstringsRule,
+            BidiControlRule,
             InvisibleCharactersRule,
             IPAddressRule,
             MACAddressRule,

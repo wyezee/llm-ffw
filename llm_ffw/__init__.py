@@ -102,6 +102,7 @@ from .tool_result import (
 from .rules.invisible_characters import InvisibleCharactersRule
 from .rules.unicode_tag_smuggling import UnicodeTagSmugglingRule
 from .rules.banned_substrings import BannedSubstringsRule
+from .rules.bidi_control import BidiControlRule
 from .rules.json_output import JSONOutputRule
 from .rules.ip_address import IPAddressRule
 from .rules.mac_address import MACAddressRule
@@ -128,6 +129,7 @@ __all__ = [
     "BannedSubstringCatalog",
     "BannedSubstringCatalogCapability",
     "BannedSubstringsRule",
+    "BidiControlRule",
     "BUILTIN_SECRET_CATALOG",
     "ContentBlockedError",
     "EmailAddressCapability",

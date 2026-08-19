@@ -128,7 +128,7 @@ class AllRulesBenchmarkTests(unittest.TestCase):
             request_timeout=30,
         )
 
-        self.assertEqual(result.enabled_text_rules, 17)
+        self.assertEqual(result.enabled_text_rules, 18)
         self.assertEqual(result.completed, 1)
         self.assertEqual(result.rejected + result.timed_out + result.failed, 0)
         self.assertEqual(set(result.finding_counts), {item.rule_id for item in sparse.expected})
@@ -151,11 +151,12 @@ class AllRulesBenchmarkTests(unittest.TestCase):
             rule_set="default",
         )
 
-        self.assertEqual(result.enabled_text_rules, 6)
+        self.assertEqual(result.enabled_text_rules, 7)
         self.assertEqual(
             set(result.finding_counts),
             {
                 "secrets.detected",
+                "unicode.bidi_controls",
                 "unicode.invisible_characters",
                 "unicode.tag_smuggling",
                 "pii.payment_card",

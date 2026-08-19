@@ -5,10 +5,12 @@ scanning inputs entering and outputs leaving an LLM runtime.
 
 The default scanner ships a secure baseline: `SecretsRule`, input-only
 `InvisibleCharactersRule`, input-only `UnicodeTagSmugglingRule`,
-`PaymentCardRule`, `PrivateKeyRule`, and `JWTTokenRule`. It detects constrained
+both-scope `BidiControlRule`, `PaymentCardRule`, `PrivateKeyRule`, and
+`JWTTokenRule`. It detects constrained
 credential formats, armored private-key blocks, and structurally credible
 compact JWTs; canonicalizes contextual U+200B token obfuscation and non-RGI
-Unicode tag runs; and redacts Luhn-valid payment-card candidates. Findings
+Unicode tag runs; removes directional overrides while reporting other explicit
+bidi controls; and redacts Luhn-valid payment-card candidates. Findings
 retain original-text spans and safe category metadata rather than matched
 values.
 
@@ -46,13 +48,14 @@ conservative exact character, token, and line runs.
 `BALANCED_POLICY` is the default. Scope below means the scope selected by the
 normal configuration or `FirewallConfig.all_text_rules()`; configurable rules
 can be narrowed, and the input-only PII defaults can explicitly enable output
-inspection. The library exposes 17 text rules plus two structured validators:
+inspection. The library exposes 18 text rules plus two structured validators:
 
 | Rule | Activation | Default scope | Balanced handling | Policy choices |
 | --- | --- | --- | --- | --- |
 | `SecretsRule` | Default | Both | Redact | Standard¹ |
 | `InvisibleCharactersRule` | Default | Input | Remove² | Standard¹ |
 | `UnicodeTagSmugglingRule` | Default | Input | Remove² | Standard¹ |
+| `BidiControlRule` | Default | Both | Remove overrides; review other explicit controls² | Standard¹ |
 | `PaymentCardRule` | Default | Both | Redact | Standard¹ |
 | `PrivateKeyRule` | Default | Both | Redact | Standard¹ |
 | `JWTTokenRule` | Default | Both | Redact | Standard¹ |
@@ -575,10 +578,10 @@ with Firewall.from_config(config) as firewall:
     safe_prompt = firewall.sanitize_input(prompt)
 ```
 
-`default()` selects the six-rule baseline, `privacy_input()` additionally
+`default()` selects the seven-rule baseline, `privacy_input()` additionally
 enables conservative IP, MAC, IBAN, email, and phone input rules, and `json_api()`
 adds strict JSON-output and unsafe-URL inspection. `all_text_rules()` enables
-all 17 text rules, requires an explicit deployment-owned
+all 18 text rules, requires an explicit deployment-owned
 `BannedSubstringCatalog`, and uses a 30-second request timeout suitable for
 initial large-payload testing. Deployments must still tune that deadline from
 their own payload and latency measurements. Direct constructor parameters
@@ -612,8 +615,8 @@ The two secret-catalog parameters are mutually exclusive. Passing `None` for
 the opt-in banned-substring, JSON, unsafe-URL, IP-address, MAC-address, IBAN,
 Authorization-header, connection-string, email-address, phone-number, and repetition configurations leaves each corresponding
 rule disabled. Payment-card,
-private-key, JWT,
-invisible-character, and Unicode tag rules are enabled by `RuleScannerConfig`
+private-key, JWT, invisible-character, Unicode tag, and bidi-control rules are
+enabled by `RuleScannerConfig`
 defaults; their dedicated config objects customize bounds and scopes rather
 than enabling them.
 
@@ -676,6 +679,7 @@ Strict and audit policies can change the effective action.
 | `secrets.detected` | Enabled | Input/output | Redact | Secret catalog |
 | `unicode.invisible_characters` | Enabled | Input | Remove; block bounded overflow | `RuleScannerConfig` |
 | `unicode.tag_smuggling` | Enabled | Input | Remove; block bounded overflow | `RuleScannerConfig` |
+| `unicode.bidi_controls` | Enabled | Input/output | Remove overrides; review other explicit controls; block bounded overflow | `RuleScannerConfig` |
 | `pii.payment_card` | Enabled | Input/output | Redact | `PaymentCardConfig` |
 | `secrets.private_key` | Enabled | Input/output | Redact complete blocks; block unsafe malformed cases | `PrivateKeyConfig` |
 | `secrets.jwt_token` | Enabled | Input/output | Redact | `JWTTokenConfig` |
@@ -839,6 +843,20 @@ sequences pinned by Unicode Emoji 17.0 and treats malformed, extended, or other
 tag runs as findings. Applications can independently opt out with
 `RuleScannerConfig(enable_unicode_tag_smuggling=False)`. More than 64 relevant runs
 fails closed.
+
+### Default bidirectional-control inspection
+
+`BidiControlRule` inspects input and output for the nine explicit formatting
+controls defined by [Unicode Standard Annex #9](https://www.unicode.org/reports/tr9/).
+Balanced policy removes LRO and RLO directional overrides, then rescans the
+cleaned text through every enabled rule. It reports LRE, RLE, PDF, LRI, RLI,
+FSI, and PDI for review without changing the text because isolates and
+embeddings can be legitimate in plain multilingual content. LRM, RLM, and ALM
+are implicit directional marks and are deliberately preserved. Strict policy
+blocks every finding; audit policy only reviews. Applications can opt out with
+`RuleScannerConfig(enable_bidi_controls=False)`. More than 64 runs in either
+control group fails closed. This follows Unicode's guidance to treat bidi
+controls contextually rather than forbidding all directional formatting.
 
 ### Deployment-defined banned substrings
 
@@ -1369,6 +1387,7 @@ py -3.14 -m venv .venv
 .venv\Scripts\python benchmarks/bench_connection_strings.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_phone_numbers.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_repetition.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
+.venv\Scripts\python benchmarks/bench_bidi_controls.py --size 8000000 --rounds 3 --workers 2 --concurrency 4 --process-requests 8
 .venv\Scripts\python benchmarks/bench_tool_calls.py
 .venv\Scripts\python benchmarks/bench_tool_results.py
 .venv\Scripts\python tools/pii_accuracy_gate.py
@@ -1400,7 +1419,7 @@ optional expanded JSONL corpus is written under the ignored
 `benchmarks/generated/` directory, while the compact seed, group counts, and
 expected digest remain version controlled.
 
-The all-rules harness enables all 17 text rules in every worker and exercises
+The all-rules harness enables all 18 text rules in every worker and exercises
 clean input, multilingual code/log-like input, valid JSON output, invalid JSON
 output, sparse positives for every rule, dense bounded matches, and adversarial
 near-misses. It verifies exact rule IDs, spans, and

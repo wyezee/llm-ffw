@@ -16,6 +16,7 @@ BANNED_MARKER = "benchmark_forbidden_literal"
 ALL_TEXT_RULE_IDS = frozenset(
     {
         "secrets.detected",
+        "unicode.bidi_controls",
         "unicode.invisible_characters",
         "unicode.tag_smuggling",
         "pii.payment_card",
@@ -113,6 +114,15 @@ def _positive_input(size: int) -> TextScenario:
     parts: list[str] = []
     expected: list[ExpectedFinding] = []
     _append(parts, expected, "secrets.detected", "sk-" + "A" * 20, prefix="token=")
+    _append(
+        parts,
+        expected,
+        "unicode.bidi_controls",
+        "\u202e",
+        prefix="logical-order",
+        suffix="visible-order\n",
+        action="remove",
+    )
     _append(
         parts,
         expected,

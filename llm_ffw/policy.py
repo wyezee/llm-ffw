@@ -472,6 +472,7 @@ def _builtin_policy(
     *,
     input_action: Action,
     output_action: Action,
+    bidi_action: Action | None,
     invisible_action: Action | None,
     unicode_tag_action: Action | None,
     json_output_action: Action,
@@ -487,6 +488,18 @@ def _builtin_policy(
     private_key_action: Action,
     jwt_token_action: Action,
 ) -> FirewallPolicy:
+    bidi_overrides = (
+        tuple(
+            PolicyOverride(
+                "unicode.bidi_controls",
+                scope,
+                bidi_action,
+            )
+            for scope in (ScanScope.INPUT, ScanScope.OUTPUT)
+        )
+        if bidi_action is not None
+        else ()
+    )
     invisible_overrides = (
         (
             PolicyOverride(
@@ -511,10 +524,11 @@ def _builtin_policy(
     )
     return FirewallPolicy(
         policy_id=policy_id,
-        version="1.14.0",
+        version="1.15.0",
         overrides=(
             PolicyOverride("secrets.detected", ScanScope.INPUT, input_action),
             PolicyOverride("secrets.detected", ScanScope.OUTPUT, output_action),
+            *bidi_overrides,
             *invisible_overrides,
             *unicode_tag_overrides,
             PolicyOverride(
@@ -640,6 +654,7 @@ BALANCED_POLICY = _builtin_policy(
     "llm_ffw.balanced",
     input_action=Action.REDACT,
     output_action=Action.REDACT,
+    bidi_action=None,
     invisible_action=None,
     unicode_tag_action=None,
     json_output_action=Action.BLOCK,
@@ -659,6 +674,7 @@ STRICT_POLICY = _builtin_policy(
     "llm_ffw.strict",
     input_action=Action.BLOCK,
     output_action=Action.REDACT,
+    bidi_action=Action.BLOCK,
     invisible_action=Action.BLOCK,
     unicode_tag_action=Action.BLOCK,
     json_output_action=Action.BLOCK,
@@ -678,6 +694,7 @@ AUDIT_POLICY = _builtin_policy(
     "llm_ffw.audit",
     input_action=Action.REVIEW,
     output_action=Action.REVIEW,
+    bidi_action=Action.REVIEW,
     invisible_action=Action.REVIEW,
     unicode_tag_action=Action.REVIEW,
     json_output_action=Action.REVIEW,
@@ -714,6 +731,7 @@ class RuleEngine:
             supported_rule_ids=frozenset(
                 (
                     "secrets.detected",
+                    "unicode.bidi_controls",
                     "unicode.invisible_characters",
                     "unicode.tag_smuggling",
                     "output.json.validity",

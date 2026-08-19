@@ -9,6 +9,7 @@ class RuleScannerConfig:
 
     max_input_chars: int = 8_000_000
     redaction_text: str = "[REDACTED]"
+    enable_bidi_controls: bool = True
     enable_invisible_characters: bool = True
     enable_unicode_tag_smuggling: bool = True
     enable_payment_cards: bool = True
@@ -26,6 +27,8 @@ class RuleScannerConfig:
             raise TypeError("redaction_text must be a string")
         if not self.redaction_text:
             raise ValueError("redaction_text must not be empty")
+        if not isinstance(self.enable_bidi_controls, bool):
+            raise TypeError("enable_bidi_controls must be a boolean")
         if not isinstance(self.enable_invisible_characters, bool):
             raise TypeError("enable_invisible_characters must be a boolean")
         if not isinstance(self.enable_unicode_tag_smuggling, bool):

@@ -4,6 +4,7 @@ from typing import assert_type
 
 from llm_ffw import (
     AsyncFirewall,
+    BidiControlRule,
     ConnectionStringConfig,
     EmailAddressConfig,
     Finding,
@@ -44,6 +45,7 @@ assert_type(
 )
 
 engine = RuleEngine()
+assert_type(BidiControlRule().rule_id, str)
 assert_type(engine.process("synthetic"), FirewallResult)
 assert_type(
     engine.stream(mode=StreamMode.AUTO),

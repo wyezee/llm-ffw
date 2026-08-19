@@ -4,6 +4,13 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Added
+
+- Add default `BidiControlRule` for both input and output: balanced policy
+  removes Unicode directional overrides and reviews other explicit bidi
+  formatting controls, with bounded findings, remove-and-rescan enforcement,
+  disclosure-safe metadata, and an 8 MB benchmark.
+
 ## 0.14.0 - 2026-08-19
 
 ### Added
