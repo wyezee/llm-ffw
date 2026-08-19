@@ -51,6 +51,7 @@ from llm_ffw import (
     PhoneNumberRule,
     RepetitionConfig,
     RepetitionRule,
+    RuleActivation,
     ScanScope,
     RuleScanner,
     RuleScannerConfig,
@@ -63,6 +64,9 @@ from llm_ffw import (
     ToolResultBatch,
     ToolResultRule,
     UnsafeURLConfig,
+    available_presets,
+    available_rules,
+    config_from_preset,
 )
 from llm_ffw.rules import SecretsRule
 
@@ -107,6 +111,33 @@ for public_method in (
 assert SanitizationResult.__module__ == "llm_ffw.facade"
 assert FirewallConfig.__module__ == "llm_ffw.facade_config"
 assert FirewallStream.__module__ == "llm_ffw.streaming"
+rule_descriptors = available_rules()
+assert len(rule_descriptors) == 22
+assert tuple(item.rule_id for item in rule_descriptors) == tuple(
+    sorted(item.rule_id for item in rule_descriptors)
+)
+assert {
+    item.rule_id
+    for item in rule_descriptors
+    if item.requires_deployment_value
+} == {"content.banned_substrings", "tools.call.validity"}
+assert next(
+    item for item in rule_descriptors if item.rule_id == "tools.call.validity"
+).activation is RuleActivation.EXPLICIT
+preset_descriptors = available_presets()
+assert tuple(item.preset_id for item in preset_descriptors) == (
+    "all-text",
+    "default",
+    "json-api",
+    "privacy-input",
+)
+all_text_descriptor = preset_descriptors[0]
+assert len(all_text_descriptor.rules) == 19
+assert all(
+    item.rule_id != "content.banned_substrings"
+    for item in all_text_descriptor.rules
+)
+assert config_from_preset("all-text") == FirewallConfig.all_text_rules()
 facade_parameters = signature(Firewall).parameters
 assert "additional_secret_catalog" in facade_parameters
 assert "replacement_secret_catalog" in facade_parameters

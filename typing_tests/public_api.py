@@ -16,6 +16,8 @@ from llm_ffw import (
     FirewallStream,
     IPAddressConfig,
     PhoneNumberConfig,
+    PresetDescriptor,
+    RuleDescriptor,
     RuleEngine,
     SanitizationResult,
     StreamMode,
@@ -23,6 +25,9 @@ from llm_ffw import (
     ToolCallRule,
     ToolDefinition,
     UnsafeURLConfig,
+    available_presets,
+    available_rules,
+    config_from_preset,
 )
 
 
@@ -40,6 +45,9 @@ config = FirewallConfig(
     ),
 )
 firewall = Firewall.from_config(config)
+assert_type(available_rules(), tuple[RuleDescriptor, ...])
+assert_type(available_presets(), tuple[PresetDescriptor, ...])
+assert_type(config_from_preset("privacy-input"), FirewallConfig)
 assert_type(firewall.sanitize_input("synthetic@example.com"), str)
 assert_type(
     firewall.sanitize_input_result("synthetic@example.com"),

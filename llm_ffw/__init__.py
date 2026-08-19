@@ -36,6 +36,15 @@ from .facade import (
     SanitizationResult,
 )
 from .facade_config import FirewallConfig
+from .discovery import (
+    PresetDescriptor,
+    PresetRuleDescriptor,
+    RuleActivation,
+    RuleDescriptor,
+    available_presets,
+    available_rules,
+    config_from_preset,
+)
 from .inspection import (
     Inspection,
     InspectionFeature,
@@ -193,7 +202,11 @@ __all__ = [
     "ProcessPoolState",
     "ProcessScannerPool",
     "ProcessScannerPoolConfig",
+    "PresetDescriptor",
+    "PresetRuleDescriptor",
     "RuleCapability",
+    "RuleActivation",
+    "RuleDescriptor",
     "PolicyOverride",
     "PaymentCardCapability",
     "PaymentCardConfig",
@@ -239,6 +252,9 @@ __all__ = [
     "UnsafeURLCapability",
     "UnsafeURLConfig",
     "UnsafeURLRule",
+    "available_presets",
+    "available_rules",
+    "config_from_preset",
 ]
 
 __version__ = "0.17.1"

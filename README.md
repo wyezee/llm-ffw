@@ -31,6 +31,7 @@ URLs before a host renders them.
 ## Contents
 
 - [Rule coverage and policy](#rule-coverage-and-policy)
+- [Rule and preset discovery](#rule-and-preset-discovery)
 - [Security boundary and limitations](#security-boundary-and-limitations)
 - [Installation and quick start](#installation-and-quick-start)
 - [Common recipes](#common-recipes)
@@ -91,6 +92,58 @@ overflow, or another resource-limit condition can produce a fail-closed
 
 The bundled alternatives are `STRICT_POLICY` and `AUDIT_POLICY`. A custom
 immutable `FirewallPolicy` provides finer per-rule, per-scope control.
+
+## Rule and preset discovery
+
+Applications and CLIs can inspect every built-in rule without importing the
+private registry or constructing a firewall. Results are immutable and sorted
+by their public identifiers. To inspect one instantiated configuration instead,
+use `Firewall.capabilities().rules`:
+
+```python
+from llm_ffw import (
+    FirewallConfig,
+    RuleActivation,
+    available_presets,
+    available_rules,
+    config_from_preset,
+)
+
+def main() -> None:
+    rules = available_rules()
+    assert len(rules) == 22
+    assert any(
+        rule.rule_id == "tools.call.validity"
+        and rule.activation is RuleActivation.EXPLICIT
+        and rule.requires_deployment_value
+        for rule in rules
+    )
+
+    preset_ids = tuple(preset.preset_id for preset in available_presets())
+    assert preset_ids == ("all-text", "default", "json-api", "privacy-input")
+    assert config_from_preset("privacy-input") == FirewallConfig.privacy_input()
+
+if __name__ == "__main__":
+    main()
+```
+
+`RuleDescriptor.supported_scopes` describes every scope a rule supports.
+`PresetDescriptor.rules` instead reports the scopes actually selected by that
+preset. The `all-text` preset guarantees the 19 self-contained text rules with
+balanced policy and requires valid JSON output. `content.banned_substrings`
+remains separately discoverable with `requires_deployment_value=True`; passing
+a deployment-owned catalog directly to `FirewallConfig.all_text_rules()` can
+enable it as the twentieth text rule without changing the named preset's
+metadata.
+
+`config_from_preset()` accepts only the four exact identifiers shown above and
+returns a new validated `FirewallConfig`. It does not deserialize arbitrary
+configuration mappings. Rule and preset IDs are public identifiers and will
+not be renamed or removed in patch or minor releases; an incompatible ID
+change requires a major release. Purpose wording, detection coverage, and
+preset membership may evolve, so consumers should inspect descriptors rather
+than parse human-readable purpose text. Discovery exposes no secret prefixes,
+detection patterns, matched values, or deployment catalog contents.
 
 ## Security boundary and limitations
 

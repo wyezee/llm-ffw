@@ -4,6 +4,12 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+### Added
+
+- Add immutable public discovery for all 22 built-in rules and four named
+  presets, including scope-accurate preset metadata and exact preset lookup
+  without exposing detection patterns or private registry types.
+
 ### Changed
 
 - Complete the public configuration and integration guidance with runnable
