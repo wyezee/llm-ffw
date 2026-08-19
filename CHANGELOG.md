@@ -4,6 +4,8 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.15.0 - 2026-08-19
+
 ### Added
 
 - Add opt-in output-only `ExternalResourceRule` for bounded inline Markdown

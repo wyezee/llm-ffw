@@ -132,7 +132,7 @@ Examples using an `Unreleased` API require the source checkout until the next
 package release.
 
 ```console
-python -m pip install llm-ffw==0.14.0
+python -m pip install llm-ffw==0.15.0
 ```
 
 Create one facade during application startup and reuse it for every request:
