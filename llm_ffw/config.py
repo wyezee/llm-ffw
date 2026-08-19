@@ -38,8 +38,4 @@ class RuleScannerConfig:
             raise TypeError("enable_jwt_tokens must be a boolean")
 
 
-# Compatibility alias retained through the pre-1.0 migration window.
-ScannerConfig = RuleScannerConfig
-
-
-__all__ = ["RuleScannerConfig", "ScannerConfig"]
+__all__ = ["RuleScannerConfig"]

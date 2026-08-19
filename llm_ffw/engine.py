@@ -279,8 +279,4 @@ class RuleScanner:
             raise ValueError("prompt_context exceeds max_input_chars")
 
 
-# Compatibility alias retained through the pre-1.0 migration window.
-Scanner = RuleScanner
-
-
-__all__ = ["RuleScanner", "Scanner"]
+__all__ = ["RuleScanner"]

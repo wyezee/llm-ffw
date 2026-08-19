@@ -11,6 +11,13 @@ import venv
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_VERSION = "0.13.0"
 SMOKE_CODE = """
+import llm_ffw
+import llm_ffw.async_facade as async_facade_module
+import llm_ffw.config as config_module
+import llm_ffw.engine as engine_module
+import llm_ffw.facade as facade_module
+import llm_ffw.manager as manager_module
+import llm_ffw.policy as policy_module
 from importlib.metadata import files, metadata, version
 from inspect import signature
 from typing import get_type_hints
@@ -19,8 +26,6 @@ from llm_ffw import (
     Action,
     AsyncFirewall,
     AsyncFirewallManager,
-    AsyncLLMFirewall,
-    AsyncLLMFirewallManager,
     AuthorizationHeaderConfig,
     AuthorizationHeaderRule,
     RuleEngine,
@@ -36,8 +41,6 @@ from llm_ffw import (
     MACAddressRule,
     Firewall,
     FirewallManager,
-    LLMFirewall,
-    LLMFirewallManager,
     PaymentCardRule,
     PhoneNumberConfig,
     PhoneNumberRule,
@@ -46,8 +49,6 @@ from llm_ffw import (
     ScanScope,
     RuleScanner,
     RuleScannerConfig,
-    Scanner,
-    ScannerConfig,
     SanitizationResult,
     StreamMode,
     ToolCall,
@@ -72,12 +73,23 @@ assert any(str(path) == "llm_ffw/py.typed" for path in files("llm-ffw"))
 assert Firewall.__module__ == "llm_ffw.facade"
 assert AsyncFirewall.__module__ == "llm_ffw.async_facade"
 assert AsyncFirewallManager.__module__ == "llm_ffw.async_facade"
-assert LLMFirewall is Firewall
-assert AsyncLLMFirewall is AsyncFirewall
-assert LLMFirewallManager is FirewallManager
-assert AsyncLLMFirewallManager is AsyncFirewallManager
-assert Scanner is RuleScanner
-assert ScannerConfig is RuleScannerConfig
+for module, name in (
+    (llm_ffw, "LLMFirewall"),
+    (llm_ffw, "AsyncLLMFirewall"),
+    (llm_ffw, "LLMFirewallManager"),
+    (llm_ffw, "AsyncLLMFirewallManager"),
+    (llm_ffw, "Scanner"),
+    (llm_ffw, "ScannerConfig"),
+    (facade_module, "LLMFirewall"),
+    (async_facade_module, "AsyncLLMFirewall"),
+    (async_facade_module, "AsyncLLMFirewallManager"),
+    (manager_module, "LLMFirewallManager"),
+    (engine_module, "Scanner"),
+    (config_module, "ScannerConfig"),
+    (policy_module, "Firewall"),
+):
+    assert not hasattr(module, name)
+    assert name not in module.__all__
 for public_method in (
     Firewall.sanitize_input,
     AsyncFirewall.sanitize_input,

@@ -819,15 +819,9 @@ class RuleEngine:
         )
 
 
-# Direct module imports retain the old low-level name during migration. At the
-# package root, ``Firewall`` now identifies the production facade.
-Firewall = RuleEngine
-
-
 __all__ = [
     "AUDIT_POLICY",
     "BALANCED_POLICY",
-    "Firewall",
     "FirewallPolicy",
     "FirewallResult",
     "PolicyOverride",

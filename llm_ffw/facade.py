@@ -572,14 +572,9 @@ class Firewall:
                 raise
 
 
-# Compatibility alias retained through the pre-1.0 migration window.
-LLMFirewall = Firewall
-
-
 __all__ = [
     "ContentBlockedError",
     "FirewallUnavailableError",
     "Firewall",
-    "LLMFirewall",
     "SanitizationResult",
 ]

@@ -10,6 +10,14 @@ All notable changes are recorded here before a tagged release.
   unsafe-URL rule, with construction-time normalization, disclosure-safe
   capability counts, process propagation, and 8 MB performance coverage.
 
+### Removed
+
+- Remove the deprecated pre-1.0 `LLMFirewall`, `AsyncLLMFirewall`,
+  `LLMFirewallManager`, `AsyncLLMFirewallManager`, `Scanner`, and
+  `ScannerConfig` aliases, plus the low-level `llm_ffw.policy.Firewall` alias.
+  Use `Firewall`, `AsyncFirewall`, `FirewallManager`,
+  `AsyncFirewallManager`, `RuleScanner`, `RuleScannerConfig`, and `RuleEngine`.
+
 ### Documentation
 
 - Add compile and public-import regression coverage for every README Python

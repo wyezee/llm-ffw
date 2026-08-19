@@ -573,14 +573,7 @@ class AsyncFirewallManager:
                 raise
 
 
-# Compatibility aliases retained through the pre-1.0 migration window.
-AsyncLLMFirewall = AsyncFirewall
-AsyncLLMFirewallManager = AsyncFirewallManager
-
-
 __all__ = [
     "AsyncFirewall",
     "AsyncFirewallManager",
-    "AsyncLLMFirewall",
-    "AsyncLLMFirewallManager",
 ]

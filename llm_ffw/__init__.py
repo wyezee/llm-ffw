@@ -23,14 +23,13 @@ from .banned_substring_catalog import (
     BannedSubstringCatalog,
     LiteralMatchMode,
 )
-from .config import RuleScannerConfig, ScannerConfig
-from .engine import RuleScanner, Scanner
+from .config import RuleScannerConfig
+from .engine import RuleScanner
 from .findings import Action, Finding, Severity, Span
 from .facade import (
     ContentBlockedError,
     Firewall,
     FirewallUnavailableError,
-    LLMFirewall,
     SanitizationResult,
 )
 from .facade_config import FirewallConfig
@@ -56,13 +55,10 @@ from .manager import (
     FirewallManager,
     FirewallManagerState,
     FirewallReloadError,
-    LLMFirewallManager,
 )
 from .async_facade import (
     AsyncFirewall,
     AsyncFirewallManager,
-    AsyncLLMFirewall,
-    AsyncLLMFirewallManager,
 )
 from .policy import (
     AUDIT_POLICY,
@@ -124,8 +120,6 @@ __all__ = [
     "AUDIT_POLICY",
     "AsyncFirewall",
     "AsyncFirewallManager",
-    "AsyncLLMFirewall",
-    "AsyncLLMFirewallManager",
     "BALANCED_POLICY",
     "BannedSubstring",
     "BannedSubstringCatalog",
@@ -169,8 +163,6 @@ __all__ = [
     "AuthorizationHeaderRule",
     "MACAddressConfig",
     "MACAddressRule",
-    "LLMFirewall",
-    "LLMFirewallManager",
     "LiteralMatchMode",
     "ProcessPoolNotRunningError",
     "ProcessPoolSaturatedError",
@@ -194,8 +186,6 @@ __all__ = [
     "RuleEngine",
     "RuleScanner",
     "RuleScannerConfig",
-    "Scanner",
-    "ScannerConfig",
     "ScanScope",
     "SanitizationResult",
     "SecretCatalog",

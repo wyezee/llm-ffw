@@ -486,13 +486,8 @@ class FirewallManager:
                 raise
 
 
-# Compatibility alias retained through the pre-1.0 migration window.
-LLMFirewallManager = FirewallManager
-
-
 __all__ = [
     "FirewallManager",
     "FirewallManagerState",
     "FirewallReloadError",
-    "LLMFirewallManager",
 ]

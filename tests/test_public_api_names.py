@@ -1,22 +1,23 @@
 from inspect import signature
 import unittest
 
+import llm_ffw
+import llm_ffw.async_facade as async_facade_module
+import llm_ffw.config as config_module
+import llm_ffw.engine as engine_module
+import llm_ffw.facade as facade_module
+import llm_ffw.manager as manager_module
+import llm_ffw.policy as policy_module
+
 from llm_ffw import (
     AsyncFirewall,
     AsyncFirewallManager,
-    AsyncLLMFirewall,
-    AsyncLLMFirewallManager,
     Firewall,
     FirewallManager,
-    LLMFirewall,
-    LLMFirewallManager,
     RuleEngine,
     RuleScanner,
     RuleScannerConfig,
-    Scanner,
-    ScannerConfig,
 )
-from llm_ffw.policy import Firewall as ModulePolicyFirewall
 
 
 class PublicAPINameTests(unittest.TestCase):
@@ -27,19 +28,36 @@ class PublicAPINameTests(unittest.TestCase):
         self.assertEqual(RuleEngine.__module__, "llm_ffw.policy")
         self.assertEqual(RuleScanner.__name__, "RuleScanner")
         self.assertEqual(RuleScanner.__module__, "llm_ffw.engine")
+        self.assertEqual(AsyncFirewall.__module__, "llm_ffw.async_facade")
+        self.assertEqual(
+            AsyncFirewallManager.__module__,
+            "llm_ffw.async_facade",
+        )
+        self.assertEqual(FirewallManager.__module__, "llm_ffw.manager")
+        self.assertEqual(RuleScannerConfig.__module__, "llm_ffw.config")
         self.assertNotIn("scanner", signature(Firewall).parameters)
         self.assertIn("scanner", signature(RuleEngine).parameters)
 
-    def test_non_conflicting_legacy_names_are_identity_aliases(self) -> None:
-        self.assertIs(LLMFirewall, Firewall)
-        self.assertIs(AsyncLLMFirewall, AsyncFirewall)
-        self.assertIs(LLMFirewallManager, FirewallManager)
-        self.assertIs(AsyncLLMFirewallManager, AsyncFirewallManager)
-        self.assertIs(Scanner, RuleScanner)
-        self.assertIs(ScannerConfig, RuleScannerConfig)
-
-    def test_low_level_module_compatibility_has_explicit_root_name(self) -> None:
-        self.assertIs(ModulePolicyFirewall, RuleEngine)
+    def test_pre_one_compatibility_aliases_are_removed(self) -> None:
+        removed_by_module = (
+            (llm_ffw, "LLMFirewall"),
+            (llm_ffw, "AsyncLLMFirewall"),
+            (llm_ffw, "LLMFirewallManager"),
+            (llm_ffw, "AsyncLLMFirewallManager"),
+            (llm_ffw, "Scanner"),
+            (llm_ffw, "ScannerConfig"),
+            (facade_module, "LLMFirewall"),
+            (async_facade_module, "AsyncLLMFirewall"),
+            (async_facade_module, "AsyncLLMFirewallManager"),
+            (manager_module, "LLMFirewallManager"),
+            (engine_module, "Scanner"),
+            (config_module, "ScannerConfig"),
+            (policy_module, "Firewall"),
+        )
+        for module, name in removed_by_module:
+            with self.subTest(module=module.__name__, name=name):
+                self.assertFalse(hasattr(module, name))
+                self.assertNotIn(name, module.__all__)
 
 
 if __name__ == "__main__":
