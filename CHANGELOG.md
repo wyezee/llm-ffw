@@ -4,6 +4,14 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.17.1 - 2026-08-19
+
+### Fixed
+
+- Stabilize the cross-platform tool-call performance gate at a still-bounded
+  20,000 valid calls per second so hosted-runner CPU variance does not reject
+  otherwise unchanged runtime behavior.
+
 ## 0.17.0 - 2026-08-19
 
 ### Added
