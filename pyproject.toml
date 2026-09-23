@@ -19,6 +19,13 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
 ]
 
+[project.urls]
+Homepage = "https://github.com/wyezee/llm-ffw"
+Repository = "https://github.com/wyezee/llm-ffw"
+Issues = "https://github.com/wyezee/llm-ffw/issues"
+Changelog = "https://github.com/wyezee/llm-ffw/blob/master/CHANGELOG.md"
+Examples = "https://github.com/wyezee/llm-ffw/blob/master/EXAMPLES.md"
+
 [tool.setuptools.packages.find]
 include = ["llm_ffw*"]
 

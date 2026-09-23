@@ -212,7 +212,7 @@ The entry-point guard is required because the facade uses worker processes.
 Long-lived services should call `start()` and `close()` from their lifecycle
 hooks instead of constructing a facade per request.
 See the complete, provider-neutral
-[model I/O hook example](EXAMPLES.md#reusable-model-io-hook).
+[model I/O hook example](https://github.com/wyezee/llm-ffw/blob/master/EXAMPLES.md#reusable-model-io-hook).
 
 ## Common recipes
 
@@ -657,7 +657,7 @@ strict = FirewallConfig.all_text_rules(policy=STRICT_POLICY)
 audit = FirewallConfig.all_text_rules(policy=AUDIT_POLICY)
 ```
 
-See the [complete full-coverage example](EXAMPLES.md#enable-every-text-rule).
+See the [complete full-coverage example](https://github.com/wyezee/llm-ffw/blob/master/EXAMPLES.md#enable-every-text-rule).
 
 Balanced handling redacts or removes findings where that operation is safe,
 while invalid JSON still blocks and excessive repetition remains review-only.
@@ -903,7 +903,7 @@ structured zero-width finding without dynamic IDs, names, keys, or values.
 `enforce()` raises `ToolResultBlockedError`, while `validate()` returns the
 finding tuple for hosts that apply enforcement themselves.
 
-See the [complete structured-tool example](EXAMPLES.md#validate-structured-tool-traffic).
+See the [complete structured-tool example](https://github.com/wyezee/llm-ffw/blob/master/EXAMPLES.md#validate-structured-tool-traffic).
 
 ### Default invisible-character canonicalization
 
@@ -1535,7 +1535,7 @@ with Python 3.14.7 using a local `.venv`:
 
 ```console
 py -3.14 -m venv .venv
-.venv\Scripts\python -m pip install ruff==0.16.3 mypy==2.3.0
+.venv\Scripts\python -m pip install ruff==0.16.8 mypy==2.3.1
 .venv\Scripts\python -m ruff check llm_ffw tests benchmarks tools typing_tests
 .venv\Scripts\python -m mypy
 .venv\Scripts\python -m unittest discover -s tests -v
@@ -1646,5 +1646,5 @@ unhealthy.
 ## License
 
 LLM FFW is licensed under the
-[Apache License 2.0](LICENSE), including its explicit contributor patent grant
+[Apache License 2.0](https://github.com/wyezee/llm-ffw/blob/master/LICENSE), including its explicit contributor patent grant
 and patent-litigation termination terms.

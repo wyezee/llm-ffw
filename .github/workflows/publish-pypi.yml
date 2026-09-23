@@ -48,7 +48,7 @@ jobs:
           assert actual == expected, f'release tag {actual!r} does not match {expected!r}'"
 
       - name: Install packaging tools
-        run: python -m pip install --disable-pip-version-check build==1.5.0 twine==7.0.0
+        run: python -m pip install --disable-pip-version-check build==1.6.1 twine==7.0.0
 
       - name: Run release validation
         run: |
