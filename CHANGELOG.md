@@ -4,6 +4,20 @@ All notable changes are recorded here before a tagged release.
 
 ## Unreleased
 
+## 0.18.1 - 2026-09-23
+
+### Fixed
+
+- Use absolute repository links for examples and the license so the long
+  description renders correctly on PyPI.
+- Publish repository, issue tracker, changelog, and example URLs in package
+  metadata.
+
+### Changed
+
+- Refresh the pinned Ruff, mypy, and build tooling used by CI, local
+  validation guidance, and the trusted publishing workflow.
+
 ## 0.18.0 - 2026-08-19
 
 ### Added
